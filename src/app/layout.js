@@ -5,6 +5,7 @@ import AuthGuard from "../components/auth/AuthGuard";
 import ToastContainerClient from "../components/common/ToastContainerClient";
 import { CustomerAddressProvider } from "../context/CustomerAddressContext";
 import { StageProvider } from "../context/StageContext";
+// import FCMProvider from "../components/FCMProvider";
 import "react-toastify/dist/ReactToastify.css";
 
 // Use local system fonts instead of Google Fonts

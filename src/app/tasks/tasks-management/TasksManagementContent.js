@@ -82,10 +82,10 @@ export default function TasksManagementContent() {
     setCurrentUser(getCurrentUser());
   }, []);
 
-  // 🔥 LOAD DEPARTMENTS - Only for ADMIN/MANAGER
+  // 🔥 LOAD DEPARTMENTS - For ADMIN/MANAGER/TL (cross-department task creation)
   useEffect(() => {
     if (!currentUser) return;
-    if (currentUser.role === 'ADMIN' || currentUser.role === 'MANAGER') {
+    if (currentUser.role === 'ADMIN' || currentUser.role === 'MANAGER' || currentUser.role === 'TL') {
       loadDepartments();
     }
   }, [currentUser]);
@@ -113,8 +113,10 @@ export default function TasksManagementContent() {
   const loadDepartments = async () => {
     try {
       const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080';
+      console.log('🔍 Loading departments from:', `${API_BASE_URL}/api/stages/departments`);
       const response = await fetch(`${API_BASE_URL}/api/stages/departments`);
       const data = await response.json();
+      console.log('🔍 Departments loaded:', data);
       setDepartments(data || []);
     } catch (error) {
       console.error("Failed to load departments:", error);
@@ -139,6 +141,8 @@ export default function TasksManagementContent() {
       setCustomFields([]);
       
       console.log('Department tasks loaded:', tasksData?.length || 0, 'tasks');
+      console.log('🔍 Employees loaded for task assignment:', employeesData?.length || 0, 'employees');
+      console.log('🔍 Sample employee data:', employeesData?.[0]); // Debug first employee
     } catch (error) {
       console.error("Failed to load data:", error);
       toast.error(error.message || "Failed to load tasks");
@@ -211,10 +215,10 @@ export default function TasksManagementContent() {
         </div>
       </div>
     ) : (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-slate-50 p-6">
-      <div className="max-w-7xl mx-auto">
+    <div className="w-full">
+      <div className="max-w-7xl mx-auto px-0">
         {/* Header */}
-        <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-6">
           <div>
             <h1 className="text-3xl font-bold text-slate-900">Tasks Management</h1>
             <p className="text-slate-600">
@@ -232,7 +236,7 @@ export default function TasksManagementContent() {
         </div>
 
         {/* Filters */}
-        <div className="mb-6 bg-white rounded-xl shadow-sm p-4 border border-slate-200">
+        <div className="mb-6 bg-white rounded-xl shadow-sm p-4 border border-slate-200 mx-6">
           <div className="flex flex-col lg:flex-row gap-4">
             <div className="flex-1">
               <div className="relative">
@@ -309,7 +313,7 @@ export default function TasksManagementContent() {
 
         {/* Loading */}
         {loading && (
-          <div className="flex justify-center items-center py-12">
+          <div className="flex justify-center items-center py-12 mx-6">
             <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-slate-200 border-t-indigo-600"></div>
             <p className="mt-2 text-slate-600">Loading tasks...</p>
           </div>
@@ -320,7 +324,7 @@ export default function TasksManagementContent() {
           <>
             {viewMode === "table" ? (
               /* Table View */
-              <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+              <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mx-6">
                 <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-slate-200">
                     <thead className="bg-slate-50 border-b border-slate-200">
@@ -391,7 +395,7 @@ export default function TasksManagementContent() {
               </div>
             ) : (
               /* Card View */
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mx-6">
                 {filteredTasks.map((task) => (
                   <div key={task.id} className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition-shadow">
                     <div className="flex justify-between items-start mb-4">
@@ -447,7 +451,7 @@ export default function TasksManagementContent() {
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="mt-4 flex justify-center items-center gap-2">
+          <div className="mt-4 flex justify-center items-center gap-2 mx-6">
             <button
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
               disabled={currentPage === 1}
@@ -535,6 +539,8 @@ export default function TasksManagementContent() {
 
 // Task Modal Component
 function TaskModal({ task, employees, customFields, departments, currentUser, onClose, onSave }) {
+  console.log('🔍 TaskModal received departments:', departments);
+  console.log('🔍 TaskModal received currentUser:', currentUser);
   const [formData, setFormData] = useState({
     taskName: "",
     taskDescription: "",
@@ -566,10 +572,8 @@ function TaskModal({ task, employees, customFields, departments, currentUser, on
     required: false,
   });
 
-  // 🔥 FILTERED EMPLOYEES - Based on selected department
-  const filteredEmployees = formData.department
-    ? employees.filter(emp => emp.departmentName === formData.department)
-    : employees;
+  // 🔥 ALL EMPLOYEES - Show all employees regardless of department (for cross-department assignment)
+  const filteredEmployees = employees; // Show all employees for cross-department task assignment
 
   useEffect(() => {
     // ✅ Initialize modalCustomFields from parent props
@@ -609,10 +613,10 @@ function TaskModal({ task, employees, customFields, departments, currentUser, on
         emptyMap[field.id] = "";
       });
       
-      // Only auto-fill department for TL/EMPLOYEE (not for ADMIN/MANAGER)
-      const initialDepartment = (currentUser?.role === 'TL' || currentUser?.role === 'EMPLOYEE') 
+      // Only auto-fill department for EMPLOYEE only (not for ADMIN/MANAGER/TL)
+      const initialDepartment = (currentUser?.role === 'EMPLOYEE') 
         ? currentUser?.department || ""
-        : ""; // ADMIN/MANAGER start with empty department
+        : ""; // ADMIN/MANAGER/TL start with empty department to allow cross-department selection
       
       console.log('CREATE MODE - User role:', currentUser?.role, 'Initial department:', initialDepartment);
       
@@ -891,34 +895,40 @@ function TaskModal({ task, employees, customFields, departments, currentUser, on
               />
             </div>
 
-            {/* 🔥 DEPARTMENT FIELD - Role-based behavior */}
+            {/* DEPARTMENT FIELD - Role-based behavior */}
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
                 Department <span className="text-red-500">*</span>
               </label>
-              {(currentUser?.role === 'ADMIN' || currentUser?.role === 'MANAGER') ? (
-                // ADMIN/MANAGER: Editable dropdown
-                <select
-                  name="department"
-                  value={formData.department}
-                  onChange={handleInputChange}
-                  required
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 focus:border-indigo-500 focus:ring-indigo-500"
-                >
-                  <option value="">Select department</option>
-                  {departments?.map(dept => (
-                    <option key={dept} value={dept}>{dept}</option>
-                  ))}
-                </select>
+              {(currentUser?.role === 'ADMIN' || currentUser?.role === 'MANAGER' || currentUser?.role === 'TL') ? (
+                // ADMIN/MANAGER/TL: Editable dropdown for cross-department task creation
+                <>
+                  <select
+                    name="department"
+                    value={formData.department}
+                    onChange={handleInputChange}
+                    required
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 focus:border-indigo-500 focus:ring-indigo-500"
+                  >
+                    <option value="">Select target department</option>
+                    {departments?.map(dept => (
+                      <option key={dept} value={dept}>{dept}</option>
+                    ))}
+                  </select>
+                  {console.log('🔍 Rendering department dropdown, departments count:', departments?.length)}
+                  {departments?.length === 0 && (
+                    <p className="text-xs text-red-600 mt-1">No departments loaded. Check console for errors.</p>
+                  )}
+                </>
               ) : (
-                // TL/EMPLOYEE: Disabled input
+                // EMPLOYEE: Disabled input (only EMPLOYEEs cannot choose department)
                 <input
                   type="text"
                   name="department"
                   value={formData.department}
                   disabled
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 bg-slate-100 text-slate-600 cursor-not-allowed"
-                  placeholder="Auto-filled from your profile"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 bg-slate-50 text-slate-600"
+                  placeholder="Your department"
                 />
               )}
             </div>
@@ -932,21 +942,59 @@ function TaskModal({ task, employees, customFields, departments, currentUser, on
                 value={formData.assignedToEmployeeId}
                 onChange={handleInputChange}
                 required
-                disabled={!formData.department}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 focus:border-indigo-500 focus:ring-indigo-500 disabled:bg-slate-100"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 focus:border-indigo-500 focus:ring-indigo-500"
               >
-                <option value="">
-                  {!formData.department ? "Select department first" : "Select employee"}
-                </option>
-                {filteredEmployees.map(emp => (
-                  <option key={emp.id} value={emp.id}>
-                    {emp.firstName} {emp.lastName} ({emp.departmentName})
-                  </option>
-                ))}
+                <option value="">Select employee</option>
+                {filteredEmployees.map(emp => {
+                  // Debug employee data
+                  console.log('🔍 Processing employee:', {
+                    id: emp.id,
+                    name: `${emp.firstName} ${emp.lastName}`,
+                    roleName: emp.roleName,
+                    departmentName: emp.departmentName,
+                    tlId: emp.tlId,
+                    tlFullName: emp.tlFullName,
+                    tlFirstName: emp.tlFirstName,
+                    tlLastName: emp.tlLastName
+                  });
+                  
+                  // Format like Organization page: Role + Department + TL mapping
+                  let displayText = `${emp.firstName} ${emp.lastName}`;
+                  
+                  // Add role
+                  if (emp.roleName) {
+                    displayText += ` (${emp.roleName}`;
+                  } else {
+                    displayText += ` (Employee`;
+                  }
+                  
+                  // Add department
+                  if (emp.departmentName) {
+                    displayText += ` - ${emp.departmentName}`;
+                  }
+                  
+                  // Add TL mapping for employees
+                  if (emp.roleName === 'EMPLOYEE' && emp.tlId && emp.tlFullName) {
+                    displayText += `, TL: ${emp.tlFullName}`;
+                  } else if (emp.roleName === 'EMPLOYEE' && emp.tlId && (emp.tlFirstName || emp.tlLastName)) {
+                    const tlName = `${emp.tlFirstName || ''} ${emp.tlLastName || ''}`.trim();
+                    if (tlName) {
+                      displayText += `, TL: ${tlName}`;
+                    }
+                  }
+                  
+                  displayText += ')';
+                  
+                  return (
+                    <option key={emp.id} value={emp.id}>
+                      {displayText}
+                    </option>
+                  );
+                })}
               </select>
-              {formData.department && filteredEmployees.length === 0 && (
+              {filteredEmployees.length === 0 && (
                 <p className="text-xs text-amber-600 mt-1">
-                  No employees found in {formData.department} department
+                  No employees available
                 </p>
               )}
             </div>

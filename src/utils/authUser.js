@@ -5,6 +5,8 @@
  * 🔥 CACHED to prevent infinite React loops
  */
 
+import { getTabSafeItem } from "./tabSafeStorage";
+
 let cachedUser = null;
 let cacheTimestamp = 0;
 const CACHE_DURATION = 5000; // 5 seconds
@@ -19,7 +21,7 @@ export const getAuthUser = () => {
   }
 
   try {
-    const raw = localStorage.getItem("user_data");
+    const raw = getTabSafeItem("user_data");
     if (!raw) {
       cachedUser = null;
       return null;

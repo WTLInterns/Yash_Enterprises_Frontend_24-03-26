@@ -200,7 +200,15 @@ export default function EmployeesPage() {
                     </td>
                     <td className="p-3 text-gray-600">{employee.email}</td>
                     <td className="p-3 text-gray-600">{employee.phone || 'N/A'}</td>
-                    <td className="p-3 text-gray-600">{employee.department?.name || 'N/A'}</td>
+                    <td className="p-3 text-gray-600">
+                      {(() => {
+                        // ✅ NEW: Show TL name for EMPLOYEE role, department name for others
+                        if (employee.role?.name === 'EMPLOYEE' && employee.tl) {
+                          return `${employee.tl.firstName} ${employee.tl.lastName} (${employee.tl.departmentName || 'N/A'})`;
+                        }
+                        return employee.departmentName || employee.department?.name || 'N/A';
+                      })()}
+                    </td>
                     <td className="p-3">
                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(employee.status)}`}>
                         {employee.status || 'Unknown'}

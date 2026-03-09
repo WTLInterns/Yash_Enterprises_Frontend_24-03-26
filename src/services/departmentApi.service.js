@@ -1,5 +1,49 @@
 import { backendApi } from "@/services/api";
-import { getAuthUser } from "@/utils/authUser";
+import { getTabSafeItem } from "@/utils/tabSafeStorage";
+
+// 🔥 CRITICAL: Tab-safe auth user function for multi-tab isolation
+const getAuthUser = () => {
+  if (typeof window === 'undefined') return null;
+  try {
+    let rawUserData = getTabSafeItem("user_data");
+    if (!rawUserData) {
+      rawUserData = localStorage.getItem("user_data");
+    }
+    let user = rawUserData ? JSON.parse(rawUserData) : null;
+    
+    if (!user) return null;
+
+    // ⭐ CRITICAL FIX: Map backend field names to frontend expectations
+    user.role = user.role || user.roleName || null;
+    user.department = user.department || user.departmentName || user.tlDepartmentName || null;
+    
+    // 🔥 CRITICAL: If user exists but no department, try to get it from separate storage
+    if (user && !user.department) {
+      const departmentFromStorage = getTabSafeItem("user_department") || localStorage.getItem("user_department");
+      if (departmentFromStorage) {
+        user.department = departmentFromStorage;
+        console.log("🔄 [DEPARTMENT API] Added department from storage:", departmentFromStorage);
+      }
+    }
+    
+    // 🔥 DEBUG: Log user data to debug department issue
+    console.log("🔍 [DEPARTMENT API] User data:", {
+      user: user,
+      department: user?.department,
+      role: user?.role,
+      roleName: user?.roleName,
+      departmentName: user?.departmentName,
+      hasDepartment: !!user?.department,
+      rawUserData: rawUserData,
+      fullUserObject: JSON.stringify(user, null, 2)
+    });
+    
+    return user;
+  } catch (error) {
+    console.error("Error getting auth user:", error);
+    return null;
+  }
+};
 
 // 🎯 Department-aware API service for all entities
 export const departmentApiService = {
@@ -43,9 +87,18 @@ export const departmentApiService = {
     const user = getAuthUser();
     const department = user?.department;
     
-    // 🔥 Admin users can access all customers without department restriction
-    if (user?.role === 'ADMIN' || user?.role === 'MANAGER') {
-      console.log('Admin/Manager user - fetching all customers without department filter');
+    // 🔥 DEBUG: Log detailed info for troubleshooting
+    console.log("🔍 [GET CUSTOMERS] Detailed debug:", {
+      user: user,
+      department: department,
+      role: user?.role,
+      hasDepartment: !!department,
+      params: params
+    });
+    
+    // 🔥 Admin & Account users can access all customers without department restriction
+    if (user?.role === 'ADMIN' || user?.role === 'MANAGER' || user?.role === 'ACCOUNT') {
+      console.log('Admin/Manager/Account user - fetching all customers without department filter');
       const queryParams = { ...params };
       const queryString = new URLSearchParams(queryParams).toString();
       const response = await backendApi.get(`/clients${queryString ? '?' + queryString : ''}`);
@@ -54,6 +107,33 @@ export const departmentApiService = {
     
     // 🔥 TL users need department filtering
     if (!department) {
+      console.error('❌ [GET CUSTOMERS] Department information required for customers access. User:', user);
+      
+      // 🔥 TEMPORARY: Try to get department from localStorage as fallback
+      const fallbackDepartment = getTabSafeItem("user_department") || localStorage.getItem('user_department');
+      if (fallbackDepartment) {
+        console.log('🔄 [GET CUSTOMERS] Using fallback department from storage:', fallbackDepartment);
+        const queryParams = {
+          department: fallbackDepartment,
+          ...params
+        };
+        const queryString = new URLSearchParams(queryParams).toString();
+        const response = await backendApi.get(`/clients?${queryString}`);
+        return response || [];
+      }
+      
+      // 🔥 TEMPORARY: For TL users without department, use default department to prevent error
+      if (user?.role === 'TL' || user?.role === 'TEAM_LEAD') {
+        console.log('🔄 [GET CUSTOMERS] Using default department for TL user without department');
+        const queryParams = {
+          department: 'PPE', // Default department
+          ...params
+        };
+        const queryString = new URLSearchParams(queryParams).toString();
+        const response = await backendApi.get(`/clients?${queryString}`);
+        return response || [];
+      }
+      
       throw new Error('Department information required for customers access');
     }
     
@@ -72,9 +152,9 @@ export const departmentApiService = {
     const user = getAuthUser();
     const department = user?.department;
     
-    // 🔥 Admin users can access all products without department restriction
-    if (user?.role === 'ADMIN' || user?.role === 'MANAGER') {
-      console.log('Admin/Manager user - fetching all products without department filter');
+    // 🔥 Admin & Account users can access all products without department restriction
+    if (user?.role === 'ADMIN' || user?.role === 'MANAGER' || user?.role === 'ACCOUNT') {
+      console.log('Admin/Manager/Account user - fetching all products without department filter');
       const queryParams = { ...params };
       const queryString = new URLSearchParams(queryParams).toString();
       const response = await backendApi.get(`/products${queryString ? '?' + queryString : ''}`);
@@ -128,8 +208,8 @@ export const departmentApiService = {
     const user = getAuthUser();
     const department = user?.department;
     
-    // 🔥 Admin/Manager can access all employees
-    if (user?.role === 'ADMIN' || user?.role === 'MANAGER') {
+    // 🔥 Admin/Manager/Account can access all employees
+    if (user?.role === 'ADMIN' || user?.role === 'MANAGER' || user?.role === 'ACCOUNT') {
       const queryParams = { ...params };
       const queryString = new URLSearchParams(queryParams).toString();
       const response = await backendApi.get(`/employees${queryString ? '?' + queryString : ''}`);
@@ -194,9 +274,9 @@ export const departmentApiService = {
     const user = getAuthUser();
     const department = user?.department;
     
-    // 🔥 Admin users can create tasks without department restriction
-    if (user?.role === 'ADMIN' || user?.role === 'MANAGER') {
-      console.log('Admin/Manager user - creating task without department restriction');
+    // 🔥 Admin & Account users can create tasks without department restriction
+    if (user?.role === 'ADMIN' || user?.role === 'MANAGER' || user?.role === 'ACCOUNT') {
+      console.log('Admin/Manager/Account user - creating task without department restriction');
       const response = await backendApi.post('/tasks', taskData);
       return response;
     }
@@ -220,9 +300,9 @@ export const departmentApiService = {
     const user = getAuthUser();
     const department = user?.department;
     
-    // 🔥 Admin users can update tasks without department restriction
-    if (user?.role === 'ADMIN' || user?.role === 'MANAGER') {
-      console.log('Admin/Manager user - updating task without department restriction');
+    // 🔥 Admin & Account users can update tasks without department restriction
+    if (user?.role === 'ADMIN' || user?.role === 'MANAGER' || user?.role === 'ACCOUNT') {
+      console.log('Admin/Manager/Account user - updating task without department restriction');
       const response = await backendApi.put(`/tasks/${id}`, taskData);
       return response;
     }
@@ -246,9 +326,9 @@ export const departmentApiService = {
     const user = getAuthUser();
     const department = user?.department;
     
-    // 🔥 Admin users can delete tasks without department restriction
-    if (user?.role === 'ADMIN' || user?.role === 'MANAGER') {
-      console.log('Admin/Manager user - deleting task without department restriction');
+    // 🔥 Admin & Account users can delete tasks without department restriction
+    if (user?.role === 'ADMIN' || user?.role === 'MANAGER' || user?.role === 'ACCOUNT') {
+      console.log('Admin/Manager/Account user - deleting task without department restriction');
       const response = await backendApi.delete(`/tasks/${id}`);
       return response;
     }

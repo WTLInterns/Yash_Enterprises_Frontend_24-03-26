@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import webSocketService from '../services/websocketService';
+import { getTabSafeItem } from '@/utils/tabSafeStorage';
 
 export default function WebSocketProvider({ children }) {
   useEffect(() => {
@@ -14,10 +15,32 @@ export default function WebSocketProvider({ children }) {
           console.warn('WebSocket connection timeout - continuing without real-time features');
         }, 5000); // 5 second timeout
         
-        await webSocketService.connect()
+        // 🔥 FIX: Get user context and pass to WebSocket connection
+        let user = null;
+        if (typeof window !== 'undefined') {
+          try {
+            let rawUserData = getTabSafeItem("user_data");
+            if (!rawUserData) {
+              rawUserData = localStorage.getItem("user_data");
+            }
+            const userData = rawUserData ? JSON.parse(rawUserData) : null;
+            if (userData) {
+              user = {
+                id: userData.id || userData.employeeId,
+                role: userData.role,
+                department: userData.department,
+                name: userData.fullName || userData.name
+              };
+            }
+          } catch (error) {
+            console.warn('Failed to parse user data for WebSocket:', error);
+          }
+        }
+        
+        await webSocketService.connect(user)
           .then(() => {
             clearTimeout(connectionTimeout);
-            console.log('WebSocket initialized successfully in admin panel');
+            console.log('WebSocket initialized successfully with user context:', user);
           })
           .catch((error) => {
             clearTimeout(connectionTimeout);
@@ -41,7 +64,7 @@ export default function WebSocketProvider({ children }) {
       }
       webSocketService.disconnect();
     };
-  }, []);
+  }, []); // 🔥 CRITICAL: Empty dependency array - runs only ONCE
 
   return <>{children}</>;
 }

@@ -9,8 +9,8 @@ export const departmentStatsService = {
     try {
       console.log('Fetching REAL department stats for:', department, 'User role:', user?.role);
       
-      // 🔥 For Admin/Manager users, get all data without department filtering
-      const isAdminOrManager = user?.role === 'ADMIN' || user?.role === 'MANAGER';
+      // 🔥 For Admin/Manager/Account users, get all data without department filtering
+      const isAdminOrManager = user?.role === 'ADMIN' || user?.role === 'MANAGER' || user?.role === 'ACCOUNT';
       
       // 🔥 Use department-aware APIs for all data
       const [

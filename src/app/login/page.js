@@ -2,8 +2,11 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { backendApi } from "@/services/api";
 import { toast } from "react-toastify";
+import { backendApi } from "@/services/api";
+import { getAuthUser } from "@/utils/userUtils";
+import { getTabSafeItem, setTabSafeItem, clearOldLocalStorage } from "@/utils/tabSafeStorage";
+import { clearAuthUserCache } from "@/utils/authUser";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -17,13 +20,40 @@ export default function LoginPage() {
   const [orgError, setOrgError] = useState("");
 
   useEffect(() => {
-    const token = localStorage.getItem("auth_token");
-    const role = localStorage.getItem("user_role");
+    const token = getTabSafeItem("auth_token");
+    const role = getTabSafeItem("user_role");
 
     if (token && role) {
-      router.replace(
-        role === "ADMIN" ? "/admin/dashboard" : "/employee/dashboard"
-      );
+      // Clear old localStorage data to prevent conflicts
+      clearOldLocalStorage();
+      
+      // Clear auth user cache to ensure fresh data
+      clearAuthUserCache();
+      
+      // Log existing user details
+      console.log('🔄 EXISTING USER DETECTED');
+      console.log('👤 EXISTING USER ROLE:', role);
+      console.log('🔐 EXISTING TOKEN:', token ? 'Present' : 'Missing');
+      
+      // Initialize FCM for existing logged-in users
+      const employeeId = getTabSafeItem("employee_id");
+      if (employeeId) {
+        console.log('🚀 Starting FCM registration for existing user...');
+        import('@/lib/web_push').then(({ registerWebFcmToken }) => {
+          registerWebFcmToken({ employeeId: parseInt(employeeId) })
+            .then((fcmToken) => {
+              console.log('✅ FCM TOKEN REGISTERED FOR EXISTING USER!');
+              console.log('🔑 FCM TOKEN:', fcmToken);
+              console.log('🆔 EMPLOYEE ID:', employeeId);
+              console.log('👤 ROLE:', role);
+            })
+            .catch((err) => {
+              console.warn('⚠️ FCM registration failed for existing user:', err);
+              console.log('🔍 FCM ERROR DETAILS:', JSON.stringify(err, null, 2));
+            });
+        });
+      }
+      router.replace("/dashboard");
     }
   }, [router]);
 
@@ -74,22 +104,115 @@ export default function LoginPage() {
 
       // Success case with proper validation
       if (data?.token && data?.role) {
-        // Store user data
-        localStorage.setItem("auth_token", data.token);
-        localStorage.setItem("user_role", data.role);
-        localStorage.setItem("user_data", JSON.stringify(data.user));
-        localStorage.setItem("employee_id", data.employeeId);
+        // Clear old localStorage data to prevent cross-tab conflicts
+        clearOldLocalStorage();
+        
+        // Clear auth user cache to ensure fresh data
+        clearAuthUserCache();
+        
+        // Store user data using tab-safe storage
+        setTabSafeItem("auth_token", data.token);
+        setTabSafeItem("user_role", data.role);
+        setTabSafeItem("user_data", JSON.stringify(data.user));
+        setTabSafeItem("employee_id", data.employeeId);
+        
+        // 🔥 CRITICAL: Store department separately for department API
+        // Department might be in data.user.departmentName OR data.user.department OR data.department
+        const userDepartment = data.user?.departmentName || data.user?.department || data.department;
+        console.log("🔍 DEPARTMENT EXTRACTION:", {
+          'data.user.departmentName': data.user?.departmentName,
+          'data.user.department': data.user?.department,
+          'data.department': data.department,
+          'final userDepartment': userDepartment
+        });
+        if (userDepartment) {
+          setTabSafeItem("user_department", userDepartment);
+          localStorage.setItem("user_department", userDepartment);
+        }
+        
+        // 🔥 CRITICAL: Also store role in user object if missing
+        if (data.user && !data.user.role && data.role) {
+          data.user.role = data.role;
+        }
+        if (data.user && !data.user.roleName && data.role) {
+          data.user.roleName = data.role;
+        }
+        if (data.user && !data.user.department && userDepartment) {
+          data.user.department = userDepartment;
+        }
+        if (data.user && !data.user.departmentName && userDepartment) {
+          data.user.departmentName = userDepartment;
+        }
+
+        // 🔥 CRITICAL: Use sessionStorage for multi-tab support
+        const userData = {
+          userId: data.user?.id || data.employeeId,
+          id: data.user?.id || data.employeeId,
+          name: data.user?.fullName || data.user?.firstName || "User",
+          fullName: data.user?.fullName || data.user?.firstName,
+          firstName: data.user?.firstName,
+          lastName: data.user?.lastName,
+          role: data.role,
+          roleName: data.role,
+          department: userDepartment,
+          departmentName: userDepartment,
+          email: data.user?.email,
+          employeeId: data.employeeId,
+          token: data.token
+        };
+
+        // Store in sessionStorage (separate per tab)
+        sessionStorage.setItem("user_data", JSON.stringify(userData));
+        sessionStorage.setItem("user", JSON.stringify(userData));
+        sessionStorage.setItem("token", data.token);
+        
+        // Also store in tabSafeStorage for compatibility
+        setTabSafeItem("user_data", JSON.stringify(userData));
+        setTabSafeItem("token", data.token);
+        
+        // Keep localStorage for backward compatibility with CRM
+        localStorage.setItem("user_data", JSON.stringify(userData));
+        localStorage.setItem("user", JSON.stringify(userData));
+        localStorage.setItem("token", data.token);
+        
+        // 🔥 DEBUG: Log what we're storing
+        console.log("🔍 [LOGIN] Storing user data:", {
+          userData: userData,
+          department: userDepartment,
+          role: data.role,
+          hasDepartment: !!userDepartment,
+          dataResponse: data
+        });
 
         // Success notification with user name
-        const userName = data.user?.firstName || data.user?.fullName || "User";
+        const userName = userData.fullName || userData.name || "User";
         toast.success(`Welcome ${userName}!`);
         
-        // Role-based redirect
-        if (data.role === "ADMIN") {
-          router.replace("/admin/dashboard");
-        } else {
-          router.replace("/employee/dashboard");
+        // Log full response and user details
+        console.log('🔍 FULL LOGIN RESPONSE:', JSON.stringify(data, null, 2));
+        console.log('👤 USER ROLE:', userData.role);
+        console.log('👤 USER NAME:', userData.fullName);
+        console.log('👤 USER DEPARTMENT:', userData.department);
+        console.log('🆔 EMPLOYEE ID:', userData.employeeId);
+        console.log('🔐 TOKEN:', userData.token ? 'Present' : 'Missing');
+        
+        // Initialize FCM for web push notifications
+        try {
+          console.log('🚀 Starting FCM registration...');
+          const { registerWebFcmToken } = await import('@/lib/web_push');
+          const fcmToken = await registerWebFcmToken({ employeeId: data.employeeId });
+          console.log('✅ FCM TOKEN REGISTERED SUCCESSFULLY!');
+          console.log('🔑 FCM TOKEN:', fcmToken);
+          console.log('👤 FCM REGISTERED FOR EMPLOYEE ID:', data.employeeId);
+          console.log('👤 FCM REGISTERED FOR ROLE:', data.role);
+        } catch (fcmError) {
+          console.warn('⚠️ FCM registration failed:', fcmError);
+          console.log('🔍 FCM ERROR DETAILS:', JSON.stringify(fcmError, null, 2));
+          // Don't block login if FCM fails
         }
+        
+        // Role-based redirect - all go to same dashboard
+        router.replace("/dashboard");
       } else {
         // Specific error handling
         const errorMessage = data?.error || data?.message || "Login failed";

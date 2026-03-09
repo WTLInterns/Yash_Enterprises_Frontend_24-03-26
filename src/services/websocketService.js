@@ -7,16 +7,41 @@ class WebSocketService {
     this.isConnected = false;
     this.isConnecting = false;
     this.subscriptions = new Map(); // Track subscriptions
+    this.tabId = Math.random().toString(36).substring(2); // 🔥 Tab-specific ID
+    this.channel = null; // 🔥 BroadcastChannel for cross-tab sync
     this.listeners = {
       attendance: [],
       task: [],
       punch: [],
       adminNotification: []
     };
+    
+    console.log("🔌 WebSocket Tab ID:", this.tabId);
+    
+    // 🔥 Initialize BroadcastChannel
+    if (typeof BroadcastChannel !== 'undefined') {
+      try {
+        this.channel = new BroadcastChannel("crm-notifications");
+        this.channel.onmessage = (event) => {
+          this.notifyListeners("adminNotification", event.data);
+        };
+        console.log("🔔 BroadcastChannel initialized for cross-tab sync");
+      } catch (error) {
+        console.log("🔔 BroadcastChannel not available");
+      }
+    }
   }
 
-  connect() {
-    if (this.isConnected || this.isConnecting) {
+  connect(user = null) {
+    // 🔥 FIX: Force re-subscribe if connected and user becomes available
+    if (this.isConnected && user) {
+      console.log("🔄 Updating subscriptions with new user context");
+      this.subscribeToTopics(user);
+      return Promise.resolve();
+    }
+
+    if (this.isConnecting || this.isConnected) {
+      console.log('WebSocket already connected or connecting');
       return Promise.resolve();
     }
 
@@ -24,9 +49,7 @@ class WebSocketService {
 
     return new Promise((resolve, reject) => {
       try {
-        // Use SockJS for WebSocket connection
         const socket = new SockJS('http://localhost:8080/ws');
-        
         this.client = new Client({
           webSocketFactory: () => socket,
           connectHeaders: {},
@@ -43,8 +66,8 @@ class WebSocketService {
           this.isConnected = true;
           this.isConnecting = false;
           
-          // Subscribe to topics
-          this.subscribeToTopics();
+          // Subscribe to user-specific topics
+          this.subscribeToTopics(user);
           resolve();
         };
 
@@ -54,6 +77,12 @@ class WebSocketService {
           this.isConnecting = false;
           this.cleanupSubscriptions();
           reject(new Error('WebSocket connection failed'));
+        };
+
+        // 🔥 FIX: Add WebSocket close handler
+        this.client.onWebSocketClose = () => {
+          console.log("⚠️ WebSocket closed. Reconnecting...");
+          this.isConnected = false;
         };
 
         this.client.onDisconnect = (frame) => {
@@ -79,11 +108,14 @@ class WebSocketService {
     });
   }
 
-  subscribeToTopics() {
+  subscribeToTopics(user = null) {
     if (!this.client || !this.isConnected) return;
 
-    // Clean up existing subscriptions before creating new ones
-    this.cleanupSubscriptions();
+    // 🔥 CRITICAL FIX: Prevent re-subscription loop
+    if (this.subscriptions.size > 0) {
+      console.log("🔌 Already subscribed to topics, skipping re-subscription");
+      return;
+    }
 
     try {
       // Subscribe to attendance events
@@ -119,16 +151,100 @@ class WebSocketService {
       });
       this.subscriptions.set('punch', punchSub);
 
-      // ADD THIS: Subscribe to admin notifications
-      const adminSub = this.client.subscribe('/topic/admin-notifications', (message) => {
-        try {
-          const data = JSON.parse(message.body);
-          this.notifyListeners('adminNotification', data);
-        } catch (error) {
-          console.error('Error parsing admin notification:', error);
+      // USER-SPECIFIC NOTIFICATION SUBSCRIPTIONS
+      if (user) {
+        console.log('🔔 Subscribing to user-specific notifications for:', {
+          userId: user.id,
+          role: user.role,
+          department: user.department
+        });
+
+        // Subscribe to role-based notifications
+        if (user.role) {
+          const roleTopic = `/topic/notifications/role/${user.role}`;
+          const roleSub = this.client.subscribe(roleTopic, (message) => {
+            try {
+              const data = JSON.parse(message.body);
+              console.log('🔔 Received role-based notification:', data);
+              
+              // 🔥 Broadcast to other tabs
+              if (this.channel) {
+                this.channel.postMessage(data);
+              }
+              
+              this.notifyListeners('adminNotification', data);
+            } catch (error) {
+              console.error('Error parsing role notification:', error);
+            }
+          });
+          this.subscriptions.set('role', roleSub);
+          console.log("✅ Subscribed:", roleTopic);
         }
-      });
-      this.subscriptions.set('adminNotification', adminSub);
+
+        // Subscribe to department-based notifications
+        if (user.department) {
+          const deptTopic = `/topic/notifications/department/${user.department}`;
+          const deptSub = this.client.subscribe(deptTopic, (message) => {
+            try {
+              const data = JSON.parse(message.body);
+              console.log('🔔 Received department-based notification:', data);
+              
+              // 🔥 Broadcast to other tabs
+              if (this.channel) {
+                this.channel.postMessage(data);
+              }
+              
+              this.notifyListeners('adminNotification', data);
+            } catch (error) {
+              console.error('Error parsing department notification:', error);
+            }
+          });
+          this.subscriptions.set('department', deptSub);
+          console.log("✅ Subscribed:", deptTopic);
+        }
+
+        // Subscribe to user-specific notifications
+        if (user.id) {
+          const userTopic = `/topic/notifications/user/${user.id}`;
+          const userSub = this.client.subscribe(userTopic, (message) => {
+            try {
+              const data = JSON.parse(message.body);
+              console.log('🔔 Received user-specific notification:', data);
+              
+              // 🔥 Broadcast to other tabs
+              if (this.channel) {
+                this.channel.postMessage(data);
+              }
+              
+              this.notifyListeners('adminNotification', data);
+            } catch (error) {
+              console.error('Error parsing user notification:', error);
+            }
+          });
+          this.subscriptions.set('user', userSub);
+          console.log("✅ Subscribed:", userTopic);
+        }
+      } else {
+        // Fallback: Subscribe to general admin notifications (backward compatibility)
+        console.log('🔔 No user context, subscribing to general admin notifications');
+        const adminSub = this.client.subscribe('/topic/admin-notifications', (message) => {
+          try {
+            const data = JSON.parse(message.body);
+            console.log('🔔 Received general admin notification:', data);
+            
+            // 🔥 Broadcast to other tabs
+            if (this.channel) {
+              this.channel.postMessage(data);
+            }
+            
+            this.notifyListeners('adminNotification', data);
+          } catch (error) {
+            console.error('Error parsing admin notification:', error);
+          }
+        });
+        this.subscriptions.set('adminNotification', adminSub);
+        console.log("✅ Subscribed: /topic/admin-notifications (fallback)");
+      }
 
     } catch (error) {
       console.error('Error subscribing to topics:', error);

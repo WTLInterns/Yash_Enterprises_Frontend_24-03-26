@@ -1,10 +1,22 @@
 import { useState, useEffect } from "react";
+import { getTabSafeItem } from "./tabSafeStorage";
 
 // Utility functions for dynamic user data
 export const getCurrentUser = () => {
   if (typeof window === "undefined") return null;
   try {
-    const userData = JSON.parse(localStorage.getItem("user_data") || "{}");
+    // Priority: sessionStorage -> tabSafeStorage -> localStorage
+    let userDataStr = sessionStorage.getItem('user_data');
+    
+    if (!userDataStr) {
+      userDataStr = getTabSafeItem("user_data");
+    }
+    
+    if (!userDataStr) {
+      userDataStr = localStorage.getItem('user_data');
+    }
+    
+    const userData = JSON.parse(userDataStr || "{}");
     return userData;
   } catch (error) {
     console.error("Error parsing user data:", error);
@@ -14,7 +26,7 @@ export const getCurrentUser = () => {
 
 export const getCurrentUserRole = () => {
   if (typeof window === "undefined") return "ADMIN";
-  return localStorage.getItem("user_role") || "ADMIN";
+  return getTabSafeItem("user_role") || "ADMIN";
 };
 
 export const getCurrentUserName = () => {

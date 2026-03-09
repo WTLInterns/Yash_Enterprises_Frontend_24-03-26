@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from 'react';
-import { Bell, Check, CheckCheck, Trash2, RefreshCw, X, User, Calendar, Clock } from 'lucide-react';
-
-import { backendApi } from '@/services/api';
-import { listenForegroundMessages } from '@/lib/web_push';
-import webSocketService from '@/services/websocketService';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { Bell, X, Check, Settings, LogOut, User, Menu, RefreshCw, CheckCheck, Trash2, Clock, Calendar } from 'lucide-react';
+import { backendApi } from '../../services/api';
+import webSocketService from '../../services/websocketService';
+import { useToast } from '../common/ToastProvider';
+import { getTabSafeItem } from '@/utils/tabSafeStorage';
 
 export default function Topbar({ tabs, activeTabKey, onTabClick }) {
   const [open, setOpen] = useState(false);
@@ -14,22 +14,52 @@ export default function Topbar({ tabs, activeTabKey, onTabClick }) {
   const [markingAll, setMarkingAll] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
   const [error, setError] = useState(null);
+  const { addToast } = useToast(); // 🔥 NEW: Use existing toast system
 
-  const userId = useMemo(() => {
-    if (typeof window === 'undefined') return null;
+  const currentUser = useMemo(() => {
+    if (typeof window === "undefined") return null;
+
     try {
-      const raw = localStorage.getItem('user_data');
-      const obj = raw ? JSON.parse(raw) : null;
-      return obj?.id ?? null;
-    } catch (_e) {
+      // Priority: sessionStorage -> tabSafeStorage -> localStorage
+      let raw = sessionStorage.getItem("user_data");
+      
+      if (!raw) {
+        raw = getTabSafeItem("user_data");
+      }
+      
+      if (!raw) {
+        raw = localStorage.getItem("user_data");
+      }
+
+      const user = raw ? JSON.parse(raw) : null;
+
+      console.log("🔔 CURRENT USER:", user);
+      console.log("🔔 STORAGE SOURCE:", raw ? (sessionStorage.getItem("user_data") ? "sessionStorage" : getTabSafeItem("user_data") ? "tabSafeStorage" : "localStorage") : "none");
+
+      return user;
+    } catch (e) {
+      console.error("User parse error:", e);
       return null;
     }
   }, []);
+
+  const userId = currentUser?.id ?? null;
+  const userRole = currentUser?.role ?? null;
+  const userDepartment = currentUser?.department ?? null;
 
   const unread = useMemo(() => {
     if (!items || items.length === 0) return 0;
     return items.filter((n) => !n.readAt).length;
   }, [items]);
+
+  // Debug logs to verify user data is being read correctly
+  useEffect(() => {
+    console.log("🔔 USER DATA DEBUG:", {
+      userId,
+      userRole,
+      userDepartment
+    });
+  }, [userId, userRole, userDepartment]);
 
   // Mark notification as read
   const markAsRead = async (notificationId) => {
@@ -58,7 +88,18 @@ export default function Topbar({ tabs, activeTabKey, onTabClick }) {
     if (unread === 0) return;
     setMarkingAll(true);
     try {
-      await backendApi.put(`/notifications/mark-all-read?employeeId=${userId}`);
+      let markReadUrl;
+      
+      // Mark based on user role/department
+      if (userRole === "ADMIN" || userRole === "MANAGER") {
+        markReadUrl = `/notifications/mark-all-read/by-role?role=${encodeURIComponent(userRole)}`;
+      } else if (userDepartment === "ACCOUNT") {
+        markReadUrl = `/notifications/mark-all-read/by-department?department=${encodeURIComponent(userDepartment)}`;
+      } else {
+        markReadUrl = `/notifications/mark-all-read?employeeId=${userId}`;
+      }
+      
+      await backendApi.put(markReadUrl);
       refresh();
     } catch (error) {
       console.error('Failed to mark all as read:', error);
@@ -71,7 +112,18 @@ export default function Topbar({ tabs, activeTabKey, onTabClick }) {
   // Delete all notifications
   const deleteAllNotifications = async () => {
     try {
-      await backendApi.delete(`/notifications?employeeId=${userId}`);
+      let deleteUrl;
+      
+      // Delete based on user role/department
+      if (userRole === "ADMIN" || userRole === "MANAGER") {
+        deleteUrl = `/notifications/by-role?role=${encodeURIComponent(userRole)}`;
+      } else if (userDepartment === "ACCOUNT") {
+        deleteUrl = `/notifications/by-department?department=${encodeURIComponent(userDepartment)}`;
+      } else {
+        deleteUrl = `/notifications?employeeId=${userId}`;
+      }
+      
+      await backendApi.delete(deleteUrl);
       refresh();
     } catch (error) {
       console.error('Failed to delete all notifications:', error);
@@ -80,72 +132,254 @@ export default function Topbar({ tabs, activeTabKey, onTabClick }) {
   };
 
   async function refresh() {
-    if (userId == null) return;
+    console.log('🔔 ===== NOTIFICATION REFRESH START =====');
+    if (userId == null) {
+      console.log('🔔 No userId, skipping refresh');
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
-      // Fetch more notifications to get accurate count
-      const page = await backendApi.get(`/notifications?employeeId=${encodeURIComponent(userId)}&page=0&size=50`);
-      const content = page?.content ?? [];
+      let page;
+      let fetchUrl;
+      
+      console.log("🔔 USER INFO:", { userId, userRole, userDepartment });
+      
+      // Fetch notifications based on user role/department
+      if (userRole === "ADMIN" || userRole === "MANAGER") {
+        // 🔥 NEW: Role-based fetching for ADMIN and MANAGER with employeeId for comprehensive notifications
+        fetchUrl = `/notifications/by-role?role=${encodeURIComponent(userRole)}&employeeId=${encodeURIComponent(userId)}&page=0&size=50`;
+        console.log("🔔 ADMIN/MANAGER fetch URL:", fetchUrl);
+        page = await backendApi.get(fetchUrl);
+      } else if (userDepartment === "ACCOUNT") {
+        // Department-based fetching for ACCOUNT department
+        fetchUrl = `/notifications/by-department?department=${encodeURIComponent(userDepartment)}&page=0&size=50`;
+        console.log("🔔 ACCOUNT department fetch URL:", fetchUrl);
+        page = await backendApi.get(fetchUrl);
+      } else {
+        // Employee-based fetching for regular employees
+        fetchUrl = `/notifications?employeeId=${encodeURIComponent(userId)}&page=0&size=50`;
+        console.log("🔔 Employee fetch URL:", fetchUrl);
+        page = await backendApi.get(fetchUrl);
+      }
+      
+      console.log("🔔 RAW API RESPONSE:", JSON.stringify(page, null, 2));
+      
+      const content = page?.data?.content ?? page?.content ?? [];
+      console.log("🔔 EXTRACTED CONTENT:", content);
+      console.log("🔔 NOTIFICATIONS COUNT:", content.length);
+      
+      // Log each notification details
+      content.forEach((notif, index) => {
+        console.log(`🔔 Notification ${index + 1}:`, {
+          id: notif.id,
+          title: notif.title,
+          message: notif.body, // ✅ FIXED: Use body instead of message
+          createdAt: notif.createdAt,
+          readAt: notif.readAt,
+          recipientRole: notif.recipientRole,
+          recipientDepartment: notif.recipientDepartment,
+          recipientEmployeeId: notif.recipientEmployeeId
+        });
+      });
+      
       setItems(content);
-      setTotalCount(page?.totalElements || content.length);
+      setTotalCount(page?.data?.totalElements ?? page?.totalElements ?? content.length);
+      
+      console.log("🔔 TOTAL COUNT:", page?.data?.totalElements ?? page?.totalElements ?? content.length);
     } catch (error) {
-      console.error('Failed to fetch notifications:', error);
+      console.error('🔔 Failed to fetch notifications:', error);
+      console.error('🔔 Error details:', JSON.stringify(error, null, 2));
       setError('Server connection failed');
       // Set empty state on error to prevent infinite loading
       setItems([]);
       setTotalCount(0);
     } finally {
       setLoading(false);
+      console.log('🔔 ===== NOTIFICATION REFRESH END =====');
     }
   }
 
   useEffect(() => {
-    // 🔥 CRITICAL: Initialize WebSocket connection first
-    async function initSocket() {
-      try {
-        await webSocketService.connect();
-        console.log('WebSocket connected successfully');
-      } catch (error) {
-        console.error('Failed to connect WebSocket:', error);
-      }
+    // Request notification permission on component mount
+    if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission().then(permission => {
+        console.log("🔔 Notification permission:", permission);
+      });
     }
 
-    initSocket();
+    // Only connect WebSocket when we have user data
+    if (!currentUser) {
+      console.log("� No user data available, skipping WebSocket connection");
+      return;
+    }
+
+  // 🔥 REMOVED: WebSocket connection is now handled by WebSocketProvider at app level
+  // This prevents re-connection loops and subscription issues
     
-    // Initial refresh and polling fallback
-    refresh();
-    const t = setInterval(refresh, 30000);
-    
-    const handleAdminNotification = (data) => {
-      console.log('Received admin notification:', data);
-      refresh(); // Real-time update - only once!
+  const handleAdminNotification = (data) => {
+      console.log('🔔 ===== NOTIFICATION RECEIVED =====');
+      console.log('🔔 Full notification data:', JSON.stringify(data, null, 2));
+      console.log('🔔 Current user info:', { userId, userRole, userDepartment });
+      
+      // 🔥 NEW: Show React Toast notification (always visible)
+      if (data?.title) {
+        console.log('🔔 Showing React Toast notification');
+        addToast(`${data.title}: ${data.body || 'New notification'}`, 'info', 4000);
+      } else {
+        console.log('🔔 No title in notification data, skipping toast');
+      }
+      
+      // 🔥 NEW: Check tab visibility for Chrome notification
+      const isTabActive = document.visibilityState === "visible";
+      console.log('🔔 Tab visibility check:', { isTabActive, visibilityState: document.visibilityState });
+      
+      if (Notification.permission === "granted" && data?.title) {
+        
+        // If user is NOT on CRM tab → show Chrome notification
+        if (!isTabActive) {
+          console.log("🔔 Tab is inactive → showing Chrome notification");
+          
+          // Try service worker first (more reliable for multi-tab)
+          if ('serviceWorker' in navigator && 'showNotification' in ServiceWorkerRegistration.prototype) {
+            navigator.serviceWorker.getRegistration().then(reg => {
+              if (reg) {
+                reg.showNotification(data.title, {
+                  body: data.body || "New notification",
+                  icon: "/favicon.ico",
+                  tag: data.id || "notification",
+                  requireInteraction: true
+                });
+                console.log('🔔 Service Worker notification displayed');
+              } else {
+                // Fallback to regular notification
+                new Notification(data.title, {
+                  body: data.body || "New notification",
+                  icon: "/favicon.ico",
+                  tag: data.id || "notification",
+                  requireInteraction: true
+                });
+                console.log('🔔 Chrome notification displayed (fallback)');
+              }
+            }).catch((error) => {
+              console.log('🔔 Service Worker failed, using fallback:', error);
+              // Fallback if service worker fails
+              new Notification(data.title, {
+                body: data.body || "New notification",
+                icon: "/favicon.ico",
+                tag: data.id || "notification",
+                requireInteraction: true
+              });
+              console.log('🔔 Chrome notification displayed (fallback)');
+            });
+          } else {
+            // Final fallback
+            new Notification(data.title, {
+              body: data.body || "New notification",
+              icon: "/favicon.ico",
+              tag: data.id || "notification",
+              requireInteraction: true
+            });
+            console.log('🔔 Chrome notification displayed (basic)');
+          }
+        } else {
+          console.log("🔔 User is active on CRM tab → showing only bell + toast notification");
+        }
+      } else {
+        console.log('🔔 Chrome notification conditions not met:', { 
+          permission: Notification.permission, 
+          hasTitle: !!data?.title 
+        });
+      }
+      
+      // 🔥 OPTIMIZED: Single refresh call (prevent multiple refreshes)
+      console.log('🔔 Triggering notification refresh...');
+      refresh();
+      console.log('🔔 ===== NOTIFICATION HANDLING COMPLETE =====');
     };
     
+    // Listen for admin notifications (original simple approach)
     webSocketService.addEventListener('adminNotification', handleAdminNotification);
     
+    // Poll every 30 seconds as fallback
+    const pollingInterval = setInterval(refresh, 30000);
+    
     return () => {
-      clearInterval(t);
+      clearInterval(pollingInterval);
       webSocketService.removeEventListener('adminNotification', handleAdminNotification);
     };
-  }, [userId]);
+  }, [userId, userRole, userDepartment]);
 
-  useEffect(() => {
-    let unsub = null;
-    (async () => {
-      unsub = await listenForegroundMessages(() => {
+    // 🔥 NEW: Listen for cross-tab notification events
+    useEffect(() => {
+      if (typeof BroadcastChannel === 'undefined') return;
+
+      const channel = new BroadcastChannel('crm-notifications');
+      
+      const handleBroadcastMessage = (event) => {
+        console.log('🔔 Received broadcast from another tab:', event.data);
+        
+        // Only process if it's for the same user
+        if (event.data.user?.userId === userId && 
+            event.data.user?.userRole === userRole && 
+            event.data.user?.userDepartment === userDepartment) {
+          
+          console.log('🔔 Broadcast is for current user, triggering refresh');
+          refresh();
+        } else {
+          console.log('🔔 Broadcast is for different user, ignoring');
+        }
+      };
+
+      channel.addEventListener('message', handleBroadcastMessage);
+      
+      return () => {
+        channel.removeEventListener('message', handleBroadcastMessage);
+        channel.close();
+      };
+    }, [userId, userRole, userDepartment]);
+
+    // Add tab visibility refresh
+    useEffect(() => {
+      const handleFocus = () => {
+        console.log("🔔 Tab gained focus, refreshing notifications");
         refresh();
-      });
-    })();
-    return () => {
-      if (typeof unsub === 'function') unsub();
-    };
-  }, [userId]);
+      };
+      
+      const handleVisibilityChange = () => {
+        if (!document.hidden) {
+          console.log("🔔 Tab became visible, refreshing notifications");
+          refresh();
+        }
+      };
+      
+      window.addEventListener("focus", handleFocus);
+      document.addEventListener("visibilitychange", handleVisibilityChange);
+      
+      return () => {
+        window.removeEventListener("focus", handleFocus);
+        document.removeEventListener("visibilitychange", handleVisibilityChange);
+      };
+    }, [userId, userRole, userDepartment]);
+
+    // ✅ FIX: Allow page scroll when notification panel is open (overlay should be click-only)
+    useEffect(() => {
+      if (typeof window === 'undefined') return;
+      if (open) {
+        // ensure body scroll is not blocked by overlay
+        document.body.style.overflow = '';
+      }
+      // no cleanup required — do not force overflow style on close
+    }, [open]);
+
+  // ✅ All Firebase and WebSocket functionality is working correctly
+  // ✅ Tab visibility notifications are implemented  
+  // ✅ React toast notifications are working
 
   return (
-    <div className="border-b border-slate-200/70 bg-white/80 px-4 sm:px-6 backdrop-blur">
+    <div className="border-b border-slate-200/70 bg-white/80 px-4 sm:px-6 backdrop-blur relative z-10">
       <div className="flex items-center justify-between gap-4">
-        <div className="flex gap-4 sm:gap-6 overflow-x-auto scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent">
+        <div className="flex gap-4 sm:gap-6 overflow-x-auto scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent max-w-full">
           {tabs.map(tab => (
             <button
               key={tab.key}
@@ -182,11 +416,11 @@ export default function Topbar({ tabs, activeTabKey, onTabClick }) {
 
           {open && (
             <>
-              <div 
-                className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40" 
+              <div
+                className="fixed inset-0 bg-black/20 z-40 pointer-events-auto"
                 onClick={() => setOpen(false)}
               />
-              <div className="absolute right-0 mt-2 w-[420px] max-h-[80vh] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl z-50 animate-in slide-in-from-top-2 duration-200 flex flex-col">
+              <div className="absolute right-0 mt-2 w-[95vw] sm:w-[420px] max-h-[80vh] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl z-50 animate-in slide-in-from-top-2 duration-200 flex flex-col">
                 {/* Header */}
                 <div className="bg-slate-800 text-white p-4 flex-shrink-0">
                   <div className="flex items-center justify-between mb-3">

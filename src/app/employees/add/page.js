@@ -18,6 +18,7 @@ export default function AddEmployeePage({ onSuccess, isModal = false, editingEmp
   const [error, setError] = useState('');
   const [roles, setRoles] = useState([]);
   const [managers, setManagers] = useState([]);
+  const [tlList, setTlList] = useState([]); // ✅ NEW: Team Lead list for EMPLOYEE role
   const [teams, setTeams] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [allDepartments, setAllDepartments] = useState([]); // ✅ ADDED: Store all departments for mapping
@@ -33,6 +34,7 @@ export default function AddEmployeePage({ onSuccess, isModal = false, editingEmp
     roleId: '',
     teamId: '',
     departmentId: '',
+    tlId: '', // ✅ NEW: TL reference for EMPLOYEE role
     designationId: '',
     customDesignation: '',
     reportingManagerId: '',
@@ -138,9 +140,10 @@ export default function AddEmployeePage({ onSuccess, isModal = false, editingEmp
       setLoading(true);
       
       // Fetch all dropdown data in parallel with error handling
-      const [rolesData, managersData, teamsData, departmentsData, designationsData, nextIdData] = await Promise.allSettled([
+      const [rolesData, managersData, tlData, teamsData, departmentsData, designationsData, nextIdData] = await Promise.allSettled([
         backendApi.get('/roles'),
         backendApi.get('/employees/managers'), // ✅ FIXED: Fetch only managers
+        backendApi.get('/employees?role=TL'), // ✅ NEW: Fetch only TLs
         backendApi.get('/teams'),
         backendApi.get('/departments').catch(() => []), // Handle missing departments endpoint
         backendApi.get('/designations'),
@@ -152,6 +155,10 @@ export default function AddEmployeePage({ onSuccess, isModal = false, editingEmp
       // ✅ FIXED: Show only managers as potential reporting managers
       const managerEmployees = managersData.status === 'fulfilled' ? managersData.value || [] : [];
       setManagers(managerEmployees);
+      
+      // ✅ NEW: Set TL list for EMPLOYEE role
+      const tlEmployees = tlData.status === 'fulfilled' ? tlData.value || [] : [];
+      setTlList(tlEmployees);
       
       setTeams(teamsData.status === 'fulfilled' ? teamsData.value : []);
       setDepartments(departmentsData.status === 'fulfilled' ? departmentsData.value : []);
@@ -337,6 +344,27 @@ export default function AddEmployeePage({ onSuccess, isModal = false, editingEmp
     }
   };
 
+  // ✅ NEW: Handle TL selection and auto-assign department
+  const handleTLChange = (tlId) => {
+    const selectedTL = tlList.find(tl => tl.id === Number(tlId));
+    
+    if (selectedTL) {
+      setFormData(prev => ({
+        ...prev,
+        tlId: selectedTL.id,
+        departmentId: selectedTL.departmentId || '', // Auto-assign department from TL
+        departmentName: selectedTL.departmentName || '' // Store department name
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        tlId: '',
+        departmentId: '',
+        departmentName: ''
+      }));
+    }
+  };
+
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -486,6 +514,8 @@ export default function AddEmployeePage({ onSuccess, isModal = false, editingEmp
         teamName: teamNameValue,
         reportingManagerId: reportingManagerIdValue,
         reportingManagerName: reportingManagerNameValue,
+        // ✅ NEW: TL assignment for EMPLOYEE role
+        tlId: roleName === 'EMPLOYEE' ? (formData.tlId ? parseInt(formData.tlId) : null) : null,
         organizationId: formData.organizationId ? parseInt(formData.organizationId) : 1,
         hiredAt: formData.hiredAt ? new Date(formData.hiredAt).toISOString().split('T')[0] : null,
         dateOfBirth: formData.dateOfBirth ? new Date(formData.dateOfBirth).toISOString().split('T')[0] : null,
@@ -833,69 +863,95 @@ export default function AddEmployeePage({ onSuccess, isModal = false, editingEmp
                     )}
                   </div>
 
-                  {/* ✅ CONDITIONAL DEPARTMENT FIELD (TL only) */}
+                  {/* ✅ CONDITIONAL TL DROPDOWN (EMPLOYEE only) */}
                   {(() => {
                     const selectedRole = roles.find(r => r.id === parseInt(formData.roleId));
                     const roleName = selectedRole?.name;
-                    return roleName === 'TL';
+                    return roleName === 'EMPLOYEE';
                   })() && (
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Department *
+                        Team Lead (TL) *
                       </label>
                       <select
-                        name="departmentId"
-                        value={formData.departmentId || ''}
-                        onChange={handleChange}
-                        className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                          formErrors.departmentId ? 'border-red-500' : 'border-gray-300'
-                        }`}
+                        value={formData.tlId || ''}
+                        onChange={(e) => handleTLChange(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                       >
-                        <option value="">Select Department</option>
-                        {(() => {
-                          const selectedRole = roles.find(r => r.id === parseInt(formData.roleId));
-                          const isTL = selectedRole?.name === 'TL';
-                          
-                          if (isTL) {
-                            // ✅ SAFE VERSION: Handle both string and object department data
-                            return departments.map((dept, index) => {
-                              // ✅ EXTRA SAFETY: Handle null/undefined department data
-                              if (!dept) return null;
-                              
-                              const label =
-                                typeof dept === 'string'
-                                  ? dept
-                                  : dept?.name || '';
-
-                              // ✅ Skip empty labels to prevent invalid options
-                              if (!label.trim()) return null;
-
-                              return (
-                                <option key={`dept-${label}-${index}`} value={label}>
-                                  {label}
-                                </option>
-                              );
-                            }).filter(Boolean); // ✅ Remove null options
-                          } else {
-                            // For non-TL: Show department objects with stable keys
-                            return departments.map((dept) => {
-                              // ✅ EXTRA SAFETY: Handle null/undefined department data
-                              if (!dept || !dept.id) return null;
-                              
-                              return (
-                                <option key={`dept-${dept.id}`} value={dept.id}>
-                                  {dept.name || 'Unknown'}
-                                </option>
-                              );
-                            }).filter(Boolean); // ✅ Remove null options
-                          }
-                        })()}
+                        <option value="">Select TL</option>
+                        {tlList.map((tl) => (
+                          <option key={tl.id} value={tl.id}>
+                            {tl.firstName} {tl.lastName} ({tl.departmentName || 'N/A'})
+                          </option>
+                        ))}
                       </select>
+                    </div>
+                  )}
+
+                  {/* ✅ CONDITIONAL DEPARTMENT FIELD */}
+                  {(() => {
+                    const selectedRole = roles.find(r => r.id === parseInt(formData.roleId));
+                    const roleName = selectedRole?.name;
+                    // Show department field for EMPLOYEE (read-only via TL) or TL (editable)
+                    return roleName === 'EMPLOYEE' || roleName === 'TL';
+                  })() && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Department {(() => {
+                          const selectedRole = roles.find(r => r.id === parseInt(formData.roleId));
+                          return selectedRole?.name === 'EMPLOYEE' ? '(via TL)' : '*';
+                        })()}
+                      </label>
+                      {(() => {
+                        const selectedRole = roles.find(r => r.id === parseInt(formData.roleId));
+                        const isEmployee = selectedRole?.name === 'EMPLOYEE';
+                        
+                        if (isEmployee) {
+                          // For EMPLOYEE: show read-only department from TL
+                          return (
+                            <input
+                              type="text"
+                              value={formData.departmentName ? `${formData.departmentName} (via ${tlList.find(t => t.id === formData.tlId)?.firstName || 'TL'})` : ''}
+                              disabled
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 cursor-not-allowed text-gray-600"
+                            />
+                          );
+                        } else {
+                          // For TL: show editable department dropdown
+                          return (
+                            <select
+                              name="departmentId"
+                              value={formData.departmentId || ''}
+                              onChange={handleChange}
+                              className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                                formErrors.departmentId ? 'border-red-500' : 'border-gray-300'
+                              }`}
+                            >
+                              <option value="">Select Department</option>
+                              {departments.map((dept, index) => {
+                                if (!dept) return null;
+                                const label =
+                                  typeof dept === 'string'
+                                    ? dept
+                                    : dept?.name || '';
+                                if (!label.trim()) return null;
+                                return (
+                                  <option key={`dept-${label}-${index}`} value={label}>
+                                    {label}
+                                  </option>
+                                );
+                              }).filter(Boolean)}
+                            </select>
+                          );
+                        }
+                      })()}
                       {isSubmitted && formErrors.departmentId && (
                         <p className="mt-1 text-sm text-red-600">{formErrors.departmentId}</p>
                       )}
                     </div>
                   )}
+
+                  {/* ✅ CONDITIONAL DEPARTMENT FIELD (TL only) - REMOVED: Handled in unified section above */}
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">

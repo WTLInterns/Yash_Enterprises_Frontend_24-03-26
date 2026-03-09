@@ -4,6 +4,7 @@ import { getFirebaseApp } from './firebase';
 import { backendApi } from '@/services/api';
 
 export async function ensureServiceWorker() {
+  // Only run in browser environment
   if (typeof window === 'undefined') return null;
   if (!('serviceWorker' in navigator)) return null;
 
@@ -18,7 +19,12 @@ export async function ensureServiceWorker() {
 }
 
 export async function registerWebFcmToken({ employeeId }) {
-  if (typeof window === 'undefined') return null;
+  console.log('🚀 FCM: Starting registration for employee:', employeeId);
+  
+  if (typeof window === 'undefined') {
+    console.log('❌ FCM: Not in browser environment');
+    return null;
+  }
 
   // Check if we already have a valid token for this employee
   const storedToken = sessionStorage.getItem('fcm_token');
@@ -33,54 +39,71 @@ export async function registerWebFcmToken({ employeeId }) {
         platform: 'WEB',
         token: storedToken,
       });
+      console.log('✅ FCM: Cached token re-registered successfully');
     } catch (e) {
-      console.error('❌ Failed to re-register cached token:', e);
+      console.error('❌ FCM: Failed to re-register cached token:', e);
     }
     return storedToken;
   }
 
   const supported = await isSupported().catch(() => false);
   if (!supported) {
-    console.warn('❌ FCM not supported in this browser');
+    console.warn('❌ FCM: Not supported in this browser');
     return null;
   }
 
-  if (!('Notification' in window)) return null;
+  if (!('Notification' in window)) {
+    console.warn('❌ FCM: Notifications not supported');
+    return null;
+  }
+
+  console.log('🔔 FCM: Current notification permission:', Notification.permission);
 
   if (Notification.permission === 'denied') {
-    console.warn('❌ Notifications blocked (Notification.permission=denied)');
+    console.warn('❌ FCM: Notifications blocked (Notification.permission=denied)');
     return null;
   }
 
   const permission =
     Notification.permission === 'default' ? await Notification.requestPermission() : Notification.permission;
 
+  console.log('🔔 FCM: Notification permission after request:', permission);
+
   if (permission !== 'granted') {
-    console.warn('❌ Notification permission not granted:', permission);
+    console.warn('❌ FCM: Notification permission not granted:', permission);
     return null;
   }
 
+  console.log('🔧 FCM: Registering service worker...');
   const registration = await ensureServiceWorker();
-  if (!registration) return null;
+  if (!registration) {
+    console.error('❌ FCM: Service worker registration failed');
+    return null;
+  }
 
+  console.log('🔧 FCM: Getting Firebase app...');
   const app = getFirebaseApp();
   const messaging = getMessaging(app);
 
   const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
   if (!vapidKey) {
-    console.error('❌ Missing NEXT_PUBLIC_FIREBASE_VAPID_KEY');
+    console.error('❌ FCM: Missing NEXT_PUBLIC_FIREBASE_VAPID_KEY');
     return null;
   }
 
+  console.log('🔑 FCM: Getting FCM token...');
   const token = await getToken(messaging, {
     vapidKey,
     serviceWorkerRegistration: registration,
   }).catch((e) => {
-    console.error('❌ getToken failed:', e);
+    console.error('❌ FCM: getToken failed:', e);
     return null;
   });
 
-  if (!token) return null;
+  if (!token) {
+    console.error('❌ FCM: Failed to get token');
+    return null;
+  }
 
   console.log(`🔑 FCM Token (${employeeId}):`, token);
 
@@ -90,16 +113,21 @@ export async function registerWebFcmToken({ employeeId }) {
     sessionStorage.setItem('fcm_employee_id', employeeId.toString());
   }
 
+  console.log('📤 FCM: Sending token to backend...');
   await backendApi.post('/notifications/token', {
     employeeId,
     platform: 'WEB',
     token,
   });
 
+  console.log('✅ FCM: Registration completed successfully');
   return token;
 }
 
 export async function listenForegroundMessages(onMsg) {
+  // Only run in browser environment
+  if (typeof window === 'undefined') return () => {};
+  
   const supported = await isSupported().catch(() => false);
   if (!supported) return () => {};
 

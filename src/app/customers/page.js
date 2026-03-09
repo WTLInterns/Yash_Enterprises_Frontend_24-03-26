@@ -22,12 +22,14 @@ import { useToast } from "@/components/common/ToastProvider";
 import { getLoggedInUser } from "@/utils/auth";
 import { getAuthUser } from "@/utils/authUser";
 import { getCurrentUserName, getCurrentUserRole } from "@/utils/userUtils";
+import { getTabSafeItem } from "@/utils/tabSafeStorage";
 
 import { useCustomerAddressSync } from "@/context/CustomerAddressContext";
 
 import { useStages } from "@/context/StageContext";
 
 import CustomerExcelUploadModal from "@/components/excel/CustomerExcelUploadModal";
+import AccountTransferDialog from "@/components/common/AccountTransferDialog";
 
 export default function CustomersPage() {
   const { addToast } = useToast();
@@ -36,8 +38,101 @@ export default function CustomersPage() {
 
   const { departments, getStagesForDepartment, fetchStagesForDepartment, fetchDepartments } = useStages();
 
-  const userName = getCurrentUserName();
-  const userRole = getCurrentUserRole();
+  // 🔥 CRITICAL FIX: Use tab-safe storage for multi-tab login isolation
+  const [userName, setUserName] = useState(() => {
+    if (typeof window === 'undefined') return "Admin User";
+    try {
+      let rawUserData = getTabSafeItem("user_data");
+      if (!rawUserData) {
+        rawUserData = localStorage.getItem("user_data");
+      }
+      const user = rawUserData ? JSON.parse(rawUserData) : null;
+      return user?.fullName || `${user?.firstName || ""} ${user?.lastName || ""}`.trim() || "Admin User";
+    } catch {
+      return "Admin User";
+    }
+  });
+
+  const [userRole, setUserRole] = useState(() => {
+    if (typeof window === 'undefined') return "ADMIN";
+    try {
+      let role = getTabSafeItem("user_role");
+      if (!role) {
+        role = localStorage.getItem("user_role");
+      }
+      return role || "ADMIN";
+    } catch {
+      return "ADMIN";
+    }
+  });
+
+  // 🔥 CRITICAL: Cross-tab user data sync
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleStorageChange = (e) => {
+      if (e.key === 'user_data' || e.key === 'user_role') {
+        // Update local state when user data changes in another tab
+        try {
+          let rawUserData = getTabSafeItem("user_data");
+          if (!rawUserData) {
+            rawUserData = localStorage.getItem("user_data");
+          }
+          const user = rawUserData ? JSON.parse(rawUserData) : null;
+          setUserName(user?.fullName || `${user?.firstName || ""} ${user?.lastName || ""}`.trim() || "Admin User");
+          
+          let role = getTabSafeItem("user_role");
+          if (!role) {
+            role = localStorage.getItem("user_role");
+          }
+          setUserRole(role || "ADMIN");
+        } catch (error) {
+          console.error("Error updating user data from storage:", error);
+        }
+      }
+    };
+
+    // Listen for BroadcastChannel messages for real-time updates
+    let broadcastChannel = null;
+    if (typeof BroadcastChannel !== 'undefined') {
+      broadcastChannel = new BroadcastChannel('crm-updates');
+      broadcastChannel.onmessage = (e) => {
+        if (e.data?.type === 'CUSTOMER_UPDATED') {
+          console.log("🔄 Customer updated in another tab, refreshing list...");
+          fetchCustomers();
+        }
+        
+        if (e.data?.type === 'DEAL_STAGE_CHANGED') {
+          console.log("🔄 Deal stage changed in another tab, refreshing deals...");
+          fetchDeals();
+        }
+      };
+    }
+
+    window.addEventListener('storage', handleStorageChange);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      if (broadcastChannel) {
+        broadcastChannel.close();
+      }
+    };
+  }, []);
+
+  // 🔥 CRITICAL: Tab-safe auth user function
+  const getTabSafeAuthUser = () => {
+    if (typeof window === 'undefined') return null;
+    try {
+      let rawUserData = getTabSafeItem("user_data");
+      if (!rawUserData) {
+        rawUserData = localStorage.getItem("user_data");
+      }
+      return rawUserData ? JSON.parse(rawUserData) : null;
+    } catch (error) {
+      console.error("Error getting auth user:", error);
+      return null;
+    }
+  };
 
   const [customers, setCustomers] = useState([]);
 
@@ -60,6 +155,10 @@ export default function CustomersPage() {
   const [clientFieldDefinitions, setClientFieldDefinitions] = useState([]);
 
   const [showExcelUploadModal, setShowExcelUploadModal] = useState(false);
+
+  // 🎯 Account transfer dialog state
+  const [showAccountTransferDialog, setShowAccountTransferDialog] = useState(false);
+  const [pendingStageChange, setPendingStageChange] = useState(null);
 
 
 
@@ -267,8 +366,8 @@ export default function CustomersPage() {
 
           try {
 
-            // 🔐 CRITICAL: Get user for backend authorization
-            const authUser = getAuthUser();
+            // 🔐 CRITICAL: Get user for backend authorization using tab-safe storage
+            const authUser = getTabSafeAuthUser();
             
             const addressesResponse = await fetch(`http://localhost:8080/api/clients/${customer.id}/addresses`, {
               headers: {
@@ -362,16 +461,91 @@ export default function CustomersPage() {
 
 
 
+  // 🔥 NEW: Fetch products for deals to calculate accurate values (like detail page)
+  const fetchDealProducts = async (dealId) => {
+    try {
+      const res = await backendApi.get(`/deals/${dealId}/products`);
+      const list = Array.isArray(res?.content) ? res.content : Array.isArray(res) ? res : [];
+      
+      // Adapt products like the detail page does
+      const adaptedProducts = list.map((ln) => {
+        const price = Number(ln.price ?? ln.unitPrice ?? 0) || 0;
+        const qty = Number(ln.qty ?? ln.quantity ?? 1) || 1;
+        const discount = Number(ln.discount ?? ln.discountAmount ?? 0) || 0;
+        const tax = Number(ln.tax ?? ln.taxAmount ?? 0) || 0;
+        
+        return {
+          id: ln.id,
+          dealProductId: ln.id,
+          productId: ln.productId ?? null,
+          name: ln.productName || ln.name || "Unknown Product",
+          price,
+          qty,
+          discount,
+          tax,
+          finalAmount: price * qty - discount + tax
+        };
+      });
+      
+      return adaptedProducts;
+    } catch (err) {
+      console.error(`Failed to fetch products for deal ${dealId}:`, err);
+      return [];
+    }
+  };
+
+  // 🔥 NEW: Calculate grand total from products (same as detail page)
+  const calculateGrandTotal = (products) => {
+    return products.reduce(
+      (sum, p) => sum + (p.price * p.qty - (p.discount || 0) + (p.tax || 0)),
+      0
+    );
+  };
+
   const fetchDeals = async () => {
     try {
       const res = await backendApi.get("/deals");
       const list = normalizeList(res);
 
       // 🔥 NORMALIZE: backend returns 'stage' but frontend expects 'stageCode'
-      const normalized = list.map(d => ({
-        ...d,
-        stageCode: d.stage || d.stageCode || ""
+      // 🔥 FIXED: Also normalize valueAmount from value_amount field
+      // 🔥 CRITICAL FIX: Normalize clientId from client_id to match mapping
+      // 🔥 NEW: Calculate actual values from products (like detail page)
+      const normalized = await Promise.all(list.map(async (d) => {
+        // Normalize basic fields first
+        const basicDeal = {
+          ...d,
+          clientId: d.clientId ?? d.client_id ?? d.client ?? null,
+          stageCode: d.stage || d.stageCode || "",
+        };
+
+        // 🔥 NEW: Fetch products and calculate actual value (like detail page)
+        try {
+          const products = await fetchDealProducts(d.id);
+          const calculatedValue = calculateGrandTotal(products);
+          
+          console.log(`🔍 Deal ${d.id} (${d.name}): ${products.length} products, calculated value: ₹${calculatedValue}`);
+          
+          return {
+            ...basicDeal,
+            valueAmount: calculatedValue > 0 ? calculatedValue : d.valueAmount ?? d.value_amount ?? 0,
+            _productCount: products.length,
+            _calculatedValue: calculatedValue
+          };
+        } catch (productErr) {
+          console.warn(`Failed to calculate value for deal ${d.id}, using fallback:`, productErr);
+          return {
+            ...basicDeal,
+            valueAmount: d.valueAmount ?? d.value_amount ?? 0,
+            _productCount: 0,
+            _calculatedValue: 0
+          };
+        }
       }));
+
+      // 🔍 DEBUG: Log sample deal data to understand structure
+      console.log("🔍 Sample deal data:", list.slice(0, 2));
+      console.log("🔍 Sample normalized deal data:", normalized.slice(0, 2));
 
       setDeals(normalized);
     } catch (err) {
@@ -872,21 +1046,21 @@ export default function CustomersPage() {
 
     const q = search.toLowerCase();
 
-    
-
-    // Text search filter
-
     const textMatch = name.includes(q) || email.includes(q) || phone.includes(q);
 
-    
+    // 🎯 Skip department/stage filtering for ACCOUNT users (they don't work with CRM deals)
+    const isAccountUser = userRole === "ACCOUNT";
+    if (isAccountUser) {
+      return textMatch; // Only apply text search for ACCOUNT users
+    }
 
-    // Department and stage filtering
-
+    // Department and stage filtering (for TL, ADMIN, MANAGER)
     let deptStageMatch = true;
 
     if (filterDepartment || filterStage) {
 
-      const customerDeals = deals.filter(deal => deal.clientId === customer.id);
+      // 🔥 CRITICAL FIX: Normalize clientId mapping for deal filtering
+      const customerDeals = deals.filter(deal => Number(deal?.clientId ?? deal?.client_id) === Number(customer.id));
 
       if (filterDepartment && filterStage) {
 
@@ -1063,7 +1237,15 @@ export default function CustomersPage() {
 
       const dealList = normalizeList(customerDeal);
 
-      const deal = dealList.find((d) => Number(d?.clientId) === Number(customer.id)) || dealList[0] || null;
+      // 🔥 CRITICAL FIX: Normalize clientId from client_id to match mapping
+      const normalizedDealList = dealList.map(d => ({
+        ...d,
+        clientId: d.clientId ?? d.client_id ?? d.client ?? null,
+        stageCode: d.stage || d.stageCode || "",
+        valueAmount: d.valueAmount ?? d.value_amount ?? 0
+      }));
+
+      const deal = normalizedDealList.find((d) => Number(d?.clientId) === Number(customer.id)) || normalizedDealList[0] || null;
 
       
 
@@ -1346,9 +1528,9 @@ export default function CustomersPage() {
 
 
 
-      // Get logged in user for owner fields
+      // Get logged in user for owner fields using tab-safe storage
 
-      const user = getLoggedInUser();
+      const user = getTabSafeAuthUser();
 
       
 
@@ -1586,7 +1768,8 @@ export default function CustomersPage() {
 
       if (selectedCustomer?.id) {
 
-        const existingDeal = deals.find((deal) => Number(deal?.clientId) === Number(selectedCustomer.id));
+        // 🔥 CRITICAL FIX: Normalize clientId mapping for deal lookup
+        const existingDeal = deals.find((deal) => Number(deal?.clientId ?? deal?.client_id) === Number(selectedCustomer.id));
 
         if (existingDeal) {
 
@@ -1609,6 +1792,35 @@ export default function CustomersPage() {
       addToast(selectedCustomer?.id ? "Customer updated successfully" : "Customer created successfully", "success");
 
 
+
+      // 🔥 CRITICAL: Broadcast customer update to other tabs for real-time updates
+      if (typeof window !== 'undefined') {
+        const customerId = selectedCustomer?.id || response?.id;
+        if (customerId) {
+          // Custom event for same tab
+          const event = new CustomEvent('crm-data-update', {
+            detail: {
+              type: 'CUSTOMER_UPDATED',
+              customerId: customerId,
+              action: selectedCustomer?.id ? 'updated' : 'created',
+              userId: getTabSafeAuthUser()?.id
+            }
+          });
+          window.dispatchEvent(event);
+          
+          // BroadcastChannel for cross-tab communication
+          if (typeof BroadcastChannel !== 'undefined') {
+            const channel = new BroadcastChannel('crm-updates');
+            channel.postMessage({
+              type: 'CUSTOMER_UPDATED',
+              customerId: customerId,
+              action: selectedCustomer?.id ? 'updated' : 'created',
+              userId: getTabSafeAuthUser()?.id
+            });
+            channel.close();
+          }
+        }
+      }
 
       // Refresh data to show updated addresses
 
@@ -1756,7 +1968,8 @@ export default function CustomersPage() {
 
       // Remove associated deal
 
-      const customerDeal = deals.find(deal => deal.clientId === id);
+      // 🔥 CRITICAL FIX: Normalize clientId mapping for deal lookup
+      const customerDeal = deals.find(deal => Number(deal?.clientId ?? deal?.client_id) === Number(id));
 
       if (customerDeal) {
 
@@ -1800,7 +2013,8 @@ export default function CustomersPage() {
 
         setCustomers((prev) => prev.filter((c) => c.id !== id));
 
-        setDeals((prev) => prev.filter((d) => d.clientId !== id));
+        // 🔥 CRITICAL FIX: Normalize clientId mapping for deal filtering
+        setDeals((prev) => prev.filter((d) => Number(d?.clientId ?? d?.client_id) !== Number(id)));
 
         
 
@@ -1904,47 +2118,50 @@ export default function CustomersPage() {
 
         <div className="mb-4 flex flex-wrap items-center gap-3">
 
-          {/* Department Filter */}
+          {/* 🎯 Hide department/stage filters for ACCOUNT users */}
+          {userRole !== "ACCOUNT" && (
+            <>
+              {/* Department Filter */}
 
-          <select
-            value={filterDepartment}
-            onChange={async (e) => {
-              const dept = e.target.value;
-              
-              setFilterDepartment(dept);
-              setFilterStage("");
+              <select
+                value={filterDepartment}
+                onChange={async (e) => {
+                  const dept = e.target.value;
+                  
+                  setFilterDepartment(dept);
+                  setFilterStage("");
 
 
 
-              if (dept) {
+                  if (dept) {
 
-                const stages = await fetchStagesForDepartment(dept);
+                    const stages = await fetchStagesForDepartment(dept);
 
-                setFilterAvailableStages(stages || []);
+                    setFilterAvailableStages(stages || []);
 
-              } else {
+                  } else {
 
-                setFilterAvailableStages([]);
+                    setFilterAvailableStages([]);
 
-              }
+                  }
 
-            }}
+                }}
 
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
 
-          >
+              >
 
-            <option value="">All Departments</option>
+                <option value="">All Departments</option>
 
-            {Array.isArray(departments) && departments.length > 0 ? (
-              departments.map(dept => (
-                <option key={dept} value={dept}>{dept}</option>
-              ))
-            ) : (
-              <option disabled>Loading departments...</option>
-            )}
+                {Array.isArray(departments) && departments.length > 0 ? (
+                  departments.map(dept => (
+                    <option key={dept} value={dept}>{dept}</option>
+                  ))
+                ) : (
+                  <option disabled>Loading departments...</option>
+                )}
 
-          </select>
+              </select>
 
 
 
@@ -1984,7 +2201,8 @@ export default function CustomersPage() {
 
           </select>
 
-
+            </>
+          )}
 
           {/* Search */}
 
@@ -2140,7 +2358,22 @@ export default function CustomersPage() {
 
                   {filtered.map((customer) => {
 
-                    const customerDeal = deals.find(deal => deal.clientId === customer.id);
+                    // 🔥 CRITICAL FIX: Normalize clientId mapping for deal lookup
+                    const customerDeal = deals.find(deal => Number(deal?.clientId ?? deal?.client_id) === Number(customer.id));
+
+                    // 🔍 DEBUG: Log deal data to understand structure
+                    if (customer.id === 1 || customer.id === 2) { // Debug first few customers
+                      console.log(`🔍 Customer ${customer.id} deal data:`, customerDeal);
+                      console.log(`🔍 Available deal fields:`, customerDeal ? Object.keys(customerDeal) : 'No deal found');
+                      if (customerDeal) {
+                        console.log(`🔍 Deal ${customerDeal.id} value breakdown:`, {
+                          valueAmount: customerDeal.valueAmount,
+                          _productCount: customerDeal._productCount,
+                          _calculatedValue: customerDeal._calculatedValue,
+                          hasProducts: customerDeal._productCount > 0
+                        });
+                      }
+                    }
 
                     return (
 
@@ -2274,7 +2507,7 @@ export default function CustomersPage() {
 
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700">
 
-                          ${customerDeal?.valueAmount || 0}
+                          {customerDeal?.valueAmount ? `₹${Number(customerDeal.valueAmount).toLocaleString()}` : "-"}
 
                         </td>
 
@@ -3511,9 +3744,16 @@ export default function CustomersPage() {
                             disabled={!formDepartment}
 
                             onChange={(e) => {
-
-                              setForm({ ...form, stage: e.target.value });
-
+                              const newStage = e.target.value;
+                              
+                              // 🎯 Show confirmation dialog if ACCOUNT stage is selected
+                              if (newStage === "ACCOUNT") {
+                                setPendingStageChange(newStage);
+                                setShowAccountTransferDialog(true);
+                                return;
+                              }
+                              
+                              setForm({ ...form, stage: newStage });
                             }}
 
                             className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm disabled:bg-slate-100 disabled:text-slate-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
@@ -4016,7 +4256,8 @@ export default function CustomersPage() {
 
                     {(() => {
 
-                      const customerDeal = deals.find(deal => deal.clientId === selectedCustomer.id);
+                      // 🔥 CRITICAL FIX: Normalize clientId mapping for deal lookup
+                      const customerDeal = deals.find(deal => Number(deal?.clientId ?? deal?.client_id) === Number(selectedCustomer.id));
 
                       if (!customerDeal) return null;
 
@@ -4234,6 +4475,25 @@ export default function CustomersPage() {
           
           // Close modal
           setShowExcelUploadModal(false);
+        }}
+      />
+
+      {/* 🎯 Account Transfer Confirmation Dialog */}
+      <AccountTransferDialog
+        isOpen={showAccountTransferDialog}
+        dealName={form.name || "Untitled Deal"}
+        customerName={form.name || "Unknown Customer"}
+        onConfirm={async () => {
+          // Apply the pending stage change
+          setForm({ ...form, stage: pendingStageChange });
+          setShowAccountTransferDialog(false);
+          setPendingStageChange(null);
+          
+          addToast("Deal will be transferred to Accounts when saved", "info");
+        }}
+        onCancel={() => {
+          setShowAccountTransferDialog(false);
+          setPendingStageChange(null);
         }}
       />
 

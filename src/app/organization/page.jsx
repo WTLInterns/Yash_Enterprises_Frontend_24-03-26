@@ -86,6 +86,9 @@ export default function OrganizationPage() {
           ? (e?.reportingManagerName ?? '')   // TL: string from reportingManagerName
           : (e?.reportingManagerId ?? ''),    // Non-TL: numeric reportingManagerId
 
+      // ✅ TL ASSIGNMENT (for EMPLOYEE role)
+      tlId: e?.tlId ?? '',
+
       status: e?.status ?? 'ACTIVE',
       gender: e?.gender ?? '',
       dateOfBirth: e?.dateOfBirth ?? '',
@@ -251,7 +254,7 @@ export default function OrganizationPage() {
             console.log('Full first employee object:', JSON.stringify(data?.[0], null, 2)); // Full object debug
             
             const mapped = (data || []).map((e) => {
-                console.log('Mapping employee:', e.id, 'roleName:', e.roleName, 'teamName:', e.teamName, 'designationName:', e.designationName);
+                console.log('Mapping employee:', e.id, 'roleName:', e.roleName, 'tlId:', e.tlId, 'tlDepartmentName:', e.tlDepartmentName);
                 const name = e.firstName
                     ? `${e.firstName} ${e.lastName || ""}`.trim()
                     : e.employeeId || e.userId || "-";
@@ -269,7 +272,10 @@ export default function OrganizationPage() {
                     joiningDate: e.hiredAt,
                     reportingManager: e.reportingManagerName || "-",
                     team: e.teamName || "-",
-                    department: getCorrectDepartmentName(e.departmentName), // ✅ FIXED: Use departmentName with mapping
+                    // ✅ FIXED: Show TL name + department for EMPLOYEE
+                    department: e.roleName === 'EMPLOYEE' && e.tlId
+                      ? `${e.tlFullName || `${e.tlFirstName || ''} ${e.tlLastName || ''}`.trim()} (${getCorrectDepartmentName(e.tlDepartmentName)})`
+                      : getCorrectDepartmentName(e.departmentName),
                     designation: e.customDesignation || e.designationName || "-",
                     role: e.roleName || "-",
                     status: e.status || "-",

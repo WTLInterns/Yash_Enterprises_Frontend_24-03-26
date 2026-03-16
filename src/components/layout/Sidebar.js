@@ -108,6 +108,8 @@ const filterSectionsByRoleAndDepartment = (sections, user) => {
 
   const roleRestrictedItems = {
 
+    "hrm-dashboard": ["ADMIN", "MANAGER", "HR", "ACCOUNT"], // HRM Dashboard for Admin, Manager, HR, and Account department
+
     "address-edit-requests": ["ADMIN", "MANAGER", "TL", "ACCOUNT"], // TL & ACCOUNT can access address edit requests
 
     "tasks": ["ADMIN", "MANAGER", "TL"], // TL can access tasks
@@ -145,6 +147,8 @@ const filterSectionsByRoleAndDepartment = (sections, user) => {
     "unolo-sites",
 
     "expenses-invoices"
+
+    // Note: hrm-dashboard is NOT here because HR and ACCOUNT roles should also see it
 
   ];
 

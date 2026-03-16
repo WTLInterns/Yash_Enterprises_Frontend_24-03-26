@@ -60,6 +60,8 @@ const sidebarSections = [
 
       // ✅ REMOVED: Unolo dashboard for TL (will be handled by role-based routing)
 
+      { key: "hrm-dashboard", label: "HRM Dashboard", href: "/hrm", icon: "dashboard", accent: "indigo" },
+
       { key: "unolo-attendance", label: "Attendance", href: "/attendance", icon: "attendance", accent: "cyan" },
 
       { key: "unolo-leave", label: "Leave", href: "/leaves", icon: "leaves", accent: "rose" },

@@ -56,7 +56,8 @@ export function createApiClient({ baseUrl = "" } = {}) {
 
     const headers = {
 
-      "Content-Type": "application/json",
+      // 🔥 CRITICAL FIX: Don't set Content-Type for FormData - let browser set multipart boundary
+      ...(body instanceof FormData ? {} : { "Content-Type": "application/json" }),
 
       Accept: "application/json",
 
@@ -128,7 +129,7 @@ export function createApiClient({ baseUrl = "" } = {}) {
 
       headers,
 
-      body: body ? JSON.stringify(body) : undefined,
+      body: body instanceof FormData ? body : (body ? JSON.stringify(body) : undefined),
 
     });
 

@@ -52,16 +52,12 @@ const CustomerExcelUploadModal = ({ isOpen, onClose, onUploadSuccess }) => {
       const formData = new FormData();
       formData.append('file', file);
 
-      const response = await backendApi.post('/deals/upload-excel', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
+      const response = await backendApi.post('/deals/upload-excel', formData);
 
-      setUploadResult(response.data);
+      setUploadResult(response);
       
-      if (response.data.success > 0) {
-        onUploadSuccess?.(response.data);
+      if (response.success > 0) {
+        onUploadSuccess?.(response);
       }
     } catch (error) {
       console.error('Upload failed:', error);

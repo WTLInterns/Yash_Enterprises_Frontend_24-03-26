@@ -247,14 +247,47 @@ export default function AdminManagerCRMDashboard({ userName, userRole }) {
     });
 
     // Convert to array format
-    const result = stages.map(stage => ({
-      stage: stage.stageCode,
-      count: stageMap[stage.stageCode] || 0
+    return Object.entries(stageMap).map(([stage, count]) => ({
+      stage,
+      count
     }));
+  }, [deals, selectedDepartment, departments, getStagesForDepartment]);
 
-    console.log('🔥 [DASHBOARD] Funnel counts computed:', result);
+  // ✅ BANK DEPARTMENT STATS - Calculate bank-wise deal distribution
+  const bankDepartmentStats = useMemo(() => {
+    console.log('🔥 [DASHBOARD] Computing bank department stats');
+    
+    if (!deals.length || !bankRecords.length) {
+      console.log('🔥 [DASHBOARD] No deals or banks available for stats');
+      return [];
+    }
+
+    const result = bankRecords.map(bank => {
+      const deptCounts = {};
+      
+      // Initialize all departments with 0
+      departments.forEach(dept => {
+        deptCounts[dept] = deals.filter(
+          d => d.bankId === bank.id && d.department === dept
+        ).length;
+      });
+
+      const totalDeals = deals.filter(d => d.bankId === bank.id).length;
+
+      return {
+        bankName: bank.name || bank.bankName,
+        bankId: bank.id,
+        totalDeals,
+        departments: deptCounts
+      };
+    });
+
+    // Sort by total deals descending
+    result.sort((a, b) => b.totalDeals - a.totalDeals);
+
+    console.log('🔥 [DASHBOARD] Bank department stats calculated:', result);
     return result;
-  }, [selectedDepartment, deals, departments, getStagesForDepartment]);
+  }, [deals, bankRecords, departments]);
 
   // ✅ DYNAMIC DASHBOARD STATS - useMemo for performance
   const dashboardStats = useMemo(() => {
@@ -760,66 +793,77 @@ export default function AdminManagerCRMDashboard({ userName, userRole }) {
           />
         </div>
 
-        {/* Right Side - Records Data */}
+        {/* Right Side - Bank Pipeline Summary */}
         <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">
-            Recent Records - {selectedDepartment === 'ALL' ? 'All Departments' : selectedDepartment}
-          </h3>
-          
-          <div className="space-y-3 max-h-96 overflow-y-auto">
-            {(() => {
-              // 🔥 FIXED: Link customers with their deals to get department and stage info
-              const customersWithDeals = customers.slice(0, 10).map(customer => {
-                const customerDeal = deals.find(deal => Number(deal?.clientId) === Number(customer.id));
-                return {
-                  ...customer,
-                  department: customerDeal?.department || customer.department || 'No Department',
-                  stage: customerDeal?.stageCode || customer.stage || 'No Stage',
-                  valueAmount: customerDeal?.valueAmount || customer.valueAmount || 0
-                };
-              });
-
-              return customersWithDeals.length > 0 ? (
-                customersWithDeals.map((customer, index) => (
-                  <div key={customer.id || index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-100 hover:bg-gray-100 transition-colors">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900 truncate">
-                        {customer.customerName || customer.name || 'Unknown Customer'}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {customer.department} • {customer.stage}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        customer.stage === 'CLOSE_WIN' ? 'bg-green-100 text-green-800' :
-                        customer.stage === 'CLOSE_LOST' ? 'bg-red-100 text-red-800' :
-                        'bg-blue-100 text-blue-800'
-                      }`}>
-                        {customer.stage}
-                      </span>
-                      <span className="text-xs text-gray-500">
-                        ₹{(customer.valueAmount || 0).toLocaleString()}
-                      </span>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="text-center py-8">
-                  <div className="text-gray-500">
-                    <div className="text-lg font-medium mb-2">No records found</div>
-                    <div className="text-sm">No customer records available for the selected department</div>
-                  </div>
-                </div>
-              );
-            })()}
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-gray-900">
+              Bank Pipeline Summary
+            </h3>
+            <div className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+              {bankDepartmentStats.length} Banks
+            </div>
           </div>
           
-          {customers && customers.length > 10 && (
-            <div className="mt-4 text-center">
-              <button className="text-sm text-indigo-600 hover:text-indigo-800 font-medium">
-                View all {customers.length} records →
-              </button>
+          <div className="space-y-4 max-h-96 overflow-y-auto">
+            {bankDepartmentStats.length > 0 ? (
+              bankDepartmentStats.map((bank) => (
+                <div
+                  key={bank.bankId}
+                  className="p-4 bg-gray-50 rounded-lg border border-gray-200"
+                >
+                  <div className="flex justify-between items-center mb-3">
+                    <span className="font-semibold text-gray-900 text-base">
+                      {bank.bankName}
+                    </span>
+                    <span className="text-sm text-gray-600 bg-white px-3 py-1 rounded-full border">
+                      Total: {bank.totalDeals}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2 text-xs">
+                    {departments.map((dept) => (
+                      <div
+                        key={dept}
+                        className={`flex justify-between items-center p-2 rounded border ${
+                          bank.departments[dept] > 0 
+                            ? 'bg-white border-indigo-200' 
+                            : 'bg-gray-100 border-gray-200'
+                        }`}
+                      >
+                        <span className="font-medium text-gray-700">{dept}</span>
+                        <span className={`font-bold ${
+                          bank.departments[dept] > 0 
+                            ? 'text-indigo-600' 
+                            : 'text-gray-400'
+                        }`}>
+                          {bank.departments[dept]}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {bank.totalDeals === 0 && (
+                    <div className="text-center py-2 text-xs text-gray-500">
+                      No deals in any department
+                    </div>
+                  )}
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-8">
+                <div className="text-gray-500">
+                  <div className="text-lg font-medium mb-2">No bank data available</div>
+                  <div className="text-sm">Please ensure banks and deals are loaded</div>
+                </div>
+              </div>
+            )}
+          </div>
+          
+          {bankDepartmentStats.length > 0 && (
+            <div className="mt-4 pt-4 border-t border-gray-200">
+              <div className="text-xs text-gray-500 text-center">
+                Showing {bankDepartmentStats.length} banks • {departments.length} departments each
+              </div>
             </div>
           )}
         </div>

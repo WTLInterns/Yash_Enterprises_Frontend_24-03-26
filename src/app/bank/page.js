@@ -124,17 +124,41 @@ export default function BanksPage() {
 
   const handleCreateOrUpdate = async () => {
     try {
-      // Get logged-in user data
-      const userData = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('user_data') || '{}') : {};
+      // Get logged-in user data using utility functions
+      const userId = getCurrentUserId();
+      const userName = getCurrentUserName();
+      const userRole = getCurrentUserRole();
       
-      // Don't send ownerId from frontend - backend will set it from authenticated user
-      const employeeId = userData.id;
-      if (!employeeId) {
+      // Also check raw storage for debugging
+      const rawUserData = JSON.parse(localStorage.getItem('user_data') || sessionStorage.getItem('user_data') || '{}');
+      
+      console.log('🔍 [BANK] User authentication check:', {
+        userId_from_util: userId,
+        userName_from_util: userName,
+        userRole_from_util: userRole,
+        raw_userData: rawUserData,
+        raw_userId: rawUserData?.id || rawUserData?.userId,
+        storage_sources: {
+          localStorage_userData: localStorage.getItem('user_data'),
+          sessionStorage_userData: sessionStorage.getItem('user_data'),
+          localStorage_authUser: localStorage.getItem('authUser'),
+          sessionStorage_authUser: sessionStorage.getItem('authUser')
+        }
+      });
+      
+      // Check multiple sources for valid user ID
+      const validUserId = userId || rawUserData?.id || rawUserData?.userId;
+      
+      // ID 1 is actually valid in this system (it's the real user ID)
+      if (!validUserId) {
         toast.error("User not logged in. Please login again.");
+        console.error('🔍 [BANK] Authentication failed - No user ID found');
         return;
       }
       
-      // Create payload with correct field names (no ownerId)
+      console.log('🔍 [BANK] Authentication successful - User ID:', validUserId);
+      
+      // Create payload with correct field names (no ownerId - backend will set it)
       const payload = {
         name: form.name,
         branchName: form.branch,
@@ -159,7 +183,7 @@ export default function BanksPage() {
         }
       }
       
-      console.log('Sending payload:', payload);
+      console.log('🔍 [BANK] Sending payload:', payload);
       
       let savedId = selectedBank?.id;
       if (selectedBank) {
@@ -197,7 +221,7 @@ export default function BanksPage() {
       setForm({ name: "", branch: "", phone: "", website: "", address: "", district: "", taluka: "", pinCode: "", description: "", customFields: {} });
       setCurrentFieldValues({});
     } catch (err) {
-      console.error("Save failed:", err);
+      console.error("🔍 [BANK] Save failed:", err);
       const isNotFound = err?.status === 404 || err?.data?.status === 404;
       if (isNotFound) {
         toast.error("Bank not found. Reloading list...");
@@ -206,6 +230,22 @@ export default function BanksPage() {
         setSelectedBank(null);
         return;
       }
+      
+      // Handle authentication errors specifically
+      if (err?.status === 401 || err?.data?.message?.includes('Unauthorized')) {
+        toast.error("Session expired. Please login again.");
+        // Clear invalid session data
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('user_data');
+          sessionStorage.removeItem('user_data');
+          // Redirect to login after a short delay
+          setTimeout(() => {
+            window.location.href = '/login';
+          }, 2000);
+        }
+        return;
+      }
+      
       const errorMsg = err?.data?.message || err?.message || "Unknown error";
       toast.error(`Failed to save bank: ${errorMsg}`);
     }

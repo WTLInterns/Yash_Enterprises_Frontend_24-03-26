@@ -10,20 +10,57 @@ import {
   X,
   IndianRupee,
   Plus,
-  XCircle
+  XCircle,
+  Download,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
+import * as XLSX from "xlsx";
+import { saveAs } from "file-saver";
 
 export default function ExpenseOverviewPage() {
 
+  const [activeTab, setActiveTab] = useState('overview');
   const [expenses, setExpenses] = useState([]);
+  const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
 
   const [selectedExpense, setSelectedExpense] = useState(null);
   const [previewImage, setPreviewImage] = useState(null);
+  const [showFormModal, setShowFormModal] = useState(false);
+  const [editExpense, setEditExpense] = useState(null);
+  const [saving, setSaving] = useState(false);
+
+  // Get current user info for role-based filtering
+  const [currentUser, setCurrentUser] = useState(null);
+
+  // Function to get current user info
+  function getCurrentUser() {
+    try {
+      const userData = localStorage.getItem("user_data") || 
+                      localStorage.getItem("authUser") || 
+                      localStorage.getItem("user") ||
+                      sessionStorage.getItem("authUser") || 
+                      sessionStorage.getItem("user");
+      
+      if (userData) {
+        return JSON.parse(userData);
+      }
+    } catch (err) {
+      console.error("Failed to get current user:", err);
+    }
+    return null;
+  }
 
   useEffect(() => {
+    const user = getCurrentUser();
+    setCurrentUser(user);
     loadExpenses();
+    loadEmployees();
   }, []);
 
   async function loadExpenses() {
@@ -35,6 +72,71 @@ export default function ExpenseOverviewPage() {
       console.error('Failed to load expenses', err);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function loadEmployees() {
+    try {
+      const res = await backendApi.get('/employees');
+      setEmployees(res || []);
+    } catch (err) {
+      console.error("Failed to load employees", err);
+    }
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+
+    const formData = new FormData(e.target);
+
+    const file = formData.get("receipt");
+
+    // File validation
+    if(file && file.size > 5 * 1024 * 1024){
+      alert("File must be under 5MB");
+      return;
+    }
+
+    const payload = {
+      employeeId: formData.get("employeeId"),
+      category: formData.get("category"),
+      amount: formData.get("amount"),
+      description: formData.get("description"),
+      expenseDate: formData.get("expenseDate"),
+      status: formData.get("status")
+    };
+
+    const uploadData = new FormData();
+
+    uploadData.append("expense", JSON.stringify(payload));
+
+    if(file && file.size > 0){
+      uploadData.append("file", file);
+    }
+
+    try {
+      setSaving(true);
+
+      if(editExpense){
+        await backendApi.put(`/expenses/${editExpense.id}`, uploadData,{
+          headers:{ "Content-Type":"multipart/form-data" }
+        });
+      }else{
+        await backendApi.post(`/expenses`, uploadData,{
+          headers:{ "Content-Type":"multipart/form-data" }
+        });
+      }
+
+      setShowFormModal(false);
+      setEditExpense(null);
+      setPreviewImage(null);
+      e.target.reset();
+      loadExpenses();
+
+    } catch(err){
+      console.error("Failed saving expense", err);
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -62,6 +164,15 @@ export default function ExpenseOverviewPage() {
     setExpenses(prev => prev.map(e => e.id === id ? updated : e));
   }
 
+  function exportExcel() {
+    const worksheet = XLSX.utils.json_to_sheet(filtered);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Expenses");
+    const excelBuffer = XLSX.write(workbook, {bookType: "xlsx", type: "array"});
+    const fileData = new Blob([excelBuffer]);
+    saveAs(fileData, "expenses.xlsx");
+  }
+
   const summary = {
     pending: expenses.filter(e => e.status === 'PENDING').length,
     approved: expenses.filter(e => e.status === 'APPROVED').length,
@@ -69,10 +180,17 @@ export default function ExpenseOverviewPage() {
     paid: expenses.filter(e => e.status === 'PAID').length,
   };
 
-  const filtered = expenses.filter(e =>
-    e.employeeName?.toLowerCase().includes(search.toLowerCase()) ||
-    e.category?.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = expenses.filter(e => {
+    const searchMatch = 
+      e.employeeName?.toLowerCase().includes(search.toLowerCase()) ||
+      e.category?.toLowerCase().includes(search.toLowerCase());
+    
+    const statusMatch = !statusFilter || e.status === statusFilter;
+    
+    return searchMatch && statusMatch;
+  });
+
+  const paginatedExpenses = filtered.slice((page-1)*pageSize, page*pageSize);
 
   return (
     <DashboardLayout>
@@ -84,11 +202,27 @@ export default function ExpenseOverviewPage() {
           <div>
             <h1 className="text-xl font-semibold">Expenses</h1>
             <p className="text-sm text-gray-500">
-              Manage employee expenses across departments
+              {currentUser?.roleName === 'TL' 
+                ? `Manage ${currentUser?.department || 'your department'} expenses`
+                : 'Manage employee expenses across departments'
+              }
             </p>
+            {currentUser && (
+              <p className="text-xs text-gray-400 mt-1">
+                Logged in as: {currentUser.name || currentUser.firstName + ' ' + currentUser.lastName} 
+                ({currentUser.roleName || currentUser.role}) 
+                {currentUser.department && ` - ${currentUser.department}`}
+              </p>
+            )}
           </div>
 
-          <button className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-md text-sm hover:bg-indigo-700">
+          <button
+            onClick={()=>{
+              setEditExpense(null);
+              setShowFormModal(true);
+            }}
+            className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-md text-sm hover:bg-indigo-700"
+          >
             <Plus size={16}/>
             Add Expense
           </button>
@@ -104,13 +238,41 @@ export default function ExpenseOverviewPage() {
 
         {/* SEARCH */}
         <div className="bg-white border rounded-lg p-4 flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
-          <input
-            type="text"
-            placeholder="Search employee or category..."
-            value={search}
-            onChange={(e)=>setSearch(e.target.value)}
-            className="border rounded-md px-3 py-2 text-sm w-full md:w-72"
-          />
+          <div className="flex flex-col md:flex-row gap-3 flex-1">
+            <input
+              type="text"
+              placeholder="Search employee or category..."
+              value={search}
+              onChange={(e)=>{
+              setSearch(e.target.value);
+              setPage(1);
+            }}
+              className="border rounded-md px-3 py-2 text-sm w-full md:w-72"
+            />
+            
+            <select
+              value={statusFilter}
+              onChange={(e)=>{
+              setStatusFilter(e.target.value);
+              setPage(1);
+            }}
+              className="border px-3 py-2 rounded text-sm"
+            >
+              <option value="">All Status</option>
+              <option value="PENDING">Pending</option>
+              <option value="APPROVED">Approved</option>
+              <option value="REJECTED">Rejected</option>
+              <option value="PAID">Paid</option>
+            </select>
+          </div>
+          
+          <button
+            onClick={exportExcel}
+            className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded text-sm hover:bg-green-700"
+          >
+            <Download size={16}/>
+            Export Excel
+          </button>
         </div>
 
         {/* TABLE */}
@@ -138,7 +300,7 @@ export default function ExpenseOverviewPage() {
 
               <tbody>
 
-                {filtered.map(e => (
+                {paginatedExpenses.map(e => (
 
                   <tr key={e.id} className="border-b hover:bg-gray-50">
 
@@ -172,12 +334,12 @@ export default function ExpenseOverviewPage() {
 
                     {/* AMOUNT */}
                     <td className="p-3 font-semibold text-green-600">
-                      ₹{e.amount}
+                      ₹{Number(e.amount).toLocaleString()}
                     </td>
 
                     {/* DATE */}
                     <td className="p-3">
-                      {new Date(e.expenseDate).toLocaleDateString()}
+                      {e.expenseDate ? new Date(e.expenseDate).toLocaleDateString() : "-"}
                     </td>
 
                     {/* EVIDENCE */}
@@ -222,7 +384,10 @@ export default function ExpenseOverviewPage() {
                       <div className="flex justify-end gap-2">
 
                         <button
-                          onClick={()=>setSelectedExpense(e)}
+                          onClick={()=>{
+                            setEditExpense(e);
+                            setShowFormModal(true);
+                          }}
                           className="p-2 bg-gray-100 rounded"
                         >
                           <Eye size={14}/>
@@ -266,6 +431,36 @@ export default function ExpenseOverviewPage() {
 
         </div>
 
+        {/* PAGINATION */}
+        {filtered.length > pageSize && (
+          <div className="bg-white border rounded-lg p-4 flex justify-between items-center">
+            <div className="text-sm text-gray-600">
+              Showing {((page-1)*pageSize)+1} to {Math.min(page*pageSize, filtered.length)} of {filtered.length} expenses
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={()=>setPage(page-1)}
+                disabled={page===1}
+                className="flex items-center gap-2 px-3 py-2 border rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+              >
+                <ChevronLeft size={16}/>
+                Previous
+              </button>
+              <span className="px-3 py-2 border rounded text-sm bg-gray-50">
+                Page {page}
+              </span>
+              <button
+                onClick={()=>setPage(page+1)}
+                disabled={page*pageSize >= filtered.length}
+                className="flex items-center gap-2 px-3 py-2 border rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+              >
+                Next
+                <ChevronRight size={16}/>
+              </button>
+            </div>
+          </div>
+        )}
+
       </div>
 
       {/* IMAGE MODAL */}
@@ -274,23 +469,122 @@ export default function ExpenseOverviewPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center">
 
           <div
-            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
             onClick={()=>setPreviewImage(null)}
           />
 
-          <div className="relative bg-white p-4 rounded-lg shadow-lg">
+          <div className="relative w-[80vw] max-h-[90vh] bg-white rounded-lg shadow-lg overflow-auto p-6">
 
             <button
               onClick={()=>setPreviewImage(null)}
-              className="absolute -top-3 -right-3 bg-white rounded-full shadow"
+              className="absolute top-4 right-4"
             >
-              <XCircle size={22}/>
+              <XCircle size={24}/>
             </button>
 
             <img
               src={`http://localhost:8080${previewImage}`}
-              className="max-w-[500px] rounded"
+              className="w-full object-contain"
             />
+
+          </div>
+
+        </div>
+
+      )}
+
+      {/* FORM MODAL */}
+      {showFormModal && (
+
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+
+          <div
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            onClick={()=>setShowFormModal(false)}
+          />
+
+          <div className="relative bg-white rounded-lg shadow-lg w-[500px] p-6">
+
+            <button
+              onClick={()=>setShowFormModal(false)}
+              className="absolute top-3 right-3"
+            >
+              <XCircle size={22}/>
+            </button>
+
+            <h2 className="text-lg font-semibold mb-4">
+              {editExpense ? "Edit Expense" : "Add Expense"}
+            </h2>
+
+            <form onSubmit={handleSubmit} className="space-y-4" key={editExpense?.id || "new"}>
+
+              <select
+                name="employeeId"
+                defaultValue={editExpense?.employeeId || ""}
+                className="w-full border rounded px-3 py-2"
+              >
+                <option value="">Select Employee</option>
+                {employees.map(emp => (
+                  <option key={emp.id} value={emp.id}>
+                    {emp.firstName} {emp.lastName} — {emp.departmentName || 'No Department'} ({emp.roleName})
+                  </option>
+                ))}
+              </select>
+
+              <input
+                name="category"
+                defaultValue={editExpense?.category || ""}
+                placeholder="Category"
+                className="w-full border rounded px-3 py-2"
+              />
+
+              <input
+                name="amount"
+                defaultValue={editExpense?.amount || ""}
+                placeholder="Amount"
+                className="w-full border rounded px-3 py-2"
+              />
+
+              <textarea
+                name="description"
+                defaultValue={editExpense?.description || ""}
+                placeholder="Description"
+                className="w-full border rounded px-3 py-2"
+              />
+
+              <input
+                name="expenseDate"
+                type="date"
+                defaultValue={editExpense?.expenseDate || ""}
+                className="w-full border rounded px-3 py-2"
+              />
+
+              <select
+                name="status"
+                defaultValue={editExpense?.status || "PENDING"}
+                className="w-full border rounded px-3 py-2"
+              >
+                <option value="PENDING">Pending</option>
+                <option value="APPROVED">Approved</option>
+                <option value="REJECTED">Rejected</option>
+                <option value="PAID">Paid</option>
+              </select>
+
+              <input
+                name="receipt"
+                type="file"
+                className="w-full border rounded px-3 py-2"
+              />
+
+              <button
+                type="submit"
+                disabled={saving}
+                className="w-full bg-indigo-600 text-white py-2 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {saving ? "Saving..." : (editExpense ? "Update Expense" : "Add Expense")}
+              </button>
+
+            </form>
 
           </div>
 

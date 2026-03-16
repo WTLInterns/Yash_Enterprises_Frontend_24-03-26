@@ -4,18 +4,18 @@ export function createApiClient({ baseUrl = "" } = {}) {
 
   async function request(path, { method = "GET", body, customHeaders = {} } = {}) {
 
-    // Get auth token and user data from localStorage AND sessionStorage
-    const token = localStorage.getItem("auth_token") || localStorage.getItem("token") || sessionStorage.getItem("token");
+    // Get auth token and user data from sessionStorage first (most recent), then localStorage
+    const token = sessionStorage.getItem("token") || localStorage.getItem("token") || localStorage.getItem("auth_token");
     
-    // Try multiple sources for user data
-    let userData = localStorage.getItem("user_data") || localStorage.getItem("authUser") || localStorage.getItem("user");
+    // Try multiple sources for user data - prioritize sessionStorage
+    let userData = sessionStorage.getItem("authUser") || localStorage.getItem("user_data") || localStorage.getItem("authUser");
     if (!userData) {
-      userData = sessionStorage.getItem("authUser") || sessionStorage.getItem("user");
+      userData = localStorage.getItem("authUser") || localStorage.getItem("user");
     }
     
-    const user = localStorage.getItem("user");
+    const user = sessionStorage.getItem("user") || localStorage.getItem("user");
     
-    const userRole = localStorage.getItem("user_role") || sessionStorage.getItem("user_role");
+    const userRole = sessionStorage.getItem("user_role") || localStorage.getItem("user_role");
 
     
 
@@ -30,10 +30,9 @@ export function createApiClient({ baseUrl = "" } = {}) {
     });
     
     // 🔥 GET USER INFO FOR DEPARTMENT ISOLATION
-
     const parsedUser = userData ? JSON.parse(userData) : (user ? JSON.parse(user) : null);
 
-    const userId = parsedUser?.id || null;
+    const userId = parsedUser?.id || parsedUser?.userId || null;
 
     const userDepartment = parsedUser?.department || parsedUser?.departmentName || null;
 
@@ -41,8 +40,11 @@ export function createApiClient({ baseUrl = "" } = {}) {
     const actualUserRole = parsedUser?.role || parsedUser?.roleName || userRole;
     
     // 🔥 DEBUG: Log role extraction
-    console.log('🔍 [API] Role extraction:', {
+    console.log('🔍 [API] User data extraction:', {
       parsedUser: parsedUser,
+      parsedUserId: parsedUser?.id,
+      parsedUserId_alt: parsedUser?.userId,
+      finalUserId: userId,
       parsedUserRole: parsedUser?.role,
       parsedUserRoleName: parsedUser?.roleName,
       localStorageUserRole: userRole,
@@ -76,7 +78,7 @@ export function createApiClient({ baseUrl = "" } = {}) {
 
     // 🔥 ADD USER CONTEXT HEADERS FOR ALL CRM ENDPOINTS
 
-    if (path.includes('/deals') || path.includes('/tasks') || path.includes('/clients') || path.includes('/activities') || path.includes('/notes')) {
+    if (path.includes('/deals') || path.includes('/tasks') || path.includes('/clients') || path.includes('/activities') || path.includes('/notes') || path.includes('/expenses')) {
 
       if (userId) headers["X-User-Id"] = userId?.toString();
 

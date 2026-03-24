@@ -4061,156 +4061,116 @@ export default function CustomerDetailPage() {
 
 
   async function handleStageChange(newStage) {
+    if (!toCrmId(dealId)) return;
+    if (stageChangeInFlight.current) return;
 
-    console.log("🚀 [STAGE CHANGE] =======================");
-    console.log("🚀 [STAGE CHANGE] handleStageChange called with:", newStage);
-    console.log("🚀 [STAGE CHANGE] loggedInUser:", loggedInUser);
-    console.log("🚀 [STAGE CHANGE] User Department:", loggedInUser?.department);
-    console.log("🚀 [STAGE CHANGE] dealId:", dealId);
-
-    if (!toCrmId(dealId)) {
-      console.log("❌ [STAGE CHANGE] Invalid dealId - returning");
-      return;
-    }
-
-    if (stageChangeInFlight.current) {
-      console.log("❌ [STAGE CHANGE] Stage change already in flight - returning");
-      return;
-    }
-
-    // 🎯 Show confirmation dialog if ACCOUNT stage is selected
+    // 🎯 ACCOUNT stage: always request approval (ANY department)
+    // Don't directly execute — must go through Manager/Admin approval
     if (newStage === "ACCOUNT") {
-      console.log("🔄 [STAGE CHANGE] ACCOUNT stage selected - showing transfer dialog");
-      setShowAccountTransferDialog(true);
-      setPendingStageChange(newStage);
-      return;
-    }
-
-    // 🔥 NEW: Handle CLOSE_WON and CLOSE_LOST with approval workflow
-    if (newStage === "CLOSE_WON" || newStage === "CLOSE_LOST" || newStage === "CLOSE_WIN" || newStage === "CLOSE_LOST") {
-      console.log("🎯 [STAGE CHANGE] CLOSE STAGE DETECTED:", newStage);
-      console.log("🎯 [STAGE CHANGE] ALL users need to request approval for close stages");
-      
       setApprovalModal({
         isOpen: true,
         type: "question",
-        title: "Request Approval",
-        message: `Do you want to send this ${newStage.replace('_', ' ')} request to manager for approval?`,
+        title: "Request Account Transfer",
+        message: `Do you want to send this deal to Accounts? 
+Your request will be reviewed by the Manager/Admin before transfer.`,
         onConfirm: async () => {
-          console.log("✅ [STAGE CHANGE] User confirmed approval request for:", newStage);
           setApprovalModal(prev => ({ ...prev, isOpen: false }));
-          await requestClosureApproval(newStage);
+          await requestClosureApproval("ACCOUNT");
         },
-        onCancel: () => {
-          console.log("❌ [STAGE CHANGE] User cancelled approval request for:", newStage);
-          setApprovalModal(prev => ({ ...prev, isOpen: false }));
-        },
+        onCancel: () => setApprovalModal(prev => ({ ...prev, isOpen: false })),
         confirmText: "Send Request",
-        cancelText: "Cancel"
+        cancelText: "Cancel",
       });
       return;
     }
 
-    console.log(" [STAGE CHANGE] Regular stage change - calling executeStageChange for:", newStage);
-    await executeStageChange(newStage);
-    console.log(" [STAGE CHANGE] =======================");
-  }
-
-  //  Request closure approval for ACCOUNT department users
-  async function requestClosureApproval(stage) {
-    console.log(" [APPROVAL REQUEST] =======================");
-    console.log(" [APPROVAL REQUEST] requestClosureApproval called for stage:", stage);
-    console.log(" [APPROVAL REQUEST] dealId:", dealId);
-    console.log(" [APPROVAL REQUEST] loggedInUser:", loggedInUser);
-    
-    if (!toCrmId(dealId)) {
-      console.log(" [APPROVAL REQUEST] Invalid dealId - returning");
+    // 🎯 CLOSE_WON / CLOSE_LOST: approval workflow (for ACCOUNT dept)
+    if (
+      newStage === "CLOSE_WON" || newStage === "CLOSE_LOST" ||
+      newStage === "CLOSE_WIN"
+    ) {
+      setApprovalModal({
+        isOpen: true,
+        type: "question",
+        title: "Request Approval",
+        message: `Do you want to send this ${newStage.replace(/_/g, " ")} request to manager for approval?`,
+        onConfirm: async () => {
+          setApprovalModal(prev => ({ ...prev, isOpen: false }));
+          await requestClosureApproval(newStage);
+        },
+        onCancel: () => setApprovalModal(prev => ({ ...prev, isOpen: false })),
+        confirmText: "Send Request",
+        cancelText: "Cancel",
+      });
       return;
     }
 
-    try {
-      stageChangeInFlight.current = true;
-      console.log(" [APPROVAL REQUEST] Stage change in flight set to true");
-
-      //  Log user info before API call
-      console.log(" [APPROVAL REQUEST] User info before API call:");
-      console.log(" [APPROVAL REQUEST] - User ID:", loggedInUser?.id);
-      console.log(" [APPROVAL REQUEST] - User Department:", loggedInUser?.department);
-      console.log(" [APPROVAL REQUEST] - User Role:", loggedInUser?.role);
-
-      let response;
-      try {
-        response = await backendApi.post(`/approvals/deals/${toCrmId(dealId)}/request-close`, {
-          stage: stage,
-          reason: null // Optional reason can be added later
-        });
-      } catch (apiError) {
-        // Catch API errors here to prevent console logging
-        console.log(" [APPROVAL REQUEST] API call caught:", apiError.message);
-        throw apiError; // Re-throw to be handled by outer catch
-      }
-
-      console.log(" [APPROVAL REQUEST] API Response:", response);
-      
-      if (response.message) {
-        console.log(" [APPROVAL REQUEST] Success message:", response.message);
-        addToast(response.message, 'success');
-      }
-      
-      console.log(" [APPROVAL REQUEST] Approval request completed successfully");
-      console.log(" [APPROVAL REQUEST] =======================");
-      
-    } catch (error) {
-      console.log(" [APPROVAL REQUEST] Handling error in requestClosureApproval");
-      console.log(" [APPROVAL REQUEST] Error message:", error.message);
-      
-      let errorMessage = "Failed to request approval";
-      
-      // Parse error from API service (which returns JSON string in error.message)
-      try {
-        if (error.message) {
-          const errorData = JSON.parse(error.message);
-          if (errorData.error) {
-            errorMessage = errorData.error;
-            console.log(" [APPROVAL REQUEST] Extracted error message:", errorMessage);
-          }
-        }
-      } catch (parseError) {
-        // If parsing fails, use the original error message
-        errorMessage = error.message || "Failed to request approval";
-        console.log(" [APPROVAL REQUEST] Using original error message:", errorMessage);
-      }
-      
-      if (errorMessage.includes("Approval request already pending")) {
-        console.log(" [APPROVAL REQUEST] Handling duplicate request error");
-        setApprovalModal({
-          isOpen: true,
-          type: "error",
-          title: "Request Already Pending",
-          message: "An approval request for this deal is already pending. Please wait for the manager to approve or reject the existing request before submitting a new one.",
-          confirmText: "OK",
-          cancelText: "OK",
-          onConfirm: () => setApprovalModal(prev => ({ ...prev, isOpen: false })),
-          onCancel: () => setApprovalModal(prev => ({ ...prev, isOpen: false })),
-        });
-      } else {
-        console.log(" [APPROVAL REQUEST] Showing generic error modal");
-        setApprovalModal({
-          isOpen: true,
-          type: "error",
-          title: "Request Failed",
-          message: errorMessage,
-          confirmText: "OK",
-          cancelText: "OK",
-          onConfirm: () => setApprovalModal(prev => ({ ...prev, isOpen: false })),
-          onCancel: () => setApprovalModal(prev => ({ ...prev, isOpen: false })),
-        });
-      }
-    } finally {
-      console.log(" [APPROVAL REQUEST] Finally block - setting in flight to false");
-      stageChangeInFlight.current = false;
-    }
+    // All other stages: execute directly
+    await executeStageChange(newStage);
   }
+
+  async function requestClosureApproval(stage) {
+  if (!toCrmId(dealId)) return;
+
+  try {
+    stageChangeInFlight.current = true;
+
+    let response;
+    try {
+      response = await backendApi.post(
+        `/approvals/deals/${toCrmId(dealId)}/request-close`,
+        { stage: stage }
+      );
+    } catch (apiError) {
+      throw apiError;
+    }
+
+    // Show success toast
+    addToast(
+      response?.message ||
+      "Transfer request submitted! Waiting for Manager/Admin approval.",
+      "success"
+    );
+
+  } catch (error) {
+    let errorMessage = "Failed to request approval";
+    try {
+      if (error.message) {
+        const errorData = JSON.parse(error.message);
+        if (errorData.error) errorMessage = errorData.error;
+      }
+    } catch {
+      errorMessage = error.message || "Failed to request approval";
+    }
+
+    if (errorMessage.includes("Approval request already pending")) {
+      setApprovalModal({
+        isOpen: true,
+        type: "error",
+        title: "Request Already Pending",
+        message:
+          "An approval request for this deal is already pending. Please wait for the manager to respond before submitting a new one.",
+        confirmText: "OK",
+        cancelText: "OK",
+        onConfirm: () => setApprovalModal(prev => ({ ...prev, isOpen: false })),
+        onCancel:  () => setApprovalModal(prev => ({ ...prev, isOpen: false })),
+      });
+    } else {
+      setApprovalModal({
+        isOpen: true,
+        type: "error",
+        title: "Request Failed",
+        message: errorMessage,
+        confirmText: "OK",
+        cancelText: "OK",
+        onConfirm: () => setApprovalModal(prev => ({ ...prev, isOpen: false })),
+        onCancel:  () => setApprovalModal(prev => ({ ...prev, isOpen: false })),
+      });
+    }
+  } finally {
+    stageChangeInFlight.current = false;
+  }
+}
 
 
 

@@ -7,185 +7,105 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 
 export default function LeadApprovalsPage() {
   const user = getAuthUser();
-  
-  // Custom toast notification system
-  const [toast, setToast] = useState({ show: false, message: '', type: 'info' });
 
+  const [toast, setToast] = useState({ show: false, message: '', type: 'info' });
   const addToast = (message, type = 'info') => {
     setToast({ show: true, message, type });
     setTimeout(() => setToast({ show: false, message: '', type: 'info' }), 3000);
   };
-  
+
   const [approvals, setApprovals] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [mounted, setMounted] = useState(false);
   const [processing, setProcessing] = useState({});
 
-  // Fix hydration mismatch
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  // ── Format date safely (uses requestedAt, not createdAt) ──────────────────
+  const formatDate = (dateStr) => {
+    if (!dateStr) return "—";
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return "—";
+    return d.toLocaleString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
 
-  // Fetch pending approvals with enhanced data
+  // ── Fetch approvals (no extra deal/client calls — backend already has all data) ──
   const fetchApprovals = async () => {
-    if (!mounted) return;
-    
     try {
       setLoading(true);
       const data = await backendApi.get("/approvals/pending");
-      
-      // Enhance approvals with deal and client details
-      const enhancedApprovals = await Promise.all(
-        (data || []).map(async (approval) => {
-          try {
-            // Fetch deal details to get amount and client info
-            const dealResponse = await backendApi.get(`/deals/${approval.dealId}`);
-            const deal = dealResponse;
-            
-            // Fetch client details
-            const clientResponse = await backendApi.get(`/clients/${deal.clientId}`);
-            const client = clientResponse;
-            
-            return {
-              ...approval,
-              deal,
-              client,
-              // Use deal value amount for display
-              amount: deal.valueAmount || 0,
-              clientName: client.name || `Client #${deal.clientId}`
-            };
-          } catch (err) {
-            console.error("Failed to fetch details for approval:", approval.id, err);
-            return {
-              ...approval,
-              amount: 0,
-              clientName: `Client #${approval.dealId}`
-            };
-          }
-        })
-      );
-      
-      setApprovals(enhancedApprovals);
+      setApprovals(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Failed to fetch approvals:", error);
-      toast.error("Failed to fetch approvals");
+      addToast("Failed to fetch approvals", "error");
     } finally {
       setLoading(false);
     }
   };
 
-  // Fetch approvals on component mount
-  useEffect(() => {
-    if (mounted) {
-      fetchApprovals();
-    }
-  }, [mounted]);
-
-  // Auto-refresh approvals every 30 seconds
-  useEffect(() => {
-    if (!mounted) return;
-    
-    const interval = setInterval(() => {
-      fetchApprovals();
-    }, 30000); // 30 seconds
-
-    return () => clearInterval(interval);
-  }, [mounted]);
-
-  // Handle approval
-  const handleApprove = async (approvalId) => {
-    try {
-      setProcessing(prev => ({ ...prev, [approvalId]: 'approve' }));
-      
-      const response = await backendApi.post(`/approvals/${approvalId}/approve`);
-      
-      if (response.message) {
-        addToast(response.message, 'success');
-      }
-      
-      // Refresh approvals list
-      await fetchApprovals();
-      
-      // 🎯 Broadcast approval to other tabs (especially customer detail page)
-      if (typeof BroadcastChannel !== 'undefined') {
-        const broadcastChannel = new BroadcastChannel('crm-updates');
-        broadcastChannel.postMessage({
-          type: 'DEAL_APPROVAL_COMPLETED',
-          approvalId: approvalId,
-          timestamp: new Date().toISOString()
-        });
-        broadcastChannel.close();
-      }
-      
-    } catch (error) {
-      console.error("Failed to approve:", error);
-      addToast("Failed to approve request", 'error');
-    } finally {
-      setProcessing(prev => ({ ...prev, [approvalId]: null }));
-    }
-  };
-
-  // Handle rejection
-  const handleReject = async (approvalId) => {
-    try {
-      const reason = prompt("Please provide reason for rejection:");
-      if (!reason) return;
-      
-      setProcessing(prev => ({ ...prev, [approvalId]: 'reject' }));
-      
-      const response = await backendApi.post(`/approvals/${approvalId}/reject`, {
-        reason: reason
-      });
-      
-      if (response.message) {
-        addToast(response.message, 'success');
-      }
-      
-      // Refresh approvals list
-      await fetchApprovals();
-      
-      // 🎯 Broadcast rejection to other tabs (especially customer detail page)
-      if (typeof BroadcastChannel !== 'undefined') {
-        const broadcastChannel = new BroadcastChannel('crm-updates');
-        broadcastChannel.postMessage({
-          type: 'DEAL_APPROVAL_COMPLETED',
-          approvalId: approvalId,
-          timestamp: new Date().toISOString()
-        });
-        broadcastChannel.close();
-      }
-      
-    } catch (error) {
-      console.error("Failed to reject:", error);
-      addToast("Failed to reject request", 'error');
-    } finally {
-      setProcessing(prev => ({ ...prev, [approvalId]: null }));
-    }
-  };
-
   useEffect(() => {
     fetchApprovals();
+    // Auto-refresh every 60s (not 30s to avoid hammering)
+    const interval = setInterval(fetchApprovals, 60000);
+    return () => clearInterval(interval);
   }, []);
 
-  // Fix hydration mismatch - only render after mounted
-  if (!mounted) {
-    return (
-      <DashboardLayout>
-        <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-          <div className="text-slate-600">Loading...</div>
-        </div>
-      </DashboardLayout>
-    );
-  }
+  // ── Approve ──────────────────────────────────────────────────────────────
+  const handleApprove = async (approvalId, dealName) => {
+    if (!confirm(`Approve transfer of deal "${dealName}" to Accounts?`)) return;
+    try {
+      setProcessing(prev => ({ ...prev, [approvalId]: 'approve' }));
+      const response = await backendApi.post(`/approvals/${approvalId}/approve`, {});
+      addToast(response?.message || `Deal "${dealName}" approved!`, 'success');
+      await fetchApprovals();
 
-  // Check if user is MANAGER role
+      if (typeof BroadcastChannel !== 'undefined') {
+        const bc = new BroadcastChannel('crm-updates');
+        bc.postMessage({ type: 'DEAL_APPROVAL_COMPLETED', approvalId, status: 'APPROVED' });
+        bc.close();
+      }
+    } catch (error) {
+      console.error("Failed to approve:", error);
+      addToast("Failed to approve request", "error");
+    } finally {
+      setProcessing(prev => ({ ...prev, [approvalId]: null }));
+    }
+  };
+
+  // ── Reject ───────────────────────────────────────────────────────────────
+  const handleReject = async (approvalId, dealName) => {
+    const reason = prompt("Please provide reason for rejection:");
+    if (!reason?.trim()) return;
+    try {
+      setProcessing(prev => ({ ...prev, [approvalId]: 'reject' }));
+      const response = await backendApi.post(`/approvals/${approvalId}/reject`, { reason });
+      addToast(response?.message || `Deal "${dealName}" rejected.`, 'info');
+      await fetchApprovals();
+
+      if (typeof BroadcastChannel !== 'undefined') {
+        const bc = new BroadcastChannel('crm-updates');
+        bc.postMessage({ type: 'DEAL_APPROVAL_COMPLETED', approvalId, status: 'REJECTED' });
+        bc.close();
+      }
+    } catch (error) {
+      console.error("Failed to reject:", error);
+      addToast("Failed to reject request", "error");
+    } finally {
+      setProcessing(prev => ({ ...prev, [approvalId]: null }));
+    }
+  };
+
+  // ── Role guard ───────────────────────────────────────────────────────────
   if (user?.role !== 'MANAGER' && user?.role !== 'ADMIN') {
     return (
       <DashboardLayout>
         <div className="min-h-screen bg-slate-50 flex items-center justify-center">
           <div className="text-center">
             <h1 className="text-2xl font-bold text-slate-900 mb-4">Access Denied</h1>
-            <p className="text-slate-600">Only MANAGER and ADMIN role users can access this page.</p>
+            <p className="text-slate-600">Only MANAGER and ADMIN can access this page.</p>
             <p className="text-sm text-slate-500 mt-2">Your role: {user?.role || 'Unknown'}</p>
           </div>
         </div>
@@ -203,30 +123,25 @@ export default function LeadApprovalsPage() {
               <div>
                 <h1 className="text-2xl font-bold text-slate-900">Lead Approvals</h1>
                 <p className="text-sm text-slate-600 mt-1">
-                  Manage deal closure requests from ACCOUNT department
+                  Manage deal transfer requests to Accounts department
                 </p>
               </div>
               <button
                 onClick={fetchApprovals}
-                disabled={!mounted || loading}
+                disabled={loading}
                 className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
               >
-                {!mounted ? "Loading..." : loading ? "Refreshing..." : "Refresh"}
+                {loading ? "Refreshing..." : "Refresh"}
               </button>
             </div>
           </div>
         </div>
 
         {/* Content */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8" suppressHydrationWarning>
-          {!mounted ? (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          {loading ? (
             <div className="text-center py-12">
-              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-              <p className="mt-2 text-slate-600">Loading...</p>
-            </div>
-          ) : loading ? (
-            <div className="text-center py-12">
-              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600" />
               <p className="mt-2 text-slate-600">Loading approvals...</p>
             </div>
           ) : approvals.length === 0 ? (
@@ -241,92 +156,80 @@ export default function LeadApprovalsPage() {
                 <table className="min-w-full divide-y divide-slate-200">
                   <thead className="bg-slate-50">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                        Deal
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                        Client
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                        Email
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                        Phone
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                        Requested By
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                        Stage
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                        Requested At
-                      </th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">
-                        Actions
-                      </th>
+                      {["Deal", "Client", "From Dept", "Current Stage", "Value", "Requested By", "Requested At", "Actions"].map(h => (
+                        <th key={h} className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                          {h}
+                        </th>
+                      ))}
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-slate-200">
                     {approvals.map((approval) => (
                       <tr key={approval.id} className="hover:bg-slate-50">
+                        {/* Deal */}
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm font-medium text-slate-900">
-                            {approval.deal?.name || approval.dealName || `Deal #${approval.dealId}`}
+                            {approval.dealName || `Deal #${approval.dealId}`}
                           </div>
-                          <div className="text-xs text-slate-500">
-                            ID: {approval.dealId}
-                          </div>
+                          <div className="text-xs text-slate-500">ID: {approval.dealId}</div>
                         </td>
+
+                        {/* Client */}
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-slate-900">
-                            {approval.clientName}
+                            {approval.clientName || (approval.clientId ? `Client #${approval.clientId}` : "—")}
                           </div>
                         </td>
+
+                        {/* From Dept */}
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-slate-900">
-                            {approval.client?.email || 'N/A'}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-slate-900">
-                            {approval.client?.phone || approval.client?.contactPhone || 'N/A'}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-slate-900">
-                            {approval.requestedByName}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                            approval.requestedStage === 'CLOSE_WON' 
-                              ? 'bg-green-100 text-green-800' 
-                              : 'bg-red-100 text-red-800'
-                          }`}>
-                            {approval.requestedStage.replace('_', ' ')}
+                          <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                            {approval.fromDepartment || approval.currentDepartment || "—"}
                           </span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
-                          {new Date(approval.createdAt).toLocaleDateString()}
-                          <br />
-                          {new Date(approval.createdAt).toLocaleTimeString()}
+
+                        {/* Current Stage */}
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-slate-100 text-slate-700">
+                            {approval.currentStage || "—"}
+                          </span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <div className="flex justify-end space-x-2">
+
+                        {/* Value */}
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-slate-900">
+                          {approval.valueAmount
+                            ? `₹${Number(approval.valueAmount).toLocaleString("en-IN")}` 
+                            : "—"}
+                        </td>
+
+                        {/* Requested By — dynamic from backend */}
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-medium text-slate-900">
+                            {approval.requestedByName || `User #${approval.requestedByUserId}` || "—"}
+                          </div>
+                        </td>
+
+                        {/* Requested At — uses requestedAt (not createdAt!) */}
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
+                          {formatDate(approval.requestedAt)}
+                        </td>
+
+                        {/* Actions */}
+                        <td className="px-6 py-4 whitespace-nowrap text-right">
+                          <div className="flex justify-end gap-2">
                             <button
-                              onClick={() => handleApprove(approval.id)}
-                              disabled={processing[approval.id] === 'approve'}
-                              className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 disabled:opacity-50"
+                              onClick={() => handleApprove(approval.id, approval.dealName)}
+                              disabled={!!processing[approval.id]}
+                              className="px-3 py-1.5 bg-emerald-600 text-white text-xs font-semibold rounded-lg hover:bg-emerald-700 disabled:opacity-50 transition-colors"
                             >
-                              {processing[approval.id] === 'approve' ? "..." : "Approve"}
+                              {processing[approval.id] === 'approve' ? "..." : "✅ Approve"}
                             </button>
                             <button
-                              onClick={() => handleReject(approval.id)}
-                              disabled={processing[approval.id] === 'reject'}
-                              className="px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700 disabled:opacity-50"
+                              onClick={() => handleReject(approval.id, approval.dealName)}
+                              disabled={!!processing[approval.id]}
+                              className="px-3 py-1.5 bg-rose-600 text-white text-xs font-semibold rounded-lg hover:bg-rose-700 disabled:opacity-50 transition-colors"
                             >
-                              {processing[approval.id] === 'reject' ? "..." : "Reject"}
+                              {processing[approval.id] === 'reject' ? "..." : "❌ Reject"}
                             </button>
                           </div>
                         </td>
@@ -339,14 +242,13 @@ export default function LeadApprovalsPage() {
           )}
         </div>
       </div>
-      
-      {/* Toast Notification */}
+
+      {/* Toast */}
       {toast.show && (
         <div className={`fixed top-4 right-4 z-50 px-6 py-3 rounded-lg shadow-lg text-white transition-all duration-300 ${
-          toast.type === 'success' ? 'bg-green-500' :
-          toast.type === 'error' ? 'bg-red-500' :
-          toast.type === 'warning' ? 'bg-yellow-500' :
-          'bg-blue-500'
+          toast.type === 'success' ? 'bg-emerald-500' :
+          toast.type === 'error'   ? 'bg-rose-500'    :
+          toast.type === 'warning' ? 'bg-amber-500'   : 'bg-blue-500'
         }`}>
           {toast.message}
         </div>

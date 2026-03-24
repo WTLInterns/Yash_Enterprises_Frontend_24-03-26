@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { Calendar, Plus, Edit, Trash2, Save, X } from 'lucide-react';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import { Calendar, Plus, Edit, Trash2, Save, X, Search, Loader2 } from 'lucide-react';
 import InvoiceItemTable from './InvoiceItemTable';
 import DateField from './DateField';
 import UpiQrCode from './UpiQrCode';
 import LogoSignatureUpload from './LogoSignatureUpload';
 import { backendApi } from '../../../services/api';
+import { invoiceService } from '../../../services/invoiceService';
 import { generateInvoicePdf } from '../../../utils/pdfGenerator';
 
 export default function InvoiceForm({ initialData, onSave, onCancel, onChange }) {
@@ -54,6 +55,14 @@ export default function InvoiceForm({ initialData, onSave, onCancel, onChange })
   const [loading, setLoading] = useState(false);
   const isSubmitting = useRef(false);
 
+  // Client selection state
+  const [clients, setClients] = useState([]);
+  const [selectedClient, setSelectedClient] = useState(null);
+  const [loadingClients, setLoadingClients] = useState(false);
+  const [loadingClientProducts, setLoadingClientProducts] = useState(false);
+  const [clientSearchTerm, setClientSearchTerm] = useState('');
+  const [showClientDropdown, setShowClientDropdown] = useState(false);
+
   // Load initial data
   useEffect(() => {
     if (!initialData) return;
@@ -75,6 +84,127 @@ export default function InvoiceForm({ initialData, onSave, onCancel, onChange })
       loadPersistedFields();
     }
   }, [initialData]);
+
+  // Fetch clients on component mount
+  useEffect(() => {
+    fetchClients();
+  }, []);
+
+  // Fetch clients from API
+  const fetchClients = async () => {
+    setLoadingClients(true);
+    try {
+      const clientsData = await invoiceService.getCustomers();
+      setClients(clientsData || []);
+    } catch (error) {
+      console.error('Failed to fetch clients:', error);
+      setClients([]);
+    } finally {
+      setLoadingClients(false);
+    }
+  };
+
+  // Handle client selection
+  const handleClientSelect = async (client) => {
+    console.log("Selected Client:", client); // Debug log to verify correct client
+    
+    setSelectedClient(client);
+    setShowClientDropdown(false);
+    setClientSearchTerm(''); // Clear search term so input shows selected client name
+    
+    console.log("Client object used:", {
+      name: client.name,
+      contactPhone: client.contactPhone,
+      contactNumber: client.contactNumber,
+      email: client.email,
+      address: client.address,
+      gstin: client.gstin
+    });
+
+    setFormData((prev) => {
+      const next = {
+        ...prev,
+        billedToName: client.name || '',
+        billedToMobile: client.contactPhone || client.contactNumber || '',
+        billedToEmail: client.email || '',
+        billedToAddress: client.address || '',
+        billedToGstin: client.gstin || ''
+      };
+
+      console.log("Form after client select:", next);
+      onChange?.(next);
+      return next;
+    });
+    
+    // Fetch client's deal products
+    await fetchClientProducts(client.id);
+  };
+
+  // Handle manual name change (when user types instead of selecting)
+  const handleManualNameChange = (value) => {
+    setClientSearchTerm(value);
+    setShowClientDropdown(true);
+    
+    // If user clears the search, also clear the selected client
+    if (!value.trim()) {
+      setSelectedClient(null);
+    }
+    
+    // Only update form data if we're not overriding a selected client
+    // This prevents interference when user is typing vs when a client is selected
+    if (!selectedClient) {
+      setFormData((prev) => {
+        const next = {
+          ...prev,
+          billedToName: value
+        };
+        onChange?.(next);
+        return next;
+      });
+    }
+  };
+
+  // Fetch client's deal products
+  const fetchClientProducts = async (clientId) => {
+    setLoadingClientProducts(true);
+    try {
+      const products = await invoiceService.getClientDealProducts(clientId);
+      
+      if (products && products.length > 0) {
+        // Map deal products to invoice items
+        const invoiceItems = products.map(product => ({
+          id: Date.now() + Math.random(), // temporary ID
+          name: product.productName || '',
+          description: '',
+          qty: product.quantity || 1,
+          rate: product.unitPrice || 0,
+          discount: product.discount || 0,
+          tax: product.tax || 0,
+          total: product.total || (product.quantity * product.unitPrice) || 0
+        }));
+        
+        setFormData((prev) => {
+          const next = {
+            ...prev,
+            items: invoiceItems
+          };
+          onChange?.(next);
+          return next;
+        });
+      }
+    } catch (error) {
+      console.error('Failed to fetch client products:', error);
+    } finally {
+      setLoadingClientProducts(false);
+    }
+  };
+
+  // Filter clients based on search term
+  const filteredClients = clients.filter(client =>
+    client.name?.toLowerCase().includes(clientSearchTerm.toLowerCase()) ||
+    client.email?.toLowerCase().includes(clientSearchTerm.toLowerCase()) ||
+    client.contactPhone?.includes(clientSearchTerm)
+  );
 
   // Load persisted fields from localStorage
   const loadPersistedFields = () => {
@@ -108,6 +238,23 @@ export default function InvoiceForm({ initialData, onSave, onCancel, onChange })
   };
 
   const { subtotal, cgst, sgst, grandTotal } = calculateTotals();
+
+  const upiUri = useMemo(() => {
+    if (!formData.upiId || !formData.accountName) return '';
+
+    const amount = Number(grandTotal) || 0;
+    const params = new URLSearchParams({
+      pa: formData.upiId.trim(),
+      pn: formData.accountName.trim(),
+      am: amount.toFixed(2),
+      cu: 'INR',
+      tn: 'Invoice Payment'
+    });
+
+    const uri = `upi://pay?${params.toString()}`;
+    console.log('[UPI] QR payload:', { upiId: formData.upiId, accountName: formData.accountName, grandTotal: amount, uri });
+    return uri;
+  }, [formData.upiId, formData.accountName, grandTotal]);
 
   // Format currency
   const formatCurrency = (amount) => {
@@ -158,19 +305,7 @@ export default function InvoiceForm({ initialData, onSave, onCancel, onChange })
   };
 
   // Generate UPI URI
-  const generateUpiUri = () => {
-    if (!formData.upiId || !formData.accountName) return '';
-    
-    const params = new URLSearchParams({
-      pa: formData.upiId.trim(),
-      pn: encodeURIComponent(formData.accountName.trim()),
-      am: Number(grandTotal).toFixed(2),
-      cu: 'INR',
-      tn: 'Invoice Payment'
-    });
-    
-    return `upi://pay?${params.toString()}`;
-  };
+  const generateUpiUri = () => upiUri;
 
   // Handle form submission
   const handleSubmit = async (e) => {
@@ -424,17 +559,62 @@ export default function InvoiceForm({ initialData, onSave, onCancel, onChange })
       <div className="bg-white rounded-lg shadow p-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-6">Billed To</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
+          <div className="relative">
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Name
             </label>
-            <input
-              type="text"
-              value={formData.billedToName}
-              onChange={(e) => handleFieldChange('billedToName', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-              required
-            />
+            <div className="relative">
+              <input
+                type="text"
+                value={clientSearchTerm || formData.billedToName}
+                onChange={(e) => handleManualNameChange(e.target.value)}
+                onFocus={() => setShowClientDropdown(true)}
+                placeholder="Select customer or type name"
+                className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                required
+              />
+              {loadingClients ? (
+                <Loader2 className="absolute right-3 top-2.5 h-5 w-5 animate-spin text-gray-400" />
+              ) : (
+                <Search className="absolute right-3 top-2.5 h-5 w-5 text-gray-400" />
+              )}
+              
+              {/* Client Dropdown */}
+              {showClientDropdown && (
+                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                  {filteredClients.length > 0 ? (
+                    filteredClients.map((client) => (
+                      <div
+                        key={client.id}
+                        onClick={() => {
+                          console.log("Dropdown clicked - client:", client); // Debug log
+                          handleClientSelect(client);
+                        }}
+                        className="px-3 py-2 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0"
+                      >
+                        <div className="font-medium text-gray-900">{client.name}</div>
+                        <div className="text-sm text-gray-500">
+                          {client.email && `${client.email}`}
+                          {client.email && client.contactPhone && ' • '}
+                          {client.contactPhone}
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="px-3 py-2 text-gray-500 text-sm">
+                      {clientSearchTerm ? 'No clients found' : 'No clients available'}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            {/* Click outside to close dropdown */}
+            {showClientDropdown && (
+              <div
+                className="fixed inset-0 z-0"
+                onClick={() => setShowClientDropdown(false)}
+              />
+            )}
           </div>
           
           <div>
@@ -492,6 +672,12 @@ export default function InvoiceForm({ initialData, onSave, onCancel, onChange })
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-lg font-semibold text-gray-900">Items</h2>
           <div className="flex items-center gap-4">
+            {loadingClientProducts && (
+              <div className="flex items-center gap-2 text-sm text-indigo-600">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Loading products...
+              </div>
+            )}
             <div className="flex items-center gap-2">
               <label className="flex items-center gap-2">
                 <input
@@ -605,7 +791,7 @@ export default function InvoiceForm({ initialData, onSave, onCancel, onChange })
           <div className="mt-6">
             <h3 className="text-md font-medium text-gray-900 mb-4">UPI QR Code</h3>
             <UpiQrCode 
-              upiUri={generateUpiUri()} 
+              upiUri={upiUri} 
               amount={grandTotal}
               upiId={formData.upiId}
             />

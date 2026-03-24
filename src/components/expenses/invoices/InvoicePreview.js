@@ -71,8 +71,8 @@ export default function InvoicePreview({ data: invoice }) {
     
     const params = new URLSearchParams({
       pa: safeInvoice.upiId.trim(),
-      pn: encodeURIComponent(safeInvoice.accountName.trim()),
-      am: Number(safeInvoice.grandTotal || 0).toFixed(2),
+      pn: safeInvoice.accountName.trim(),
+      am: Number(grandTotal || 0).toFixed(2),
       cu: 'INR',
       tn: 'Invoice Payment'
     });
@@ -273,13 +273,9 @@ export default function InvoicePreview({ data: invoice }) {
                         alt="UPI QR Code"
                         className="w-32 h-32 border-2 border-gray-300 rounded-lg"
                       />
-                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                        <div className="bg-white bg-opacity-90 px-2 py-1 rounded text-xs font-medium">
-                          ₹{safeInvoice.grandTotal?.toFixed(2) || '0'}
-                        </div>
-                      </div>
                     </div>
                     <div className="text-center space-y-1">
+                      <p className="text-xs text-gray-600">Amount: ₹{Number(grandTotal || 0).toFixed(2)}</p>
                       <p className="text-sm text-gray-600">Maximum ₹1,00,000 via UPI</p>
                       <p className="text-xs font-medium text-gray-700">UPI ID: {safeInvoice.upiId}</p>
                     </div>

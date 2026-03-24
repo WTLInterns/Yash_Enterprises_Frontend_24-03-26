@@ -8,6 +8,7 @@ import {
   Users,
   UserCheck,
   Calendar,
+  CalendarX,
   Clock,
   TrendingUp,
   Briefcase,
@@ -514,26 +515,25 @@ export default function HRMDashboard() {
             <StatCard
               title="Total Employees"
               value={dashboardData.stats.totalEmployees}
-              icon={<Users className="w-6 h-6" />}
+              icon={Users}
               color="bg-blue-500"
             />
             <StatCard
               title="Team Leaders"
               value={dashboardData.stats.totalTLs}
-              icon={<UserCheck className="w-6 h-6" />}
+              icon={UserCheck}
               color="bg-green-500"
             />
             <StatCard
               title="Present Today"
               value={dashboardData.stats.presentToday}
-              icon={<Calendar className="w-6 h-6" />}
+              icon={Calendar}
               color="bg-purple-500"
-              subtitle={dashboardData.attendance.length === 0 ? "(No attendance data)" : ""}
             />
             <StatCard
-              title="Leave Requests"
-              value={dashboardData.stats.leavePending + dashboardData.stats.leaveApproved + dashboardData.stats.leaveRejected}
-              icon={<Clock className="w-6 h-6" />}
+              title="On Leave"
+              value={dashboardData.stats.onLeave}
+              icon={CalendarX}
               color="bg-orange-500"
             />
           </div>

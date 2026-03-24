@@ -246,6 +246,36 @@ export const invoiceService = {
       console.warn('Clients endpoint not available, returning empty array');
       return [];
     }
+  },
+
+  // Get client's deal products
+  async getClientDealProducts(clientId) {
+    try {
+      // First get the client's deal
+      const dealResponse = await backendApi.get(`/clients/${clientId}/deal`);
+      if (!dealResponse || !dealResponse.id) {
+        console.warn('No deal found for client:', clientId);
+        return [];
+      }
+      
+      // Then get products for that deal
+      const productsResponse = await backendApi.get(`/deals/${dealResponse.id}/products`);
+      return productsResponse || [];
+    } catch (error) {
+      console.warn('Failed to fetch client deal products:', error);
+      return [];
+    }
+  },
+
+  // Alternative: Get products directly by deal ID
+  async getDealProducts(dealId) {
+    try {
+      const productsResponse = await backendApi.get(`/deals/${dealId}/products`);
+      return productsResponse || [];
+    } catch (error) {
+      console.warn('Failed to fetch deal products:', error);
+      return [];
+    }
   }
 };
 

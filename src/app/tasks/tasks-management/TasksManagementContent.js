@@ -112,7 +112,7 @@ export default function TasksManagementContent() {
 
   const loadDepartments = async () => {
     try {
-      const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api.yashrajent.com';
+      const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080';
       console.log('🔍 Loading departments from:', `${API_BASE_URL}/api/stages/departments`);
       const response = await fetch(`${API_BASE_URL}/api/stages/departments`);
       const data = await response.json();
@@ -668,7 +668,7 @@ function TaskModal({ task, employees, customFields, departments, currentUser, on
 
   const loadClients = async () => {
     try {
-      const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api.yashrajent.com';
+      const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080';
       const response = await fetch(`${API_BASE_URL}/api/clients`);
       const data = await response.json();
       setClients(data || []);
@@ -679,7 +679,7 @@ function TaskModal({ task, employees, customFields, departments, currentUser, on
 
   const fetchCustomerAddresses = async (clientId) => {
     try {
-      const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api.yashrajent.com';
+      const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080';
       const response = await fetch(`${API_BASE_URL}/api/clients/${clientId}/addresses`);
       const data = await response.json();
       
@@ -716,7 +716,7 @@ function TaskModal({ task, employees, customFields, departments, currentUser, on
 
   const fetchCustomFields = async (taskType) => {
     try {
-      const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api.yashrajent.com';
+      const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080';
       const response = await fetch(`${API_BASE_URL}/api/task-custom-fields?customTaskType=${encodeURIComponent(taskType)}`);
       const data = await response.json();
       setModalCustomFields(data || []);
@@ -748,7 +748,7 @@ function TaskModal({ task, employees, customFields, departments, currentUser, on
 
   const handleCreateCustomField = async () => {
     try {
-      const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "https://api.yashrajent.com";
+      const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080";
 
       const payload = {
         customTaskType: formData.customTaskType,
@@ -785,7 +785,7 @@ function TaskModal({ task, employees, customFields, departments, currentUser, on
     setLoading(true);
 
     try {
-      const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api.yashrajent.com';
+      const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080';
 
       if (!formData.customerAddressId) {
         toast.error("Customer location is required. Please select a customer address with coordinates.");

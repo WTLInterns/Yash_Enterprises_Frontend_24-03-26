@@ -817,7 +817,7 @@ try {
 
 const res = await fetch(
 
-`https://api.yashrajent.com/api/clients/${customer.id}/addresses`,
+`http://localhost:8080/api/clients/${customer.id}/addresses`,
 
 {
 
@@ -1500,7 +1500,7 @@ return displayNames[addressType] || addressType;
 
 
 
-      const response = await fetch('https://api.yashrajent.com/api/clients/geocode', {
+      const response = await fetch('http://localhost:8080/api/clients/geocode', {
 
 
 
@@ -1728,7 +1728,7 @@ return displayNames[addressType] || addressType;
 
 
 
-      const response = await fetch('https://api.yashrajent.com/api/clients/reverse-geocode', {
+      const response = await fetch('http://localhost:8080/api/clients/reverse-geocode', {
 
 
 
@@ -2204,7 +2204,7 @@ return displayNames[addressType] || addressType;
       // but backendApi.get("/api/clients/...") becomes /api/api/clients/... → 500!
       const authUser = getTabSafeAuthUser();
       const addrResponse = await fetch(
-        `https://api.yashrajent.com/api/clients/${customer.id}/addresses`,
+        `http://localhost:8080/api/clients/${customer.id}/addresses`,
         {
           headers: {
             "X-User-Id":         authUser?.id         ?? "",
@@ -2744,7 +2744,7 @@ return displayNames[addressType] || addressType;
 
 
 
-        await fetch(`https://api.yashrajent.com/api/clients/${savedCustomer.id}/addresses`, {
+        await fetch(`http://localhost:8080/api/clients/${savedCustomer.id}/addresses`, {
 
 
 
@@ -2798,7 +2798,7 @@ return displayNames[addressType] || addressType;
 
 
 
-        await fetch(`https://api.yashrajent.com/api/clients/${savedCustomer.id}/addresses`, {
+        await fetch(`http://localhost:8080/api/clients/${savedCustomer.id}/addresses`, {
 
 
 
@@ -6692,7 +6692,7 @@ return displayNames[addressType] || addressType;
 
 
 
-                                  const response = await fetch(`https://api.yashrajent.com/api/banks/${bankId}`);
+                                  const response = await fetch(`http://localhost:8080/api/banks/${bankId}`);
 
 
 

@@ -364,7 +364,7 @@ export default function ExpenseOverviewPage() {
                         e.receiptUrl.match(/\.(jpg|jpeg|png)$/i) ?
 
                           <img
-                            src={`https://api.yashrajent.com${e.receiptUrl}`}
+                            src={`http://localhost:8080${e.receiptUrl}`}
                             onClick={() => setPreviewImage(e.receiptUrl)}
                             className="w-10 h-10 rounded object-cover border cursor-pointer"
                           />
@@ -372,7 +372,7 @@ export default function ExpenseOverviewPage() {
                           :
 
                           <a
-                            href={`https://api.yashrajent.com${e.receiptUrl}`}
+                            href={`http://localhost:8080${e.receiptUrl}`}
                             target="_blank"
                             className="text-indigo-600 text-xs underline"
                           >
@@ -497,7 +497,7 @@ export default function ExpenseOverviewPage() {
             </button>
 
             <img
-              src={`https://api.yashrajent.com${previewImage}`}
+              src={`http://localhost:8080${previewImage}`}
               className="w-full object-contain"
             />
 

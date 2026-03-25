@@ -127,7 +127,7 @@ export const invoiceService = {
   // Generate PDF for invoice
   async generateInvoicePdf(id) {
     try {
-      const response = await fetch(`https://api.yashrajent.com/api/invoices/${id}/pdf`, {
+      const response = await fetch(`http://localhost:8080/api/invoices/${id}/pdf`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('jwt_token')}`,
@@ -235,6 +235,18 @@ export const invoiceService = {
     } catch (error) {
       console.warn('Product deletion endpoint not available, returning mock response');
       return { success: true };
+    }
+  },
+
+  async getBanks() {
+    try {
+      const res = await backendApi.get('/banks');
+      if (Array.isArray(res)) return res;
+      if (res?.content && Array.isArray(res.content)) return res.content;
+      return [];
+    } catch (error) {
+      console.warn('Banks endpoint not available, returning empty array');
+      return [];
     }
   },
 

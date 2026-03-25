@@ -115,7 +115,7 @@ export default function InvoicesPage() {
   // � Download invoice PDF
   const downloadInvoice = async (invoiceId, invoiceNo) => {
     try {
-      const response = await fetch(`https://api.yashrajent.com/api/invoices/${invoiceId}/pdf`, {
+      const response = await fetch(`http://localhost:8080/api/invoices/${invoiceId}/pdf`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,

@@ -24,6 +24,15 @@ export default function InvoicePreview({ data: invoice }) {
     items: invoice.items || []
   };
 
+  const billedToDisplayName =
+    safeInvoice.selectedBankName ||
+    safeInvoice.selectedCustomer?.name ||
+    safeInvoice.billedToName;
+
+  const hasBank = !!safeInvoice.selectedBankName;
+
+  console.log('InvoicePreview - hasBank:', hasBank, 'selectedBankName:', safeInvoice.selectedBankName, 'selectedCustomer:', safeInvoice.selectedCustomer?.name);
+
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
@@ -140,14 +149,24 @@ export default function InvoicePreview({ data: invoice }) {
         <div>
           <h3 className="font-bold text-black mb-2">BILLED TO</h3>
           <div className="space-y-1 text-sm">
-            <p className="font-medium">{safeInvoice.billedToName}</p>
+            <p className="font-medium">{billedToDisplayName}</p>
             <p className="text-gray-600">{safeInvoice.billedToAddress}</p>
             {safeInvoice.billedToGstin && <p className="text-gray-600">GSTIN: {safeInvoice.billedToGstin}</p>}
-            {safeInvoice.billedToMobile && <p className="text-gray-600">Mobile: {safeInvoice.billedToMobile}</p>}
-            {safeInvoice.billedToEmail && <p className="text-gray-600">Email: {safeInvoice.billedToEmail}</p>}
+            {!hasBank && safeInvoice.billedToMobile && <p className="text-gray-600">Mobile: {safeInvoice.billedToMobile}</p>}
+            {!hasBank && safeInvoice.billedToEmail && <p className="text-gray-600">Email: {safeInvoice.billedToEmail}</p>}
           </div>
         </div>
       </div>
+
+      {/* Customer Name Display */}
+      {safeInvoice.selectedCustomer?.name && (
+        <div className="mb-4">
+          <p className="text-sm font-medium">
+            <span className="font-semibold">Customer Name :</span>{' '}
+            {safeInvoice.selectedCustomer.name}
+          </p>
+        </div>
+      )}
 
       {/* Items Table */}
       <div className="mb-6">

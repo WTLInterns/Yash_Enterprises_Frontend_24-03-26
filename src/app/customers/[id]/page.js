@@ -234,7 +234,7 @@ export default function CustomerDetailPage() {
       // ── Fetch fresh addresses ──
       const authUser = loggedInUser;
       const addrResponse = await fetch(
-        `https://api.yashrajent.com/api/clients/${customerId}/addresses`,
+        `http://localhost:8080/api/clients/${customerId}/addresses`,
         {
           headers: {
             "X-User-Id":         authUser?.id         ?? "",
@@ -873,7 +873,7 @@ export default function CustomerDetailPage() {
       return;
     }
     try {
-      const response = await fetch('https://api.yashrajent.com/api/clients/geocode', {
+      const response = await fetch('http://localhost:8080/api/clients/geocode', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -909,7 +909,7 @@ export default function CustomerDetailPage() {
     const lng = parseFloat(address.longitude);
     if (!lat || !lng) { addToast("Enter latitude and longitude first", "warning"); return; }
     try {
-      const response = await fetch('https://api.yashrajent.com/api/clients/reverse-geocode', {
+      const response = await fetch('http://localhost:8080/api/clients/reverse-geocode', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ latitude: lat, longitude: lng })
@@ -1096,7 +1096,7 @@ export default function CustomerDetailPage() {
 
         const authUser = loggedInUser;
 
-        const addressesResponse = await fetch(`https://api.yashrajent.com/api/clients/${customerId}/addresses`, {
+        const addressesResponse = await fetch(`http://localhost:8080/api/clients/${customerId}/addresses`, {
 
           headers: {
 
@@ -3716,7 +3716,7 @@ export default function CustomerDetailPage() {
 
 
 
-      const res = await fetch("https://api.yashrajent.com/api/case-documents/upload", {
+      const res = await fetch("http://localhost:8080/api/case-documents/upload", {
 
 
 
@@ -3848,7 +3848,7 @@ export default function CustomerDetailPage() {
 
 
 
-    window.open(`https://api.yashrajent.com/api/case-documents/download/${doc.id}`, "_blank");
+    window.open(`http://localhost:8080/api/case-documents/download/${doc.id}`, "_blank");
 
 
 
@@ -5227,7 +5227,7 @@ async function ensureDealId() {
       await clientApi.update(editForm.id, customerPayload);
 
       // Save addresses
-      await fetch(`https://api.yashrajent.com/api/clients/${editForm.id}/addresses`, {
+      await fetch(`http://localhost:8080/api/clients/${editForm.id}/addresses`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(addresses),
@@ -10421,7 +10421,7 @@ async function ensureDealId() {
 
 
 
-                              src={`https://api.yashrajent.com/api/case-documents/view/${viewingDoc.id}`}
+                              src={`http://localhost:8080/api/case-documents/view/${viewingDoc.id}`}
 
 
 
@@ -10441,7 +10441,7 @@ async function ensureDealId() {
 
 
 
-                                window.open(`https://api.yashrajent.com/api/case-documents/view/${viewingDoc.id}`, '_blank');
+                                window.open(`http://localhost:8080/api/case-documents/view/${viewingDoc.id}`, '_blank');
 
 
 

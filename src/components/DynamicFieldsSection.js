@@ -27,8 +27,8 @@ export default function DynamicFieldsSection({ entity, entityId, values, onChang
     try {
       // Use the correct endpoint for client field definitions
       const endpoint = entity === 'client' 
-        ? 'https://api.yashrajent.com/api/client-fields'
-        : `https://api.yashrajent.com/api/fields?entity=${entity}`;
+        ? 'http://localhost:8080/api/client-fields'
+        : `http://localhost:8080/api/fields?entity=${entity}`;
       
       const response = await fetch(endpoint);
       if (response.ok) {

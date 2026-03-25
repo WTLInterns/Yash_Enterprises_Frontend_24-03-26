@@ -137,7 +137,7 @@ export default function OrganizationPage() {
     const handleExport = async () => {
         try {
             console.log('Exporting employees...');
-            const response = await fetch('https://api.yashrajent.com/api/employees/export/excel', {
+            const response = await fetch('http://localhost:8080/api/employees/export/excel', {
                 method: 'GET',
                 headers: {
                     'Authorization': `Bearer ${localStorage.getItem('token') || 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhZG1pbkB5YXNoZW50ZXJwcmlzZXMuY29tIiwiaWF0IjoxNzM1ODk2NzQ0LCJleHAiOjE3MzU5ODAzNDR9.test'}`
@@ -425,7 +425,7 @@ export default function OrganizationPage() {
                                                     <img
                                                         src={employee.profileImageUrl.startsWith('http') 
                                                             ? employee.profileImageUrl 
-                                                            : `https://api.yashrajent.com${employee.profileImageUrl}`}
+                                                            : `http://localhost:8080${employee.profileImageUrl}`}
                                                         alt={employee.name}
                                                         className="w-10 h-10 rounded-full object-cover border-2 border-gray-300 mr-4"
                                                         onError={(e) => {
@@ -463,7 +463,7 @@ export default function OrganizationPage() {
                                                 <img
                                                     src={employee.profileImageUrl.startsWith('http') 
                                                         ? employee.profileImageUrl 
-                                                        : `https://api.yashrajent.com${employee.profileImageUrl}`}
+                                                        : `http://localhost:8080${employee.profileImageUrl}`}
                                                     alt={employee.name}
                                                     className="w-8 h-8 rounded-full object-cover border border-gray-300"
                                                     onError={(e) => {

@@ -1,11 +1,6 @@
 "use client";
 
 
-
-
-
-
-
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 
 
@@ -3775,20 +3770,20 @@ return displayNames[addressType] || addressType;
 
 
                 <div className="overflow-auto" style={{ maxHeight: 'calc(100vh - 220px)' }}>
-                  <table className="min-w-full divide-y divide-slate-200">
+                  <table className="min-w-full divide-y divide-slate-200" style={{ position: 'relative' }}>
 
 
-
-                <thead className="bg-slate-50">
+                <thead className="bg-slate-50" style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                   <tr>
-                    {/* Plain columns — no filter needed */}
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">ID</th>
+                    {/* Sticky ID column */}
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500 sticky left-0 bg-slate-50 z-20 border-r border-slate-200" style={{ position: 'sticky', left: 0, backgroundColor: 'rgb(248 250 252)', zIndex: 20 }}>ID</th>
 
-
+                    {/* Sticky Customer Name column */}
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500 sticky left-[72px] bg-slate-50 z-20 border-r border-slate-200" style={{ position: 'sticky', left: '72px', backgroundColor: 'rgb(248 250 252)', zIndex: 20 }}>
+                      Customer Name
+                    </th>
 
                     {/* Filterable columns — use ColFilterTh */}
-                    <ColFilterTh label="Customer Name" colKey="name"       {...colFilterProps} />
-                    {/* EMAIL COLUMN REMOVED */}
                     <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">Phone</th>
                     <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
                       {getAllAddressTypes().includes('PRIMARY') ? 'Primary Address' : 'Address'}
@@ -3878,33 +3873,23 @@ return displayNames[addressType] || addressType;
 
 
 
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">
-
-
+                        {/* Sticky ID column */}
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900 sticky left-0 bg-white z-10 border-r border-slate-200" style={{ position: 'sticky', left: 0, backgroundColor: 'white', zIndex: 10 }}>
 
                           {customer.id}
-
-
 
                         </td>
 
 
 
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">
-
-
+                        {/* Sticky Customer Name column */}
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900 sticky left-[72px] bg-white z-10 border-r border-slate-200" style={{ position: 'sticky', left: '72px', backgroundColor: 'white', zIndex: 10 }}>
 
                           <Link href={`/customers/${customer.id}`} className="hover:underline">
 
-
-
                             {customer.name}
 
-
-
                           </Link>
-
-
 
                         </td>
 

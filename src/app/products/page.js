@@ -363,9 +363,9 @@ export default function ProductsPage() {
         notifications: [],
       }}
     >
-      <div className="flex flex-col space-y-4">
-        {/* HEADER */}
-        <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-col h-[calc(100vh-80px)] overflow-hidden">
+        {/* Sticky Header Section */}
+        <div className="sticky top-0 z-20 bg-white pb-2 flex flex-wrap items-center justify-between gap-3">
           <div>
             <div className="text-lg font-semibold text-slate-900">Products</div>
             <p className="text-sm text-slate-500">Manage your product catalog</p>
@@ -382,28 +382,31 @@ export default function ProductsPage() {
           </div>
         </div>
 
-        {/* SEARCH */}
-        <div className="mb-4 flex items-center gap-2 border rounded px-3 py-2 w-96">
-          <Search size={18} className="text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search products..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="flex-1 outline-none"
-          />
+        {/* Sticky Search Box Section */}
+        <div className="sticky top-[60px] z-20 bg-white py-2 mb-2">
+          <div className="flex items-center gap-2 border rounded px-3 py-2 w-96">
+            <Search size={18} className="text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search products..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="flex-1 outline-none"
+            />
+          </div>
         </div>
 
-        {/* TABLE */}
-        {loading ? (
-          <div className="text-center py-8">Loading...</div>
-        ) : (
-          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-slate-200">
-                <thead className="bg-slate-50">
+        {/* Scrollable Table Section */}
+        <div className="flex-1 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div className="overflow-auto h-full">
+            {loading ? (
+              <div className="text-center py-8">Loading...</div>
+            ) : (
+              <table className="min-w-full divide-y divide-slate-200" style={{ position: 'relative' }}>
+                <thead className="bg-slate-50" style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
+                    {/* Sticky Product Name column */}
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500 sticky left-0 bg-slate-50 z-20 border-r border-slate-200" style={{ position: 'sticky', left: 0, backgroundColor: 'rgb(248 250 252)', zIndex: 20 }}>
                       Product Name
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
@@ -445,8 +448,8 @@ export default function ProductsPage() {
                 <tbody className="divide-y divide-slate-200 bg-white">
                   {filtered.map((product) => (
                     <tr key={product.id} className="hover:bg-slate-50">
-                      {/* Product Name */}
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">
+                      {/* Sticky Product Name column */}
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900 sticky left-0 bg-white z-10 border-r border-slate-200" style={{ position: 'sticky', left: 0, backgroundColor: 'white', zIndex: 10 }}>
                         {product.name}
                       </td>
 
@@ -539,9 +542,9 @@ export default function ProductsPage() {
                   )}
                 </tbody>
               </table>
-            </div>
+            )}
           </div>
-        )}
+        </div>
 
         {/* ✅ CREATE/EDIT MODAL */}
         {showCreateModal && (

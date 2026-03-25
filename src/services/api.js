@@ -185,7 +185,7 @@ export function createApiClient({ baseUrl = "" } = {}) {
 
 export const backendApi = createApiClient({
 
-  baseUrl: "http://localhost:8080/api",
+  baseUrl: "https://api.yashrajent.com/api",
 
 });
 

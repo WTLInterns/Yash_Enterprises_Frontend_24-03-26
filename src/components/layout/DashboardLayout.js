@@ -371,13 +371,13 @@ export default function DashboardLayout({ header, children }) {
       </div>
 
       {/* Main content: proper margin for fixed sidebar */}
-      <div className="flex-1 min-h-screen main-content overflow-x-hidden">
+      <div className="flex-1 min-h-screen main-content overflow-x-hidden flex flex-col">
         <Topbar
           tabs={header?.tabs || []}
           activeTabKey={getActiveTabKey()}
           onTabClick={(tab) => tab?.href && router.push(tab.href)}
         />
-        <main className="mx-auto w-full max-w-[1600px] px-4 sm:px-6 py-6 overflow-x-hidden">
+        <main className="flex-1 overflow-y-auto mx-auto w-full max-w-[1600px] px-4 sm:px-6 py-6">
           {children}
         </main>
       </div>

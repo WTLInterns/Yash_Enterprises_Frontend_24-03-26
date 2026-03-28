@@ -1,101 +1,46 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, Search, Edit2, Trash2, Eye, Building2, Phone, Globe, MapPin, Settings, X } from "lucide-react";
+import { Plus, Search, Edit2, Trash2, Building2, X, UserPlus, Trash, User } from "lucide-react";
 import { backendApi } from "@/services/api";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import DynamicFieldsSection from "@/components/DynamicFieldsSection";
-import { getCurrentUserName, getCurrentUserRole, getCurrentUserId } from "@/utils/userUtils";
-import {
-  fetchFieldDefinitions,
-  fetchFieldValues,
-  normalizeDefinitions,
-  normalizeValues,
-  upsertFieldValue,
-} from "@/services/crmFields";
+import { getCurrentUserName, getCurrentUserRole } from "@/utils/userUtils";
 import { toast } from "react-toastify";
+import Link from "next/link";
+
+const EMPTY_CONTACT = { fullName: "", email: "", position: "" };
 
 export default function BanksPage() {
-  // ✅ FIXED: Get dynamic user data
   const userName = getCurrentUserName();
   const userRole = getCurrentUserRole();
-  const userId = getCurrentUserId();
+
   const [banks, setBanks] = useState([]);
+  const [bankContacts, setBankContacts] = useState({}); // { bankId: [contacts] }
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showDetailsDrawer, setShowDetailsDrawer] = useState(false);
+  const [showModal, setShowModal] = useState(false);
   const [selectedBank, setSelectedBank] = useState(null);
-  const [form, setForm] = useState({
-    name: "",
-    branch: "",
-    phone: "",
-    website: "",
-    address: "",
-    district: "",
-    taluka: "",
-    pinCode: "",
-    description: "",
-    customFields: {},
-  });
-  const [fieldDefs, setFieldDefs] = useState([]);
-  const [dynamicColumns, setDynamicColumns] = useState([]);
-  const [bankFieldValuesById, setBankFieldValuesById] = useState({});
-  const [currentFieldValues, setCurrentFieldValues] = useState({});
+  const [form, setForm] = useState({ name: "", branch: "", website: "", address: "", district: "", taluka: "", pinCode: "" });
+  const [contacts, setContacts] = useState([{ ...EMPTY_CONTACT }]);
 
-  const getLoggedInUser = () => {
-    if (typeof window === "undefined") return { name: "Admin", role: "Administrator" };
-    try {
-      const raw = localStorage.getItem("user_data");
-      const obj = raw ? JSON.parse(raw) : null;
-      const name = obj?.name || obj?.fullName || obj?.username || obj?.email || "Admin";
-      const role = obj?.role || obj?.designation || "Administrator";
-      return { name, role };
-    } catch {
-      return { name: "Admin", role: "Administrator" };
-    }
-  };
-
-  const fetchBankFieldDefinitions = async () => {
-    try {
-      const defsRes = await fetchFieldDefinitions("bank");
-      const defs = normalizeDefinitions(defsRes);
-      setFieldDefs(defs);
-      setDynamicColumns(defs.filter((d) => d.active !== false).map((d) => d.fieldKey));
-    } catch (err) {
-      console.error("Failed to fetch bank field definitions", err);
-      setFieldDefs([]);
-      setDynamicColumns([]);
-    }
-  };
+  // Max contact columns to show in table (dynamic)
+  const maxContacts = Math.max(1, ...Object.values(bankContacts).map(c => c.length));
 
   const fetchBanks = async () => {
     setLoading(true);
     try {
-      const res = await backendApi.get("/banks");
-      const banksData = Array.isArray(res) ? res : (res?.content || []);
-      setBanks(banksData);
-      // If currently editing a bank that no longer exists, close modal and clear selection
-      if (selectedBank && !banksData.some(b => b.id === selectedBank.id)) {
-        setShowCreateModal(false);
-        setSelectedBank(null);
-      }
-      
-      // dynamic columns from definitions
-      setDynamicColumns((fieldDefs || []).filter((d) => d.active !== false).map((d) => d.fieldKey));
+      const res = await backendApi.get("/banks?size=9999");
+      const list = Array.isArray(res) ? res : (res?.content || []);
+      setBanks(list);
 
-      // values map for list table
-      const entries = await Promise.all(
-        (banksData || []).map(async (b) => {
-          try {
-            const vals = await fetchFieldValues("bank", b.id);
-            return [b.id, normalizeValues(vals)];
-          } catch (_e) {
-            return [b.id, {}];
-          }
+      // Fetch contacts for all banks in parallel
+      const contactEntries = await Promise.all(
+        list.map(async b => {
+          const c = await backendApi.get(`/banks/${b.id}/contacts`).catch(() => []);
+          return [b.id, Array.isArray(c) ? c : []];
         })
       );
-      setBankFieldValuesById(Object.fromEntries(entries));
+      setBankContacts(Object.fromEntries(contactEntries));
     } catch (err) {
       console.error("Failed to fetch banks:", err);
     } finally {
@@ -103,627 +48,289 @@ export default function BanksPage() {
     }
   };
 
-  useEffect(() => {
-    fetchBankFieldDefinitions();
-    fetchBanks();
-  }, []);
+  useEffect(() => { fetchBanks(); }, []);
 
-  // Helper function to format field names
-  const formatLabel = (key) => {
-    return key
-      .replace(/([A-Z])/g, ' $1')
-      .replace(/^./, str => str.toUpperCase())
-      .trim();
-  };
-
-  const filtered = banks.filter((b) =>
-    (b.bankName || b.name)?.toLowerCase().includes(search.toLowerCase()) ||
-    (b.branchName || b.branch)?.toLowerCase().includes(search.toLowerCase()) ||
-    b.phone?.toLowerCase().includes(search.toLowerCase())
+  const filtered = banks.filter(b =>
+    (b.name || "").toLowerCase().includes(search.toLowerCase()) ||
+    (b.branchName || "").toLowerCase().includes(search.toLowerCase()) ||
+    (b.taluka || "").toLowerCase().includes(search.toLowerCase()) ||
+    (b.district || "").toLowerCase().includes(search.toLowerCase())
   );
 
-  const handleCreateOrUpdate = async () => {
+  const openCreate = () => {
+    setSelectedBank(null);
+    setForm({ name: "", branch: "", website: "", address: "", district: "", taluka: "", pinCode: "" });
+    setContacts([{ ...EMPTY_CONTACT }]);
+    setShowModal(true);
+  };
+
+  const openEdit = async (bank) => {
     try {
-      // Get logged-in user data using utility functions
-      const userId = getCurrentUserId();
-      const userName = getCurrentUserName();
-      const userRole = getCurrentUserRole();
-      
-      // Also check raw storage for debugging
-      const rawUserData = JSON.parse(localStorage.getItem('user_data') || sessionStorage.getItem('user_data') || '{}');
-      
-      console.log('🔍 [BANK] User authentication check:', {
-        userId_from_util: userId,
-        userName_from_util: userName,
-        userRole_from_util: userRole,
-        raw_userData: rawUserData,
-        raw_userId: rawUserData?.id || rawUserData?.userId,
-        storage_sources: {
-          localStorage_userData: localStorage.getItem('user_data'),
-          sessionStorage_userData: sessionStorage.getItem('user_data'),
-          localStorage_authUser: localStorage.getItem('authUser'),
-          sessionStorage_authUser: sessionStorage.getItem('authUser')
-        }
-      });
-      
-      // Check multiple sources for valid user ID
-      const validUserId = userId || rawUserData?.id || rawUserData?.userId;
-      
-      // ID 1 is actually valid in this system (it's the real user ID)
-      if (!validUserId) {
-        toast.error("User not logged in. Please login again.");
-        console.error('🔍 [BANK] Authentication failed - No user ID found');
-        return;
-      }
-      
-      console.log('🔍 [BANK] Authentication successful - User ID:', validUserId);
-      
-      // Create payload with correct field names (no ownerId - backend will set it)
-      const payload = {
-        name: form.name,
-        branchName: form.branch,
-        phone: form.phone,
-        website: form.website,
-        address: form.address,
-        district: form.district,
-        taluka: form.taluka,
-        pinCode: form.pinCode,
-        description: form.description,
-        customFields: JSON.stringify(form.customFields || {}),
-        active: true,
-      };
-      
-      // Validate website URL
-      if (form.website && form.website.trim()) {
-        try {
-          new URL(form.website);
-        } catch {
-          toast.error("Invalid website URL. Please use format: https://example.com");
-          return;
-        }
-      }
-      
-      console.log('🔍 [BANK] Sending payload:', payload);
-      
-      let savedId = selectedBank?.id;
+      const fresh = await backendApi.get(`/banks/${bank.id}`);
+      const existing = await backendApi.get(`/banks/${bank.id}/contacts`).catch(() => []);
+      setSelectedBank(fresh);
+      setForm({ name: fresh.name || "", branch: fresh.branchName || "", website: fresh.website || "", address: fresh.address || "", district: fresh.district || "", taluka: fresh.taluka || "", pinCode: fresh.pinCode || "" });
+      setContacts(existing.length > 0 ? existing.map(c => ({ id: c.id, fullName: c.fullName || "", email: c.email || "", position: c.position || "" })) : [{ ...EMPTY_CONTACT }]);
+      setShowModal(true);
+    } catch { toast.error("Failed to load bank"); }
+  };
+
+  const handleSave = async () => {
+    if (!form.name?.trim()) { toast.error("Bank name is required"); return; }
+    try {
+      const payload = { name: form.name, branchName: form.branch, website: form.website, address: form.address, district: form.district, taluka: form.taluka, pinCode: form.pinCode, active: true };
+      let bankId;
       if (selectedBank) {
-        if (!selectedBank?.id) {
-          toast.error("Selected bank no longer exists. Reloading list...");
-          await fetchBanks();
-          setShowCreateModal(false);
-          setSelectedBank(null);
-          return;
-        }
         await backendApi.put(`/banks/${selectedBank.id}`, payload);
-        savedId = selectedBank.id;
-        toast.success("Bank updated successfully");
+        bankId = selectedBank.id;
+        toast.success("Bank updated");
       } else {
         const created = await backendApi.post("/banks", payload);
-        savedId = created?.id;
-        toast.success("Bank created successfully");
+        bankId = created.id;
+        toast.success("Bank created");
       }
-
-      if (savedId) {
-        const activeDefs = (fieldDefs || []).filter((d) => d.active !== false);
-        await Promise.all(
-          activeDefs.map((d) =>
-            upsertFieldValue("bank", savedId, d.fieldKey, currentFieldValues?.[d.fieldKey] ?? "")
-          )
-        );
+      // Sync contacts
+      if (selectedBank) {
+        const existing = await backendApi.get(`/banks/${bankId}/contacts`).catch(() => []);
+        await Promise.all(existing.map(c => backendApi.delete(`/banks/${bankId}/contacts/${c.id}`).catch(() => {})));
       }
-      
-      // Refresh list
-      await fetchBanks();
-      
-      // Reset form and close modal
-      setShowCreateModal(false);
-      setSelectedBank(null);
-      setForm({ name: "", branch: "", phone: "", website: "", address: "", district: "", taluka: "", pinCode: "", description: "", customFields: {} });
-      setCurrentFieldValues({});
-    } catch (err) {
-      console.error("🔍 [BANK] Save failed:", err);
-      const isNotFound = err?.status === 404 || err?.data?.status === 404;
-      if (isNotFound) {
-        toast.error("Bank not found. Reloading list...");
-        await fetchBanks();
-        setShowCreateModal(false);
-        setSelectedBank(null);
-        return;
-      }
-      
-      // Handle authentication errors specifically
-      if (err?.status === 401 || err?.data?.message?.includes('Unauthorized')) {
-        toast.error("Session expired. Please login again.");
-        // Clear invalid session data
-        if (typeof window !== 'undefined') {
-          localStorage.removeItem('user_data');
-          sessionStorage.removeItem('user_data');
-          // Redirect to login after a short delay
-          setTimeout(() => {
-            window.location.href = '/login';
-          }, 2000);
-        }
-        return;
-      }
-      
-      const errorMsg = err?.data?.message || err?.message || "Unknown error";
-      toast.error(`Failed to save bank: ${errorMsg}`);
-    }
+      await Promise.all(contacts.filter(c => c.fullName?.trim()).map(c =>
+        backendApi.post(`/banks/${bankId}/contacts`, { fullName: c.fullName, email: c.email, position: c.position })
+      ));
+      setShowModal(false);
+      fetchBanks();
+    } catch (err) { toast.error("Failed to save: " + (err?.message || "Unknown error")); }
   };
 
   const handleDelete = async (id) => {
     if (!confirm("Delete this bank?")) return;
     try {
       await backendApi.delete(`/banks/${id}`);
-      // Optimistic UI update
       setBanks(prev => prev.filter(b => b.id !== id));
-      // If we were editing this bank, close the modal and clear selection
-      if (selectedBank?.id === id) {
-        setShowCreateModal(false);
-        setSelectedBank(null);
-      }
-      toast.success("Bank deleted successfully");
-      // Refetch to ensure sync
-      await fetchBanks();
-    } catch (err) {
-      console.error("Delete failed:", err);
-      const isNotFound = err?.status === 404 || err?.data?.status === 404;
-      
-      if (isNotFound) {
-        toast.error("Already deleted. Refreshing list...");
-        await fetchBanks();
-        return;
-      }
-      
-      toast.error("Failed to delete bank");
-    }
+      toast.success("Bank deleted");
+    } catch { toast.error("Failed to delete bank"); }
   };
 
-  const openEdit = async (bank) => {
-    try {
-      if (!bank?.id) {
-        toast.error("Invalid bank selected");
-        return;
-      }
+  const addContact = () => setContacts(prev => [...prev, { ...EMPTY_CONTACT }]);
+  const removeContact = (i) => setContacts(prev => prev.filter((_, idx) => idx !== i));
+  const updateContact = (i, field, value) => setContacts(prev => prev.map((c, idx) => idx === i ? { ...c, [field]: value } : c));
 
-      // Always fetch latest bank from backend
-      const freshBank = await backendApi.get(`/banks/${bank.id}`);
-      let valuesMap = {};
-      try {
-        const valsRes = await fetchFieldValues("bank", bank.id);
-        valuesMap = normalizeValues(valsRes);
-      } catch (_e) {
-        valuesMap = {};
-      }
-
-      setSelectedBank(freshBank);
-      setForm({
-        name: freshBank.name || "",
-        branch: freshBank.branchName || "",
-        phone: freshBank.phone || "",
-        website: freshBank.website || "",
-        address: freshBank.address || "",
-        district: freshBank.district || "",
-        taluka: freshBank.taluka || "",
-        pinCode: freshBank.pinCode || "",
-        description: freshBank.description || "",
-      });
-
-      setCurrentFieldValues(valuesMap);
-      setShowCreateModal(true);
-    } catch (err) {
-      console.error("Failed to open edit:", err);
-
-      const isNotFound = err?.status === 404 || err?.data?.status === 404;
-      if (isNotFound) {
-        toast.error("Bank not found. Reloading list...");
-        await fetchBanks();
-        return;
-      }
-
-      toast.error("Failed to load bank details");
-    }
-  };
-
-  const openDetails = (bank) => {
-    setSelectedBank(bank);
-    setShowDetailsDrawer(true);
-  };
+  // Contact column headers: "Contact Person 1", "Contact Person 2", ...
+  const contactColCount = Math.max(1, maxContacts);
 
   return (
-    <DashboardLayout
-      header={{
-        project: 'Banks',
-        user: { name: userName, role: userRole },
-        notifications: [],
-      }}
-    >
+    <DashboardLayout header={{ project: "Banks", user: { name: userName, role: userRole }, notifications: [] }}>
       <div className="flex flex-col h-[calc(100vh-80px)] overflow-hidden">
-        {/* Sticky Header Section */}
+
+        {/* Header */}
         <div className="sticky top-0 z-20 bg-white pb-2 flex flex-wrap items-center justify-between gap-3">
           <div>
             <div className="text-lg font-semibold text-slate-900">Banks</div>
-            <p className="text-sm text-slate-500">All banks list</p>
+            <p className="text-sm text-slate-500">{banks.length} bank branch{banks.length !== 1 ? "es" : ""}</p>
           </div>
-
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
-            >
-              <span className="text-lg leading-none">+</span>
-              <span>Add Bank</span>
-            </button>
-          </div>
+          <button onClick={openCreate} className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 shadow-sm">
+            <Plus className="h-4 w-4" /> Add Bank
+          </button>
         </div>
 
-      {/* Sticky Search Box Section */}
+        {/* Search */}
         <div className="sticky top-[60px] z-20 bg-white py-2 mb-2">
-          <div className="flex items-center gap-2 border rounded px-3 py-2 w-96">
-            <Search size={18} className="text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search banks..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="flex-1 outline-none"
-            />
+          <div className="flex items-center gap-2 border border-slate-200 rounded-lg px-3 py-2 w-96 bg-white shadow-sm">
+            <Search size={16} className="text-slate-400 shrink-0" />
+            <input type="text" placeholder="Search bank, branch, taluka, district..." value={search} onChange={e => setSearch(e.target.value)} className="flex-1 outline-none text-sm bg-transparent" />
+            {search && <button onClick={() => setSearch("")}><X className="h-3.5 w-3.5 text-slate-400" /></button>}
           </div>
         </div>
 
-      {/* Scrollable Table Section */}
-      <div className="flex-1 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className="overflow-auto h-full">
-          {loading ? (
-            <div className="text-center py-8">Loading...</div>
-          ) : (
-            <table className="min-w-full divide-y divide-slate-200" style={{ position: 'relative' }}>
-              <thead className="bg-slate-50" style={{ position: 'sticky', top: 0, zIndex: 10 }}>
-                <tr>
-                  {/* Sticky Bank Name column */}
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500 sticky left-0 bg-slate-50 z-20 border-r border-slate-200" style={{ position: 'sticky', left: 0, backgroundColor: 'rgb(248 250 252)', zIndex: 20 }}>
-                    Bank Name
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
-                    Branch
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
-                    Phone
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
-                    Website
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
-                    Owner
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
-                    Address
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
-                    Taluka
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
-                    District
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
-                    Created
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
-                    Updated
-                  </th>
-                  {/* Dynamic custom fields columns */}
-                  {dynamicColumns.map(col => (
-                    <th key={col} className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
-                      {formatLabel(col)}
+        {/* Table */}
+        <div className="flex-1 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div className="overflow-auto h-full">
+            {loading ? (
+              <div className="flex items-center justify-center h-32 text-slate-400 text-sm">Loading banks...</div>
+            ) : (
+              <table className="min-w-full divide-y divide-slate-200">
+                <thead className="bg-slate-50" style={{ position: "sticky", top: 0, zIndex: 10 }}>
+                  <tr>
+                    {/* Frozen: Branch */}
+                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 whitespace-nowrap"
+                      style={{ position: "sticky", left: 0, background: "rgb(248 250 252)", zIndex: 20, borderRight: "1px solid #e2e8f0", minWidth: 160 }}>
+                      Branch Name
                     </th>
-                  ))}
-                  <th className="px-6 py-3 text-center text-xs font-medium uppercase tracking-wider text-slate-500">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200 bg-white">
-                {filtered.map((bank) => (
-                  <tr key={bank.id} className="hover:bg-slate-50">
-                    {/* Sticky Bank Name column */}
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900 sticky left-0 bg-white z-10 border-r border-slate-200" style={{ position: 'sticky', left: 0, backgroundColor: 'white', zIndex: 10 }}>
-                      <div className="flex items-center gap-2">
-                        <Building2 className="h-4 w-4 text-blue-600" />
-                        {bank.bankName || bank.name}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700">
-                      {bank.branchName || bank.branch || "-"}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700">
-                      {bank.phone || "-"}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700">
-                      {bank.website ? (
-                        <a href={bank.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 hover:underline">
-                          <Globe className="h-4 w-4" />
-                        </a>
-                      ) : (
-                        "-"
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700">
-                      {bank.ownerName || "-"}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-slate-700">
-                      <div className="flex items-center gap-1">
-                        <MapPin className="h-4 w-4 text-slate-400" />
-                        <span className="truncate max-w-xs">{bank.address || "-"}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700">
-                      {bank.taluka || "-"}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700">
-                      {bank.district || "-"}
-                    </td>
-                    {/* Created */}
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700">
-                      {bank.createdAt
-                        ? new Date(bank.createdAt).toLocaleString()
-                        : "-"}
-                    </td>
-                    {/* Updated */}
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700">
-                      {bank.updatedAt
-                        ? new Date(bank.updatedAt).toLocaleString()
-                        : "-"}
-                    </td>
-                    {/* Dynamic custom fields data */}
-                    {dynamicColumns.map(col => (
-                      <td key={col} className="px-6 py-4 whitespace-nowrap text-sm text-slate-700">
-                        {bankFieldValuesById?.[bank.id]?.[col] || "-"}
-                      </td>
+                    {/* Frozen: Bank */}
+                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 whitespace-nowrap"
+                      style={{ position: "sticky", left: 160, background: "rgb(248 250 252)", zIndex: 20, borderRight: "1px solid #e2e8f0", minWidth: 160 }}>
+                      Bank Name
+                    </th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 whitespace-nowrap">Taluka</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 whitespace-nowrap">District</th>
+                    {/* Dynamic contact columns */}
+                    {Array.from({ length: contactColCount }, (_, i) => (
+                      <th key={i} className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 whitespace-nowrap">
+                        Contact Person {i + 1}
+                      </th>
                     ))}
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700">
-                      <div className="flex items-center justify-center gap-2">
-                        <button
-                          onClick={() => openDetails(bank)}
-                          className="text-green-600 hover:text-green-800"
-                          title="View"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => openEdit(bank)}
-                          className="text-blue-600 hover:text-blue-800"
-                          title="Edit"
-                        >
-                          <Edit2 className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(bank.id)}
-                          className="text-red-600 hover:text-red-800"
-                          title="Delete"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </td>
+                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 whitespace-nowrap">Owner</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 whitespace-nowrap">Created</th>
+                    <th className="px-5 py-3 text-center text-xs font-semibold uppercase tracking-wider text-slate-500 whitespace-nowrap">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      </div>
-
-      {/* Create/Edit Modal */}
-      {showCreateModal && (
-        <>
-          <div
-            className="fixed inset-0 z-[60] bg-slate-900/60 backdrop-blur-sm animate-fadeIn"
-            onClick={() => setShowCreateModal(false)}
-          />
-          <div className="fixed inset-0 z-[70] flex items-center justify-center px-4 py-6">
-            <div
-              className="relative w-full max-w-2xl h-[80vh] transform overflow-hidden rounded-2xl border border-slate-200/80 bg-white/95 shadow-2xl shadow-slate-900/50 animate-slideInRight flex flex-col"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-start justify-between border-b border-slate-200/80 px-6 py-4">
-                <div>
-                  <h2 className="text-lg font-semibold text-slate-900">
-                    {selectedBank ? "Edit Bank" : "Create Bank"}
-                  </h2>
-                  <p className="mt-1 text-sm text-slate-500">
-                    {selectedBank ? "Update bank information" : "Add a new bank to your database"}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowCreateModal(false)}
-                  className="rounded-full p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
-                >
-                  <X className="h-5 w-5" />
-                </button>
-              </div>
-
-              <div className="flex-1 overflow-y-auto px-6 py-4">
-                <div className="space-y-6 max-h-full">
-                  <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-2">
-                        Bank Name <span className="text-rose-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={form.name}
-                        onChange={(e) => setForm({ ...form, name: e.target.value })}
-                        className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-colors"
-                        placeholder="Enter bank name"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-2">
-                        Branch Name
-                      </label>
-                      <input
-                        type="text"
-                        value={form.branch}
-                        onChange={(e) => setForm({ ...form, branch: e.target.value })}
-                        className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-colors"
-                        placeholder="Enter branch name"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-2">
-                        Phone Number
-                      </label>
-                      <input
-                        type="tel"
-                        value={form.phone}
-                        onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                        className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-colors"
-                        placeholder="Enter phone number"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">
-                      Website
-                    </label>
-                    <input
-                      type="url"
-                      value={form.website}
-                      onChange={(e) => setForm({ ...form, website: e.target.value })}
-                      className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-colors"
-                      placeholder="https://example.com"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">
-                      Address
-                    </label>
-                    <textarea
-                      value={form.address}
-                      onChange={(e) => setForm({ ...form, address: e.target.value })}
-                      rows={3}
-                      className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-colors resize-none"
-                      placeholder="Enter complete address"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-2">
-                        District
-                      </label>
-                      <input
-                        type="text"
-                        value={form.district}
-                        onChange={(e) => setForm({ ...form, district: e.target.value })}
-                        className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-colors"
-                        placeholder="Enter district"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-2">
-                        Taluka
-                      </label>
-                      <input
-                        type="text"
-                        value={form.taluka}
-                        onChange={(e) => setForm({ ...form, taluka: e.target.value })}
-                        className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-colors"
-                        placeholder="Enter taluka"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-2">
-                        Pin Code
-                      </label>
-                      <input
-                        type="text"
-                        value={form.pinCode}
-                        onChange={(e) => setForm({ ...form, pinCode: e.target.value })}
-                        className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-colors"
-                        placeholder="Enter pin code"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">
-                      Description
-                    </label>
-                    <textarea
-                      value={form.description}
-                      onChange={(e) => setForm({ ...form, description: e.target.value })}
-                      rows={2}
-                      className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-colors resize-none"
-                      placeholder="Enter bank description"
-                    />
-                  </div>
-
-                  <DynamicFieldsSection
-                    entity="bank"
-                    entityId={selectedBank?.id}
-                    values={form.customFields}
-                    onChange={(values) => setForm({ ...form, customFields: values })}
-                  />
-                </div>
-              </div>
-
-              <div className="border-t border-slate-200/80 px-6 py-4">
-                <div className="flex items-center justify-between">
-                  <div className="text-sm text-slate-500">
-                    <span className="text-rose-500">*</span> Required fields
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setShowCreateModal(false)}
-                      className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleCreateOrUpdate}
-                      className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 transition-colors"
-                    >
-                      {selectedBank ? "Update Bank" : "Create Bank"}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </>
-      )}
-
-      {/* Details Drawer */}
-      {showDetailsDrawer && selectedBank && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex justify-end z-50">
-          <div className="bg-white w-full max-w-md h-full overflow-y-auto p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold">Bank Details</h2>
-              <button onClick={() => setShowDetailsDrawer(false)} className="text-gray-500 hover:text-gray-700">
-                ✕
-              </button>
-            </div>
-            <div className="space-y-3">
-              <div><strong>Name:</strong> {selectedBank.bankName || selectedBank.name}</div>
-              <div><strong>Branch:</strong> {selectedBank.branchName || selectedBank.branch}</div>
-              <div><strong>Phone:</strong> {selectedBank.phone}</div>
-              <div><strong>Website:</strong> {selectedBank.website ? <a href={selectedBank.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">{selectedBank.website}</a> : "-"}</div>
-              <div><strong>Address:</strong> {selectedBank.address}</div>
-            </div>
+                </thead>
+                <tbody className="divide-y divide-slate-100 bg-white">
+                  {filtered.map(bank => {
+                    const bContacts = bankContacts[bank.id] || [];
+                    return (
+                      <tr key={bank.id} className="hover:bg-slate-50 transition-colors">
+                        {/* Frozen Branch */}
+                        <td className="px-5 py-3 whitespace-nowrap text-sm font-medium"
+                          style={{ position: "sticky", left: 0, background: "white", zIndex: 10, borderRight: "1px solid #e2e8f0" }}>
+                          <Link href={`/banks/${bank.id}`} className="flex items-center gap-1.5 text-indigo-600 hover:text-indigo-800 hover:underline">
+                            <Building2 className="h-3.5 w-3.5 shrink-0" />
+                            <span>{bank.branchName || "—"}</span>
+                          </Link>
+                        </td>
+                        {/* Frozen Bank */}
+                        <td className="px-5 py-3 whitespace-nowrap text-sm font-medium"
+                          style={{ position: "sticky", left: 160, background: "white", zIndex: 10, borderRight: "1px solid #e2e8f0" }}>
+                          <Link href={`/banks/${bank.id}`} className="text-indigo-600 hover:text-indigo-800 hover:underline">
+                            {bank.name || "—"}
+                          </Link>
+                        </td>
+                        <td className="px-5 py-3 whitespace-nowrap text-sm text-slate-600">{bank.taluka || "—"}</td>
+                        <td className="px-5 py-3 whitespace-nowrap text-sm text-slate-600">{bank.district || "—"}</td>
+                        {/* Dynamic contact cells */}
+                        {Array.from({ length: contactColCount }, (_, i) => {
+                          const c = bContacts[i];
+                          return (
+                            <td key={i} className="px-5 py-3 whitespace-nowrap text-sm text-slate-600">
+                              {c ? (
+                                <div className="flex items-center gap-1.5">
+                                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-100 shrink-0">
+                                    <User className="h-3 w-3 text-indigo-600" />
+                                  </div>
+                                  <div>
+                                    <div className="font-medium text-slate-800 text-xs">{c.fullName}</div>
+                                    {c.position && <div className="text-xs text-slate-400">{c.position}</div>}
+                                  </div>
+                                </div>
+                              ) : (
+                                <span className="text-slate-300">—</span>
+                              )}
+                            </td>
+                          );
+                        })}
+                        <td className="px-5 py-3 whitespace-nowrap text-sm text-slate-600">{bank.ownerName || "—"}</td>
+                        <td className="px-5 py-3 whitespace-nowrap text-sm text-slate-500">
+                          {bank.createdAt ? new Date(bank.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—"}
+                        </td>
+                        <td className="px-5 py-3 whitespace-nowrap text-center">
+                          <div className="flex items-center justify-center gap-2">
+                            <button onClick={() => openEdit(bank)} className="p-1.5 rounded-md text-blue-600 hover:bg-blue-50" title="Edit"><Edit2 className="h-3.5 w-3.5" /></button>
+                            <button onClick={() => handleDelete(bank.id)} className="p-1.5 rounded-md text-red-500 hover:bg-red-50" title="Delete"><Trash2 className="h-3.5 w-3.5" /></button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {!filtered.length && (
+                    <tr><td colSpan={7 + contactColCount} className="px-6 py-12 text-center text-sm text-slate-400">No banks found</td></tr>
+                  )}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
-      )}
 
+        {/* Modal */}
+        {showModal && (
+          <>
+            <div className="fixed inset-0 z-[60] bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowModal(false)} />
+            <div className="fixed inset-0 z-[70] flex items-center justify-center px-4 py-6">
+              <div className="relative w-full max-w-2xl h-[85vh] rounded-2xl bg-white shadow-2xl flex flex-col overflow-hidden">
+                <div className="flex items-start justify-between border-b border-slate-200 px-6 py-4 shrink-0 bg-gradient-to-r from-indigo-50 to-white">
+                  <div>
+                    <h2 className="text-lg font-semibold text-slate-900">{selectedBank ? "Edit Bank" : "Add Bank"}</h2>
+                    <p className="text-sm text-slate-500 mt-0.5">{selectedBank ? "Update bank branch information" : "Add a new bank branch to the system"}</p>
+                  </div>
+                  <button onClick={() => setShowModal(false)} className="rounded-full p-2 text-slate-400 hover:bg-white hover:shadow-sm"><X className="h-5 w-5" /></button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Bank Name <span className="text-rose-500">*</span></label>
+                      <input type="text" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}
+                        className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                        placeholder="e.g. State Bank of India" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Branch Name</label>
+                      <input type="text" value={form.branch} onChange={e => setForm({ ...form, branch: e.target.value })}
+                        className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                        placeholder="e.g. Main Branch" />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-4">
+                    {[["Taluka", "taluka", "Taluka"], ["District", "district", "District"], ["Pin Code", "pinCode", "Pin Code"]].map(([label, key, ph]) => (
+                      <div key={key}>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">{label}</label>
+                        <input type="text" value={form[key]} onChange={e => setForm({ ...form, [key]: e.target.value })}
+                          className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-indigo-500 focus:outline-none" placeholder={ph} />
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Address</label>
+                      <textarea value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} rows={2}
+                        className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-indigo-500 focus:outline-none resize-none" placeholder="Full address" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Website</label>
+                      <input type="url" value={form.website} onChange={e => setForm({ ...form, website: e.target.value })}
+                        className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-indigo-500 focus:outline-none" placeholder="https://..." />
+                    </div>
+                  </div>
+
+                  {/* Contact Persons */}
+                  <div className="border border-slate-200 rounded-xl overflow-hidden">
+                    <div className="flex items-center justify-between px-4 py-3 bg-slate-50 border-b border-slate-200">
+                      <span className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
+                        Contact Persons <span className="ml-1 text-indigo-600 font-bold">({contacts.length})</span>
+                      </span>
+                      <button onClick={addContact} className="inline-flex items-center gap-1 text-xs font-medium text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-md px-2.5 py-1 transition-colors">
+                        <UserPlus className="h-3 w-3" /> Add Person
+                      </button>
+                    </div>
+                    <div className="divide-y divide-slate-100">
+                      {contacts.map((c, i) => (
+                        <div key={i} className="px-4 py-3 flex items-center gap-3">
+                          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-indigo-100 shrink-0 text-xs font-bold text-indigo-600">{i + 1}</div>
+                          <div className="grid grid-cols-3 gap-3 flex-1">
+                            <input type="text" value={c.fullName} onChange={e => updateContact(i, "fullName", e.target.value)}
+                              className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none" placeholder="Full name" />
+                            <input type="email" value={c.email} onChange={e => updateContact(i, "email", e.target.value)}
+                              className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none" placeholder="Email" />
+                            <input type="text" value={c.position} onChange={e => updateContact(i, "position", e.target.value)}
+                              className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none" placeholder="Position" />
+                          </div>
+                          {contacts.length > 1 && (
+                            <button onClick={() => removeContact(i)} className="p-1.5 rounded-md text-red-400 hover:bg-red-50 shrink-0"><Trash className="h-4 w-4" /></button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="border-t border-slate-200 px-6 py-4 shrink-0 flex justify-end gap-3 bg-slate-50">
+                  <button onClick={() => setShowModal(false)} className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Cancel</button>
+                  <button onClick={handleSave} className="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-medium text-white hover:bg-indigo-700 shadow-sm">{selectedBank ? "Update Bank" : "Create Bank"}</button>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </DashboardLayout>
   );

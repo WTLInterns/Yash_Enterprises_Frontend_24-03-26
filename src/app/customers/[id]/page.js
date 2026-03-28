@@ -6527,6 +6527,7 @@ async function ensureDealId() {
 
 
 
+          <div className="sticky top-0 z-20 space-y-3 -mx-4 sm:-mx-6 px-4 sm:px-6 bg-gradient-to-br from-slate-50 via-slate-100 to-slate-50/70 pb-3">
           <div className="flex flex-col gap-4 rounded-2xl border border-slate-200/70 bg-white/70 p-5 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-sm transition-shadow duration-300 lg:flex-row lg:items-center lg:justify-between">
 
 
@@ -6671,22 +6672,6 @@ async function ensureDealId() {
 
 
 
-              <button className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 px-4 py-2 text-sm font-semibold text-white shadow-md shadow-emerald-500/30 transition duration-150 hover:translate-y-[1px] hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-50">
-
-
-
-                <CreditCard className="h-4 w-4" />
-
-
-
-                Collect Payment
-
-
-
-              </button>
-
-
-
               <button onClick={() => { setEmailForm({ to: customer?.email || '', cc: '', subject: '', body: '' }); setEmailFile(null); setShowEmailModal(true); }} className="inline-flex items-center gap-2 rounded-full border border-sky-500/80 bg-sky-50/80 px-4 py-2 text-sm font-medium text-sky-900 shadow-sm shadow-sky-500/20 transition duration-150 hover:bg-sky-100 hover:shadow-md">
 
 
@@ -6731,15 +6716,7 @@ async function ensureDealId() {
 
 
 
-              <button className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200/80 bg-white/70 text-slate-500 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700">
 
-
-
-                <MoreHorizontal className="h-4 w-4" />
-
-
-
-              </button>
 
 
 
@@ -6748,12 +6725,6 @@ async function ensureDealId() {
 
 
           </div>
-
-
-
-
-
-
 
           <div className="rounded-2xl border border-slate-200/80 bg-white/80 p-5 shadow-[0_18px_50px_rgba(15,23,42,0.06)] backdrop-blur">
 
@@ -6952,6 +6923,7 @@ async function ensureDealId() {
 
 
           </div>
+          </div>{/* end sticky wrapper */}
 
 
 

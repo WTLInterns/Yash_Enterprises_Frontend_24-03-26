@@ -100,11 +100,14 @@ export default function OrganizationPage() {
       customTeam: e?.customTeam ?? '',
       customDesignation: e?.customDesignation ?? '',
 
-      profileImageUrl: e?.profileImageUrl ?? null
+      profileImageUrl: e?.profileImageUrl ?? null,
+      panNumber: e?.panNumber ?? '',
+      bankAccountNumber: e?.bankAccountNumber ?? ''
     });
 
     const [openAddForm, setOpenAddForm] = useState(false);
     const [employees, setEmployees] = useState([]);
+    const router = useRouter();
     const [editingEmployee, setEditingEmployee] = useState(null);
     const [emailModalOpen, setEmailModalOpen] = useState(false);
     const [selectedEmployee, setSelectedEmployee] = useState(null);
@@ -135,7 +138,12 @@ export default function OrganizationPage() {
         if (!confirm(`Permanently delete ${selectedIds.length} employee(s)? This cannot be undone.`)) return;
         setBulkDeleting(true);
         try {
-            await backendApi.delete('/employees/bulk', { data: selectedIds });
+            const res = await fetch('https://api.yashrajent.com/api/employees/bulk', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(selectedIds),
+            });
+            if (!res.ok) throw new Error(await res.text());
             setEmployees(prev => prev.filter(emp => !selectedIds.includes(emp.id)));
             setSelectedIds([]);
         } catch (error) {
@@ -330,6 +338,8 @@ export default function OrganizationPage() {
         >
             {/* Suppress hydration warning - temporary fix */}
             <div suppressHydrationWarning={true} className="flex flex-col space-y-4">
+                {/* STICKY TOP TOOLBAR */}
+                <div className="sticky top-0 z-20 bg-white pb-2">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
                         <div className="text-lg font-semibold text-slate-900">Employee</div>
@@ -383,17 +393,16 @@ export default function OrganizationPage() {
                             </svg>
                             <span>Add</span>
                         </button>
-
                     </div>
-
+                </div>
                 </div>
 
                 <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-                    <div className="overflow-x-auto">
+                    <div className="overflow-x-auto" style={{ maxHeight: 'calc(100vh - 200px)', overflowY: 'auto' }}>
                         <table className="min-w-full divide-y divide-slate-200">
-                            <thead className="bg-slate-50">
+                            <thead className="bg-slate-50" style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                                 <tr>
-                                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
+                                    <th className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500" style={{ position: 'sticky', left: 0, zIndex: 20, backgroundColor: 'rgb(248 250 252)', width: 40 }}>
                                         <input
                                           type="checkbox"
                                           className="h-4 w-4 rounded border-gray-300"
@@ -404,8 +413,8 @@ export default function OrganizationPage() {
                                           }}
                                         />
                                     </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">Employee</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">Employee ID</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500 border-r border-slate-200" style={{ position: 'sticky', left: 40, zIndex: 20, backgroundColor: 'rgb(248 250 252)', minWidth: 180 }}>Employee</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500 border-r border-slate-200" style={{ position: 'sticky', left: 220, zIndex: 20, backgroundColor: 'rgb(248 250 252)', minWidth: 120 }}>Employee ID</th>
                                     <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">Email</th>
                                     <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">Phone</th>
                                     <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">Department</th>
@@ -420,7 +429,7 @@ export default function OrganizationPage() {
                             <tbody className="divide-y divide-slate-200 bg-white">
                                 {employees.map((employee) => (
                                     <tr key={employee.id} className="hover:bg-slate-50">
-                                        <td className="whitespace-nowrap px-6 py-4">
+                                        <td className="px-3 py-4" style={{ position: 'sticky', left: 0, zIndex: 5, backgroundColor: 'white', width: 40 }}>
                                             <input
                                                 type="checkbox"
                                                 className="h-4 w-4 rounded border-gray-300"
@@ -431,8 +440,8 @@ export default function OrganizationPage() {
                                                 }}
                                             />
                                         </td>
-                                        {/* Employee name + avatar */}
-                                        <td className="whitespace-nowrap px-6 py-4">
+                                        {/* Employee name + avatar — STICKY */}
+                                        <td className="whitespace-nowrap px-6 py-4 border-r border-slate-200" style={{ position: 'sticky', left: 40, zIndex: 5, backgroundColor: 'white', minWidth: 180 }}>
                                             <div className="flex items-center gap-3">
                                                 {employee.profileImageUrl ? (
                                                     <img
@@ -446,10 +455,23 @@ export default function OrganizationPage() {
                                                         {employee.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0,2)}
                                                     </div>
                                                 )}
-                                                <span className="text-sm font-medium text-slate-900">{employee.name}</span>
+                                            <button
+                                                    onClick={() => router.push(`/employees/${employee.id}`)}
+                                                    className="text-sm font-medium text-indigo-600 hover:text-indigo-800 hover:underline text-left"
+                                                >
+                                                    {employee.name}
+                                                </button>
                                             </div>
                                         </td>
-                                        <td className="whitespace-nowrap px-6 py-4 text-sm text-slate-500">{employee.employeeId}</td>
+                                        {/* Employee ID — STICKY */}
+                                        <td className="whitespace-nowrap px-6 py-4 text-sm border-r border-slate-200" style={{ position: 'sticky', left: 220, zIndex: 5, backgroundColor: 'white', minWidth: 120 }}>
+                                            <button
+                                                onClick={() => router.push(`/employees/${employee.id}`)}
+                                                className="text-indigo-600 hover:text-indigo-800 hover:underline font-medium"
+                                            >
+                                                {employee.employeeId}
+                                            </button>
+                                        </td>
                                         <td className="whitespace-nowrap px-6 py-4 text-sm text-slate-500">{employee.email}</td>
                                         <td className="whitespace-nowrap px-6 py-4 text-sm text-slate-500">{employee.phone}</td>
                                         <td className="whitespace-nowrap px-6 py-4">

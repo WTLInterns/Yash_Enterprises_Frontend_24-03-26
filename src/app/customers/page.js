@@ -719,41 +719,7 @@ export default function CustomersPage() {
 
 
   const fetchCustomers = async (skipAddresses = false) => {
-    setLoading(true);
-    try {
-      const [customersData, allAddresses] = await Promise.all([
-        departmentApiService.getCustomers(),
-        fetch('https://api.yashrajent.com/api/clients/addresses/all')
-          .then(r => r.ok ? r.json() : [])
-          .catch(() => []),
-      ]);
-
-      // Group addresses by clientId for O(1) lookup
-      const addrByClient = {};
-      allAddresses.forEach(addr => {
-        const cid = addr.clientId;
-        if (!addrByClient[cid]) addrByClient[cid] = [];
-        addrByClient[cid].push(addr);
-      });
-
-      setCustomers(customersData.map(c => ({
-        ...c,
-        addresses: addrByClient[c.id] || [],
-      })));
-
-      const keys = new Set();
-      customersData.forEach((customer) => {
-        if (customer?.customFields && typeof customer.customFields === "object") {
-          Object.keys(customer.customFields).forEach((k) => keys.add(k));
-        }
-      });
-      setDynamicColumns([...keys]);
-    } catch (err) {
-      console.error("Failed to fetch customers:", err);
-      addToast("Failed to load customers", "error");
-    } finally {
-      setLoading(false);
-    }
+    await loadAllData(false);
   };
 
   const fetchBanks = async () => {
@@ -765,30 +731,15 @@ export default function CustomersPage() {
     }
   };
 
-
-
-
-
-
-
   const fetchDeals = async () => {
-
     try {
-
       const authUser = getTabSafeAuthUser();
-
       const res = await backendApi.get("/deals/filtered", {
-
         headers: {
-
           "X-User-Role": authUser?.role ?? "",
-
           "X-User-Department": authUser?.department ?? "",
-
         },
-
       });
-
       const list = normalizeList(res);
       const normalized = list.map((d) => ({
         ...d,
@@ -799,13 +750,9 @@ export default function CustomersPage() {
         movedToApproval: d.movedToApproval ?? d.moved_to_approval ?? false,
       }));
       setDeals(normalized);
-
     } catch (err) {
-
       console.error("Failed to fetch deals:", err);
-
     }
-
   };
 
 
@@ -815,20 +762,16 @@ export default function CustomersPage() {
 
 
   const fetchClientFields = async () => {
-
     try {
-
       const res = await backendApi.get("/client-fields");
-
       setClientFieldDefinitions(res);
-
     } catch (err) {
-
       console.error("Failed to fetch client field definitions:", err);
-
     }
-
   };
+
+  // Load client fields once on mount
+  useEffect(() => { fetchClientFields(); }, []);
 
 
 
@@ -837,14 +780,103 @@ export default function CustomersPage() {
 
 
   useEffect(() => {
-    const loadData = async () => {
-      await fetchDeals();
-      await fetchCustomers();
-      fetchBanks();
-      fetchClientFields();
-    };
-    loadData();
+    // Show cached data instantly (stale-while-revalidate)
+    const cached = sessionStorage.getItem('crm_customers_cache');
+    if (cached) {
+      try {
+        const { customers: cc, deals: cd, banks: cb, ts } = JSON.parse(cached);
+        const age = Date.now() - ts;
+        if (age < 10 * 60 * 1000) { // 10 min cache
+          setCustomers(cc || []);
+          setDeals(cd || []);
+          setBanks(cb || []);
+          setLoading(false);
+          // Refresh in background silently
+          loadAllData(true);
+          return;
+        }
+      } catch {}
+    }
+    loadAllData(false);
   }, []);
+
+  const loadAllData = async (silent = false) => {
+    if (!silent) setLoading(true);
+    try {
+      const authUser = getTabSafeAuthUser();
+
+      // Phase 1: Load customers + deals + banks in parallel (NO addresses — fast!)
+      const [customersData, dealsRes, banksRes] = await Promise.all([
+        departmentApiService.getCustomers(),
+        backendApi.get("/deals/filtered", {
+          headers: {
+            "X-User-Role": authUser?.role ?? "",
+            "X-User-Department": authUser?.department ?? "",
+          },
+        }).catch(() => []),
+        backendApi.get("/banks?size=9999").catch(() => ({ content: [] })),
+      ]);
+
+      // Process deals
+      const dealsList = normalizeList(dealsRes);
+      const normalizedDeals = dealsList.map((d) => ({
+        ...d,
+        clientId: d.clientId ?? d.client_id ?? (typeof d.client === 'object' ? d.client?.id : d.client) ?? null,
+        stageCode: d.stage || d.stageCode || "",
+        valueAmount: d.calculatedValue ?? d.valueAmount ?? d.value_amount ?? 0,
+        dealCode: d.dealCode ?? d.deal_code ?? null,
+        movedToApproval: d.movedToApproval ?? d.moved_to_approval ?? false,
+      }));
+
+      const banksList = normalizeList(banksRes);
+
+      // Dynamic columns
+      const keys = new Set();
+      customersData.forEach(c => {
+        if (c?.customFields && typeof c.customFields === 'object') {
+          Object.keys(c.customFields).forEach(k => keys.add(k));
+        }
+      });
+
+      // Show table immediately without addresses
+      setCustomers(customersData.map(c => ({ ...c, addresses: c.addresses || [] })));
+      setDeals(normalizedDeals);
+      setBanks(banksList);
+      setDynamicColumns([...keys]);
+      if (!silent) setLoading(false); // ← table visible NOW
+
+      // Phase 2: Load addresses in background (non-blocking)
+      fetch('https://api.yashrajent.com/api/clients/addresses/all')
+        .then(r => r.ok ? r.json() : [])
+        .catch(() => [])
+        .then(allAddresses => {
+          if (!allAddresses.length) return;
+          const addrByClient = {};
+          allAddresses.forEach(addr => {
+            const cid = addr.clientId;
+            if (!addrByClient[cid]) addrByClient[cid] = [];
+            addrByClient[cid].push(addr);
+          });
+          setCustomers(prev => prev.map(c => ({ ...c, addresses: addrByClient[c.id] || c.addresses || [] })));
+
+          // Cache with addresses
+          try {
+            sessionStorage.setItem('crm_customers_cache', JSON.stringify({
+              customers: customersData.map(c => ({ ...c, addresses: addrByClient[c.id] || [] })),
+              deals: normalizedDeals,
+              banks: banksList,
+              ts: Date.now(),
+            }));
+          } catch {}
+        });
+
+    } catch (err) {
+      console.error("Failed to load data:", err);
+      if (!silent) addToast("Failed to load customers", "error");
+    } finally {
+      if (!silent) setLoading(false);
+    }
+  };
 
   // Detect edit query param and open edit drawer — runs ONCE when customers first load
   const editOpenedRef = useRef(false);

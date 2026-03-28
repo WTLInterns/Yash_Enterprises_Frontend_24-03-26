@@ -55,8 +55,8 @@ export default function AddEmployeePage({ onSuccess, isModal = false, editingEmp
     state: '',
     pincode: '',
     country: '',
-    workEmail: '',
-    personalEmail: '',
+    panNumber: '',
+    bankAccountNumber: '',
     skills: '',
     experience: '',
     certifications: '',
@@ -86,6 +86,17 @@ export default function AddEmployeePage({ onSuccess, isModal = false, editingEmp
   useEffect(() => {
     fetchDropdownData();
   }, []);
+
+  // Auto-generate employee ID when opening for new employee
+  useEffect(() => {
+    if (!editingEmployee) {
+      backendApi.get('/employees/next-employee-id').then(data => {
+        if (data?.nextEmployeeId) {
+          setFormData(prev => ({ ...prev, employeeId: data.nextEmployeeId }));
+        }
+      }).catch(() => {});
+    }
+  }, [editingEmployee]);
 
   // ✅ ROLE-BASED: Use different department sources based on role
   useEffect(() => {
@@ -140,34 +151,27 @@ export default function AddEmployeePage({ onSuccess, isModal = false, editingEmp
       setLoading(true);
       
       // Fetch all dropdown data in parallel with error handling
-      const [rolesData, managersData, tlData, teamsData, departmentsData, designationsData, nextIdData] = await Promise.allSettled([
+      const [rolesData, managersData, tlData, teamsData, departmentsData, designationsData] = await Promise.allSettled([
         backendApi.get('/roles'),
-        backendApi.get('/employees/managers'), // ✅ FIXED: Fetch only managers
-        backendApi.get('/employees?role=TL'), // ✅ NEW: Fetch only TLs
+        backendApi.get('/employees'),
+        backendApi.get('/employees?role=TL'),
         backendApi.get('/teams'),
-        backendApi.get('/departments').catch(() => []), // Handle missing departments endpoint
+        backendApi.get('/departments').catch(() => []),
         backendApi.get('/designations'),
-        backendApi.get('/employees/next-employee-id')
       ]);
 
       setRoles(rolesData.status === 'fulfilled' ? rolesData.value : []);
       
-      // ✅ FIXED: Show only managers as potential reporting managers
-      const managerEmployees = managersData.status === 'fulfilled' ? managersData.value || [] : [];
-      setManagers(managerEmployees);
+      const allEmployees = managersData.status === 'fulfilled' ? managersData.value || [] : [];
+      // Managers = employees with MANAGER role
+      setManagers(allEmployees.filter(e => e.roleName === 'MANAGER' || e.roleName === 'ADMIN'));
       
-      // ✅ NEW: Set TL list for EMPLOYEE role
       const tlEmployees = tlData.status === 'fulfilled' ? tlData.value || [] : [];
       setTlList(tlEmployees);
       
       setTeams(teamsData.status === 'fulfilled' ? teamsData.value : []);
       setDepartments(departmentsData.status === 'fulfilled' ? departmentsData.value : []);
       setDesignations(designationsData.status === 'fulfilled' ? designationsData.value : []);
-      
-      // Set next employee ID
-      if (nextIdData.status === 'fulfilled') {
-        setNextEmployeeId(nextIdData.value.nextEmployeeId || '');
-      }
       
     } catch (err) {
       setError('Failed to load dropdown data');
@@ -260,22 +264,7 @@ export default function AddEmployeePage({ onSuccess, isModal = false, editingEmp
     }
     
     if (currentStep === 2) {
-      // Very permissive validation for testing
-      // Temporarily make team optional for testing
-      // if (!formData.teamId) errors.teamId = 'Team is required';
-      // else if (formData.teamId === 'other' && !formData.customTeam.trim()) {
-      //   errors.teamId = 'Please enter custom team name';
-      // }
-      
-      // Temporarily make designation optional for testing
-      // if (!formData.designationId) errors.designationId = 'Designation is required';
-      // else if (formData.designationId === 'other' && !formData.customDesignation.trim()) {
-      //   errors.designationId = 'Please enter custom designation';
-      // }
-      
-      if (formData.emergencyPhone && !/^[0-9+\-\s()]+$/.test(formData.emergencyPhone)) {
-        errors.emergencyPhone = 'Invalid emergency phone format';
-      }
+      // permissive validation
     }
     
     setFormErrors(errors);
@@ -525,6 +514,8 @@ export default function AddEmployeePage({ onSuccess, isModal = false, editingEmp
         // Include custom values
         customTeam: formData.teamId === 'other' ? formData.customTeam : null,
         customDesignation: formData.designationId === 'other' ? formData.customDesignation : null,
+        panNumber: formData.panNumber || null,
+        bankAccountNumber: formData.bankAccountNumber || null,
         // Include profile image if available
         profileImageBase64: formData.profileImageBase64 || null
       };
@@ -957,19 +948,38 @@ export default function AddEmployeePage({ onSuccess, isModal = false, editingEmp
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Reporting Manager
                     </label>
-                    <select
-                      name="reportingManagerId"
-                      value={formData.reportingManagerId}
-                      onChange={handleChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="">Select Manager</option>
-                      {managers.map((manager) => (
-                        <option key={manager.id} value={manager.id}>
-                          {manager.firstName} {manager.lastName}
-                        </option>
-                      ))}
-                    </select>
+                    {(() => {
+                      const selectedRole = roles.find(r => r.id === parseInt(formData.roleId));
+                      const roleName = selectedRole?.name;
+                      if (roleName === 'MANAGER') {
+                        // MANAGER → auto show Admin
+                        const admin = managers.find(m => m.roleName === 'ADMIN');
+                        return (
+                          <input
+                            type="text"
+                            value={admin ? `${admin.firstName} ${admin.lastName || ''}`.trim() : 'Admin'}
+                            disabled
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 cursor-not-allowed text-gray-600"
+                          />
+                        );
+                      }
+                      // Others → show manager list
+                      return (
+                        <select
+                          name="reportingManagerId"
+                          value={formData.reportingManagerId}
+                          onChange={handleChange}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="">Select Manager</option>
+                          {managers.map((manager) => (
+                            <option key={manager.id} value={manager.id}>
+                              {manager.firstName} {manager.lastName}
+                            </option>
+                          ))}
+                        </select>
+                      );
+                    })()}
                   </div>
 
                   <div>
@@ -1086,67 +1096,29 @@ export default function AddEmployeePage({ onSuccess, isModal = false, editingEmp
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Emergency Contact
+                      PAN Number
                     </label>
                     <input
                       type="text"
-                      name="emergencyContact"
-                      value={formData.emergencyContact}
+                      name="panNumber"
+                      value={formData.panNumber}
                       onChange={handleChange}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="Enter emergency contact name"
+                      placeholder="Enter PAN number"
                     />
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Emergency Phone
+                      Bank Account Number
                     </label>
                     <input
-                      type="tel"
-                      name="emergencyPhone"
-                      value={formData.emergencyPhone}
-                      onChange={handleChange}
-                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                        formErrors.emergencyPhone ? 'border-red-500' : 'border-gray-300'
-                      }`}
-                      placeholder="Enter emergency phone number"
-                    />
-                    {formErrors.emergencyPhone && (
-                      <p className="mt-1 text-sm text-red-600">{formErrors.emergencyPhone}</p>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Work Email
-                    </label>
-                    <input
-                      type="email"
-                      name="workEmail"
-                      value={formData.workEmail}
-                      onChange={handleChange}
-                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                        formErrors.workEmail ? 'border-red-500' : 'border-gray-300'
-                      }`}
-                      placeholder="Enter work email"
-                    />
-                    {formErrors.workEmail && (
-                      <p className="mt-1 text-sm text-red-600">{formErrors.workEmail}</p>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Personal Email
-                    </label>
-                    <input
-                      type="email"
-                      name="personalEmail"
-                      value={formData.personalEmail}
+                      type="text"
+                      name="bankAccountNumber"
+                      value={formData.bankAccountNumber}
                       onChange={handleChange}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="Enter personal email"
+                      placeholder="Enter bank account number"
                     />
                   </div>
                 </div>

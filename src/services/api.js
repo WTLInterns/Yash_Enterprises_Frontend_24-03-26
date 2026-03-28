@@ -19,16 +19,6 @@ export function createApiClient({ baseUrl = "" } = {}) {
 
     
 
-    // 🔥 DEBUG: Log all storage sources
-    console.log('🔍 [API] Storage sources:', {
-      localStorage_token: localStorage.getItem("token"),
-      sessionStorage_token: sessionStorage.getItem("token"),
-      localStorage_userData: localStorage.getItem("user_data"),
-      sessionStorage_authUser: sessionStorage.getItem("authUser"),
-      localStorage_userRole: localStorage.getItem("user_role"),
-      sessionStorage_userRole: sessionStorage.getItem("user_role")
-    });
-    
     // 🔥 GET USER INFO FOR DEPARTMENT ISOLATION
     const parsedUser = userData ? JSON.parse(userData) : (user ? JSON.parse(user) : null);
 
@@ -36,21 +26,8 @@ export function createApiClient({ baseUrl = "" } = {}) {
 
     const userDepartment = parsedUser?.department || parsedUser?.departmentName || null;
 
-    // 🔥 FIX: Extract role from parsed user data, not localStorage
+    // Extract role from parsed user data
     const actualUserRole = parsedUser?.role || parsedUser?.roleName || userRole;
-    
-    // 🔥 DEBUG: Log role extraction
-    console.log('🔍 [API] User data extraction:', {
-      parsedUser: parsedUser,
-      parsedUserId: parsedUser?.id,
-      parsedUserId_alt: parsedUser?.userId,
-      finalUserId: userId,
-      parsedUserRole: parsedUser?.role,
-      parsedUserRoleName: parsedUser?.roleName,
-      localStorageUserRole: userRole,
-      finalActualUserRole: actualUserRole,
-      path: path
-    });
 
 
 
@@ -185,7 +162,7 @@ export function createApiClient({ baseUrl = "" } = {}) {
 
 export const backendApi = createApiClient({
 
-  baseUrl: "https://api.yashrajent.com/api",
+  baseUrl: "http://localhost:8080/api",
 
 });
 

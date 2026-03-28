@@ -191,17 +191,11 @@ export default function AdminManagerCRMDashboard({ userName, userRole }) {
     allocation: ''
   });
 
-  // ✅ DYNAMIC FUNNEL COUNTS - O(n) performance with useMemo
   const funnelCounts = useMemo(() => {
-    console.log('🔥 [DASHBOARD] Computing funnel counts for department:', selectedDepartment);
-    
-    // Get stages for selected department
     let stages = getStagesForDepartment(selectedDepartment === 'ALL' ? departments[0] : selectedDepartment);
     
-    // Fallback stages for ACCOUNT department
     if (!stages || stages.length === 0) {
       if (selectedDepartment === 'ACCOUNT' || (selectedDepartment === 'ALL' && departments[0] === 'ACCOUNT')) {
-        console.log('🔥 [DASHBOARD] Using fallback stages for ACCOUNT department');
         stages = [
           { stageCode: 'INVENTORY', stageName: 'Inventory', stageOrder: 1 },
           { stageCode: 'MAKE_BILL', stageName: 'Make Bill', stageOrder: 2 },
@@ -212,8 +206,6 @@ export default function AdminManagerCRMDashboard({ userName, userRole }) {
           { stageCode: 'CLOSE_LOST', stageName: 'Close Lost', stageOrder: 7 }
         ];
       } else {
-        // Generic fallback stages for other departments
-        console.log('🔥 [DASHBOARD] Using generic fallback stages for department:', selectedDepartment);
         stages = [
           { stageCode: 'LEAD', stageName: 'Lead', stageOrder: 1 },
           { stageCode: 'CONTACTED', stageName: 'Contacted', stageOrder: 2 },
@@ -226,86 +218,46 @@ export default function AdminManagerCRMDashboard({ userName, userRole }) {
       }
     }
 
-    // Filter deals by department
     const filteredDeals = selectedDepartment === 'ALL' 
       ? deals 
       : deals.filter(d => d.department === selectedDepartment);
 
-    console.log('🔥 [DASHBOARD] Filtered deals:', filteredDeals.length, 'for department:', selectedDepartment);
-
-    // O(n) stage counting using stageMap
     const stageMap = {};
-    stages.forEach(stage => {
-      stageMap[stage.stageCode] = 0;
-    });
-
+    stages.forEach(stage => { stageMap[stage.stageCode] = 0; });
     filteredDeals.forEach(deal => {
       const stageCode = deal.stageCode || deal.stage;
-      if (stageMap.hasOwnProperty(stageCode)) {
-        stageMap[stageCode]++;
-      }
+      if (stageMap.hasOwnProperty(stageCode)) stageMap[stageCode]++;
     });
 
-    // Convert to array format
-    return Object.entries(stageMap).map(([stage, count]) => ({
-      stage,
-      count
-    }));
+    return Object.entries(stageMap).map(([stage, count]) => ({ stage, count }));
   }, [deals, selectedDepartment, departments, getStagesForDepartment]);
 
-  // ✅ BANK DEPARTMENT STATS - Calculate bank-wise deal distribution
   const bankDepartmentStats = useMemo(() => {
-    console.log('🔥 [DASHBOARD] Computing bank department stats');
-    console.log('🔥 [DASHBOARD] Available deals:', deals.length);
-    console.log('🔥 [DASHBOARD] Available banks:', bankRecords.length);
-    console.log('🔥 [DASHBOARD] Sample deal structure:', deals.slice(0, 2));
-    
-    if (!deals.length || !bankRecords.length) {
-      console.log('🔥 [DASHBOARD] No deals or banks available for stats');
-      return [];
-    }
+    if (!deals.length || !bankRecords.length) return [];
 
     const result = bankRecords.map(bank => {
       const deptCounts = {};
-      
-      // Initialize all departments with 0
       departments.forEach(dept => {
-        // 🔥 FIX: Match by relatedBankName instead of bankId
         deptCounts[dept] = deals.filter(
           d => d.relatedBankName === bank.name && d.department === dept
         ).length;
       });
-
-      // 🔥 FIX: Match by relatedBankName instead of bankId
       const totalDeals = deals.filter(d => d.relatedBankName === bank.name).length;
-
-      return {
-        bankName: bank.name || bank.bankName,
-        bankId: bank.id,
-        totalDeals,
-        departments: deptCounts
-      };
+      return { bankName: bank.name || bank.bankName, bankId: bank.id, totalDeals, departments: deptCounts };
     });
 
-    // Sort by total deals descending
     result.sort((a, b) => b.totalDeals - a.totalDeals);
-
-    console.log('🔥 [DASHBOARD] Bank department stats calculated:', result);
     return result;
   }, [deals, bankRecords, departments]);
 
-  // ✅ DYNAMIC DASHBOARD STATS - useMemo for performance
   const dashboardStats = useMemo(() => {
     if (!deals.length) return null;
-
     const stats = {
       totalDeals: deals.length,
       totalValue: deals.reduce((sum, deal) => sum + (Number(deal.valueAmount) || 0), 0),
       departmentStats: {},
       pipelineCounts: {}
     };
-
-    // Calculate department-wise stats
     departments.forEach(dept => {
       const deptDeals = deals.filter(d => d.department === dept);
       stats.departmentStats[dept] = {
@@ -313,64 +265,12 @@ export default function AdminManagerCRMDashboard({ userName, userRole }) {
         value: deptDeals.reduce((sum, deal) => sum + (Number(deal.valueAmount) || 0), 0)
       };
     });
-
-    console.log('🔥 [DASHBOARD] Dashboard stats computed:', stats);
     return stats;
   }, [deals, departments]);
 
-  useEffect(() => {
-    if (customers.length > 0 || deals.length > 0 || tasks.length > 0 || 
-        products.length > 0 || bankRecords.length > 0) {
-      console.log('🔥 [ADMIN DASHBOARD] Data loaded - activities section removed');
-    }
-  }, [customers, deals, tasks, products, bankRecords]);
-
-  // 🔥 NEW: Fetch products for deals to calculate accurate values (like customers page)
-  const fetchDealProducts = async (dealId) => {
-    try {
-      const res = await backendApi.get(`/deals/${dealId}/products`);
-      const list = Array.isArray(res?.content) ? res.content : Array.isArray(res) ? res : [];
-      
-      // Adapt products like the customers page does
-      const adaptedProducts = list.map((ln) => {
-        const price = Number(ln.price ?? ln.unitPrice ?? 0) || 0;
-        const qty = Number(ln.qty ?? ln.quantity ?? 1) || 1;
-        const discount = Number(ln.discount ?? ln.discountAmount ?? 0) || 0;
-        const tax = Number(ln.tax ?? ln.taxAmount ?? 0) || 0;
-        
-        return {
-          id: ln.id,
-          dealProductId: ln.id,
-          productId: ln.productId ?? null,
-          name: ln.productName || ln.name || "Unknown Product",
-          price,
-          qty,
-          discount,
-          tax,
-          finalAmount: price * qty - discount + tax
-        };
-      });
-      
-      return adaptedProducts;
-    } catch (err) {
-      console.error(`Failed to fetch products for deal ${dealId}:`, err);
-      return [];
-    }
-  };
-
-  // 🔥 NEW: Calculate grand total from products (same as customers page)
-  const calculateGrandTotal = (products) => {
-    return products.reduce(
-      (sum, p) => sum + (p.price * p.qty - (p.discount || 0) + (p.tax || 0)),
-      0
-    );
-  };
   const fetchDashboardData = async () => {
     setLoading(true);
     try {
-      console.log('🔥 [DASHBOARD] Fetching all system data sources for:', userRole);
-      
-      // Fetch all data sources in parallel
       const [customersData, dealsData, tasksData, productsData, bankData] = await Promise.all([
         departmentApiService.getCustomers().catch(() => []),
         backendApi.get("/deals").catch(() => []),
@@ -379,7 +279,6 @@ export default function AdminManagerCRMDashboard({ userName, userRole }) {
         backendApi.get("/banks").catch(() => [])
       ]);
 
-      // Normalize customers data
       const normalizeList = (res) => {
         if (!res) return [];
         if (Array.isArray(res)) return res;
@@ -393,84 +292,21 @@ export default function AdminManagerCRMDashboard({ userName, userRole }) {
       const normalizedProducts = normalizeList(productsData);
       const normalizedBanks = normalizeList(bankData);
 
-      // 🔥 CRITICAL: Calculate deal values from products (like customers page)
-      const normalizedDeals = await Promise.all(normalizedDealsList.map(async (d) => {
-        // Normalize basic fields first
-        const basicDeal = {
-          ...d,
-          clientId: d.clientId ?? d.client_id ?? d.client ?? null,
-          stageCode: d.stage || d.stageCode || "",
-          department: d.department || userRole || 'ALL'
-        };
-
-        // 🔥 NEW: Fetch products and calculate actual value (like customers page)
-        try {
-          const products = await fetchDealProducts(d.id);
-          const calculatedValue = calculateGrandTotal(products);
-          
-          console.log(`🔍 Deal ${d.id} (${d.name}): ${products.length} products, calculated value: ₹${calculatedValue}`);
-          
-          return {
-            ...basicDeal,
-            valueAmount: calculatedValue > 0 ? calculatedValue : d.valueAmount ?? d.value_amount ?? 0,
-            _productCount: products.length,
-            _calculatedValue: calculatedValue
-          };
-        } catch (productErr) {
-          console.warn(`Failed to calculate value for deal ${d.id}, using fallback:`, productErr);
-          return {
-            ...basicDeal,
-            valueAmount: d.valueAmount ?? d.value_amount ?? 0,
-            _productCount: 0,
-            _calculatedValue: 0
-          };
-        }
+      const normalizedDeals = normalizedDealsList.map((d) => ({
+        ...d,
+        clientId: d.clientId ?? d.client_id ?? d.client ?? null,
+        stageCode: d.stage || d.stageCode || "",
+        department: d.department || userRole || 'ALL',
+        valueAmount: d.calculatedValue ?? d.valueAmount ?? d.value_amount ?? 0,
       }));
-
-      console.log('🔥 [DASHBOARD] All system data loaded successfully:', {
-        customers: normalizedCustomers.length,
-        deals: normalizedDeals.length,
-        tasks: normalizedTasks.length,
-        products: normalizedProducts.length,
-        banks: normalizedBanks.length
-      });
-
-      // 🔥 DEBUG: Show sample deal structure to understand bank field
-      if (normalizedDeals.length > 0) {
-        console.log('🔥 [DASHBOARD] Sample deal structures:');
-        normalizedDeals.slice(0, 3).forEach((deal, index) => {
-          console.log(`🔥 Deal ${index + 1}:`, {
-            id: deal.id,
-            name: deal.name,
-            relatedBankName: deal.relatedBankName,
-            bankId: deal.bankId,
-            department: deal.department,
-            stage: deal.stage
-          });
-        });
-      }
-
-      // 🔥 DEBUG: Show bank structure
-      if (normalizedBanks.length > 0) {
-        console.log('🔥 [DASHBOARD] Sample bank structures:');
-        normalizedBanks.slice(0, 3).forEach((bank, index) => {
-          console.log(`🔥 Bank ${index + 1}:`, {
-            id: bank.id,
-            name: bank.name,
-            bankName: bank.bankName,
-            branchName: bank.branchName
-          });
-        });
-      }
 
       setCustomers(normalizedCustomers);
       setDeals(normalizedDeals);
       setTasks(normalizedTasks);
       setProducts(normalizedProducts);
       setBankRecords(normalizedBanks);
-      
-      // Build dynamic chart data from real data
-      const dynamicChartData = {
+
+      setChartData({
         departmentByAmount: departments.map(dept => {
           const deptDeals = normalizedDeals.filter(deal => deal.department === dept);
           return {
@@ -479,10 +315,8 @@ export default function AdminManagerCRMDashboard({ userName, userRole }) {
             count: deptDeals.length
           };
         })
-      };
-      setChartData(dynamicChartData);
+      });
 
-      // Build table data from real customers
       const dynamicTableData = normalizedCustomers.slice(0, 10).map((customer, index) => ({
         id: customer.id || index + 1,
         accountNo: customer.accountNo || `ACC${index + 1}`,
@@ -492,106 +326,54 @@ export default function AdminManagerCRMDashboard({ userName, userRole }) {
         amount: normalizedDeals.find(d => d.clientId === customer.id)?.valueAmount || 0,
         status: customer.status || 'Active'
       }));
-
       setTableData(dynamicTableData);
       setPagination({
-        page: 1,
-        limit: 10,
+        page: 1, limit: 10,
         total: normalizedCustomers.length,
         totalPages: Math.ceil(normalizedCustomers.length / 10)
       });
-      
-      // Activities are now loaded via shared activity system - no need to call fetchGlobalActivities
-      
     } catch (error) {
-      console.error('🔥 [DASHBOARD] Error fetching real data:', error);
-      setCustomers([]);
-      setDeals([]);
-      setTasks([]);
-      setProducts([]);
-      setBankRecords([]);
+      console.error('[DASHBOARD] Error fetching data:', error);
+      setCustomers([]); setDeals([]); setTasks([]); setProducts([]); setBankRecords([]);
     } finally {
       setLoading(false);
     }
   };
 
-  // ✅ FETCH ALL DATA - Fixed condition
   const fetchAllData = async () => {
     setLoading(true);
     try {
-      console.log('🔥 [DASHBOARD] Starting fetchAllData...');
-      
       await Promise.all([
         fetchDashboardData(),
         fetchDepartments(),
         fetchStagesForDepartment(selectedDepartment === 'ALL' ? departments[0] : selectedDepartment)
       ]);
-      console.log('🔥 [DASHBOARD] All data fetched successfully');
     } catch (error) {
-      console.error('🔥 [DASHBOARD] Failed to fetch data:', error);
+      console.error('[DASHBOARD] Failed to fetch data:', error);
     } finally {
-      console.log('🔥 [DASHBOARD] Setting loading to false');
       setLoading(false);
     }
   };
 
-  // ✅ FETCH DEPARTMENTS AND STAGES
-  const fetchDepartmentsAndStages = async () => {
-    try {
-      await fetchDepartments();
-      
-      // Fetch stages for all departments
-      for (const dept of departments) {
-        await fetchStagesForDepartment(dept);
-      }
-    } catch (error) {
-      console.error('🔥 [DASHBOARD] Error fetching departments/stages:', error);
-    }
-  };
-
-  // ✅ AUTO-REFRESH DASHBOARD DATA (not activities - activities use shared system)
   useEffect(() => {
-    const interval = setInterval(() => {
-      console.log('🔄 [ADMIN DASHBOARD] Auto-refreshing dashboard data...');
-      fetchDashboardData();
-    }, 30000); // 30 seconds
-    
+    const interval = setInterval(() => fetchDashboardData(), 30000);
     return () => clearInterval(interval);
-  }, []); // Empty dependency - run once
+  }, []);
 
-  // ✅ REAL-TIME UPDATES - Enhanced for all data types
   useEffect(() => {
     let broadcastChannel = null;
     if (typeof BroadcastChannel !== 'undefined') {
       broadcastChannel = new BroadcastChannel('crm-updates');
       broadcastChannel.onmessage = (e) => {
-        console.log('🔄 [ADMIN DASHBOARD] Real-time update detected:', e.data?.type);
-        
-        // Refresh all data for any update
-        if (e.data?.type) {
-          console.log("🔄 [ADMIN DASHBOARD] Refreshing dashboard for:", e.data?.type);
-          fetchDashboardData(); // This will refresh activities too
-        }
+        if (e.data?.type) fetchDashboardData();
       };
     }
-    
-    return () => {
-      if (broadcastChannel) {
-        broadcastChannel.close();
-      }
-    };
-  }, []); // Empty dependency - run once
+    return () => { if (broadcastChannel) broadcastChannel.close(); };
+  }, []);
 
-  // ✅ INITIAL DATA LOAD
   useEffect(() => {
     fetchAllData();
-    
-    // Safety timeout to prevent infinite loading
-    const timeout = setTimeout(() => {
-      console.log('🔥 [DASHBOARD] Safety timeout - forcing loading to false');
-      setLoading(false);
-    }, 10000); // 10 seconds timeout
-    
+    const timeout = setTimeout(() => setLoading(false), 10000);
     return () => clearTimeout(timeout);
   }, [selectedDepartment]);
 
@@ -789,40 +571,34 @@ export default function AdminManagerCRMDashboard({ userName, userRole }) {
             data={funnelCounts} 
             department={selectedDepartment} 
             stages={(() => {
-            let stages = selectedDepartment === 'ALL' 
-              ? getStagesForDepartment(departments[0]) || []
-              : getStagesForDepartment(selectedDepartment) || [];
-            
-            // Fallback stages for ACCOUNT department
-            if (!stages || stages.length === 0) {
-              if (selectedDepartment === 'ACCOUNT' || (selectedDepartment === 'ALL' && departments[0] === 'ACCOUNT')) {
-                console.log('🔥 [DASHBOARD] Using fallback stages for ACCOUNT department');
-                stages = [
-                  { stageCode: 'INVENTORY', stageName: 'Inventory', stageOrder: 1 },
-                  { stageCode: 'MAKE_BILL', stageName: 'Make Bill', stageOrder: 2 },
-                  { stageCode: 'BILL_SUBMIT', stageName: 'Bill Submit', stageOrder: 3 },
-                  { stageCode: 'BILL_FOLLOWUP', stageName: 'Bill Followup', stageOrder: 4 },
-                  { stageCode: 'BILL_PASS', stageName: 'Bill Pass', stageOrder: 5 },
-                  { stageCode: 'CLOSE_WIN', stageName: 'Close Win', stageOrder: 6 },
-                  { stageCode: 'CLOSE_LOST', stageName: 'Close Lost', stageOrder: 7 }
-                ];
-              } else {
-                // Generic fallback stages for other departments
-                console.log('🔥 [DASHBOARD] Using generic fallback stages for department:', selectedDepartment);
-                stages = [
-                  { stageCode: 'LEAD', stageName: 'Lead', stageOrder: 1 },
-                  { stageCode: 'CONTACTED', stageName: 'Contacted', stageOrder: 2 },
-                  { stageCode: 'QUALIFIED', stageName: 'Qualified', stageOrder: 3 },
-                  { stageCode: 'PROPOSAL', stageName: 'Proposal', stageOrder: 4 },
-                  { stageCode: 'NEGOTIATION', stageName: 'Negotiation', stageOrder: 5 },
-                  { stageCode: 'CLOSE_WIN', stageName: 'Close Win', stageOrder: 6 },
-                  { stageCode: 'CLOSE_LOST', stageName: 'Close Lost', stageOrder: 7 }
-                ];
+              let stages = selectedDepartment === 'ALL' 
+                ? getStagesForDepartment(departments[0]) || []
+                : getStagesForDepartment(selectedDepartment) || [];
+              if (!stages || stages.length === 0) {
+                if (selectedDepartment === 'ACCOUNT' || (selectedDepartment === 'ALL' && departments[0] === 'ACCOUNT')) {
+                  stages = [
+                    { stageCode: 'INVENTORY', stageName: 'Inventory', stageOrder: 1 },
+                    { stageCode: 'MAKE_BILL', stageName: 'Make Bill', stageOrder: 2 },
+                    { stageCode: 'BILL_SUBMIT', stageName: 'Bill Submit', stageOrder: 3 },
+                    { stageCode: 'BILL_FOLLOWUP', stageName: 'Bill Followup', stageOrder: 4 },
+                    { stageCode: 'BILL_PASS', stageName: 'Bill Pass', stageOrder: 5 },
+                    { stageCode: 'CLOSE_WIN', stageName: 'Close Win', stageOrder: 6 },
+                    { stageCode: 'CLOSE_LOST', stageName: 'Close Lost', stageOrder: 7 }
+                  ];
+                } else {
+                  stages = [
+                    { stageCode: 'LEAD', stageName: 'Lead', stageOrder: 1 },
+                    { stageCode: 'CONTACTED', stageName: 'Contacted', stageOrder: 2 },
+                    { stageCode: 'QUALIFIED', stageName: 'Qualified', stageOrder: 3 },
+                    { stageCode: 'PROPOSAL', stageName: 'Proposal', stageOrder: 4 },
+                    { stageCode: 'NEGOTIATION', stageName: 'Negotiation', stageOrder: 5 },
+                    { stageCode: 'CLOSE_WIN', stageName: 'Close Win', stageOrder: 6 },
+                    { stageCode: 'CLOSE_LOST', stageName: 'Close Lost', stageOrder: 7 }
+                  ];
+                }
               }
-            }
-            
-            return stages;
-          })()}
+              return stages;
+            })()}
           />
         </div>
 

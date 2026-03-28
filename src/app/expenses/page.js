@@ -29,11 +29,24 @@ export default function ExpenseOverviewPage() {
   const [page, setPage] = useState(1);
   const pageSize = 10;
 
+  const [clients, setClients] = useState([]);
   const [selectedExpense, setSelectedExpense] = useState(null);
   const [previewImage, setPreviewImage] = useState(null);
   const [showFormModal, setShowFormModal] = useState(false);
   const [editExpense, setEditExpense] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [filePreview, setFilePreview] = useState(null);
+  const [selectedClientId, setSelectedClientId] = useState('');
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadResult, setUploadResult] = useState(null);
+  const [rejectModal, setRejectModal] = useState(null); // { id } when open
+  const [rejectReason, setRejectReason] = useState('');
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportType, setExportType] = useState('all'); // 'all' | 'employee'
+  const [exportEmployeeId, setExportEmployeeId] = useState('');
+  const [exportFromDate, setExportFromDate] = useState('');
+  const [exportToDate, setExportToDate] = useState('');
 
   // Get current user info for role-based filtering
   const [currentUser, setCurrentUser] = useState(null);
@@ -61,6 +74,7 @@ export default function ExpenseOverviewPage() {
     setCurrentUser(user);
     loadExpenses();
     loadEmployees();
+    loadClients();
   }, []);
 
   async function loadExpenses() {
@@ -84,6 +98,15 @@ export default function ExpenseOverviewPage() {
     }
   }
 
+  async function loadClients() {
+    try {
+      const res = await backendApi.get('/clients');
+      setClients(res || []);
+    } catch (err) {
+      console.error("Failed to load clients", err);
+    }
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
 
@@ -97,13 +120,18 @@ export default function ExpenseOverviewPage() {
       return;
     }
 
+    const clientId = formData.get("clientId");
+    const selectedClient = clients.find(c => String(c.id) === String(clientId));
+
     const payload = {
       employeeId: formData.get("employeeId"),
       category: formData.get("category"),
       amount: formData.get("amount"),
       description: formData.get("description"),
       expenseDate: formData.get("expenseDate"),
-      status: formData.get("status")
+      status: formData.get("status"),
+      clientId: clientId || null,
+      clientName: selectedClient ? (selectedClient.name || selectedClient.clientName || selectedClient.companyName) : null
     };
 
     const uploadData = new FormData();
@@ -130,6 +158,8 @@ export default function ExpenseOverviewPage() {
       setShowFormModal(false);
       setEditExpense(null);
       setPreviewImage(null);
+      setFilePreview(null);
+      setSelectedClientId('');
       e.target.reset();
       loadExpenses();
 
@@ -138,6 +168,43 @@ export default function ExpenseOverviewPage() {
     } finally {
       setSaving(false);
     }
+  }
+
+  async function handleBulkUpload(file) {
+    if (!file) return;
+    const formData = new FormData();
+    formData.append('file', file);
+    setUploading(true);
+    setUploadResult(null);
+    try {
+      const res = await backendApi.post('/expenses/bulk-upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      setUploadResult({ success: true, message: `Uploaded ${res.count || res.length || 'all'} expenses successfully` });
+      loadExpenses();
+    } catch (err) {
+      setUploadResult({ success: false, message: err?.message || 'Upload failed' });
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function downloadTemplate() {
+    const workbook = new ExcelJS.Workbook();
+    const ws = workbook.addWorksheet('Expenses');
+    ws.columns = [
+      { header: 'Employee Name', key: 'employeeName', width: 20 },
+      { header: 'Client Name', key: 'clientName', width: 20 },
+      { header: 'Department', key: 'departmentName', width: 20 },
+      { header: 'Category', key: 'category', width: 20 },
+      { header: 'Description', key: 'description', width: 30 },
+      { header: 'Amount', key: 'amount', width: 15 },
+      { header: 'Expense Date (YYYY-MM-DD)', key: 'expenseDate', width: 25 },
+      { header: 'Status', key: 'status', width: 15 },
+    ];
+    ws.addRow({ employeeName: 'John Doe', clientName: 'ABC Corp', departmentName: 'PPO', category: 'Travel', description: 'Client visit', amount: 500, expenseDate: '2024-01-15', status: 'PENDING' });
+    const buffer = await workbook.xlsx.writeBuffer();
+    saveAs(new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), 'expenses-template.xlsx');
   }
 
   async function handleDelete(id) {
@@ -154,9 +221,11 @@ export default function ExpenseOverviewPage() {
     setExpenses(prev => prev.map(e => e.id === id ? updated : e));
   }
 
-  async function handleReject(id) {
-    const updated = await backendApi.post(`/expenses/${id}/reject`);
+  async function handleReject(id, reason) {
+    const updated = await backendApi.post(`/expenses/${id}/reject`, { reason });
     setExpenses(prev => prev.map(e => e.id === id ? updated : e));
+    setRejectModal(null);
+    setRejectReason('');
   }
 
   async function handlePaid(id) {
@@ -164,27 +233,83 @@ export default function ExpenseOverviewPage() {
     setExpenses(prev => prev.map(e => e.id === id ? updated : e));
   }
 
+  const STATUS_COLORS = {
+    PENDING:  { argb: 'FFFFF9C4' }, // yellow
+    APPROVED: { argb: 'FFC8E6C9' }, // green
+    PAID:     { argb: 'FFC8E6C9' }, // green
+    REJECTED: { argb: 'FFFFCDD2' }, // red
+  };
+
   async function exportExcel() {
+    // filter by export options
+    let rows = [...expenses];
+
+    if (exportType === 'employee' && exportEmployeeId) {
+      rows = rows.filter(e => String(e.employeeId) === String(exportEmployeeId));
+    }
+    if (exportFromDate) {
+      rows = rows.filter(e => e.expenseDate && e.expenseDate >= exportFromDate);
+    }
+    if (exportToDate) {
+      rows = rows.filter(e => e.expenseDate && e.expenseDate <= exportToDate);
+    }
+
     const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet("Expenses");
-    
+    const worksheet = workbook.addWorksheet('Expenses');
+
     worksheet.columns = [
-      { header: "Employee Name", key: "employeeName", width: 20 },
-      { header: "Category", key: "category", width: 20 },
-      { header: "Amount", key: "amount", width: 15 },
-      { header: "Status", key: "status", width: 15 },
-      { header: "Date", key: "expenseDate", width: 20 }
+      { header: 'Employee Name',    key: 'employeeName',    width: 22 },
+      { header: 'Client Name',      key: 'clientName',      width: 20 },
+      { header: 'Department',       key: 'departmentName',  width: 18 },
+      { header: 'Category',         key: 'category',        width: 18 },
+      { header: 'Description',      key: 'description',     width: 30 },
+      { header: 'Amount (₹)',       key: 'amount',          width: 15 },
+      { header: 'Date',             key: 'expenseDate',     width: 18 },
+      { header: 'Status',           key: 'status',          width: 14 },
+      { header: 'Rejection Reason', key: 'rejectionReason', width: 30 },
     ];
-    
-    filtered.forEach(expense => {
-      worksheet.addRow(expense);
+
+    // Style header row
+    worksheet.getRow(1).eachCell(cell => {
+      cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF3F51B5' } };
+      cell.alignment = { vertical: 'middle', horizontal: 'center' };
     });
-    
+
+    rows.forEach(expense => {
+      const row = worksheet.addRow({
+        employeeName:    expense.employeeName    || '',
+        clientName:      expense.clientName      || '',
+        departmentName:  expense.departmentName  || '',
+        category:        expense.category        || '',
+        description:     expense.description     || '',
+        amount:          expense.amount          || 0,
+        expenseDate:     expense.expenseDate     || '',
+        status:          expense.status          || '',
+        rejectionReason: expense.rejectionReason || '',
+      });
+
+      // Color only the Status cell (column 8)
+      const fillColor = STATUS_COLORS[expense.status];
+      if (fillColor) {
+        const statusCell = row.getCell(8); // 'status' column
+        statusCell.fill = { type: 'pattern', pattern: 'solid', fgColor: fillColor };
+        statusCell.font = {
+          bold: true,
+          color: {
+            argb: expense.status === 'PENDING'  ? 'FF795548' :
+                  expense.status === 'REJECTED' ? 'FFB71C1C' : 'FF1B5E20'
+          }
+        };
+      }
+    });
+
     const buffer = await workbook.xlsx.writeBuffer();
-    const blob = new Blob([buffer], {
-      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    });
-    saveAs(blob, "expenses.xlsx");
+    saveAs(
+      new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }),
+      `expenses_${exportType === 'employee' ? 'employee' : 'all'}_${exportFromDate || 'start'}_to_${exportToDate || 'end'}.xlsx`
+    );
+    setShowExportModal(false);
   }
 
   const summary = {
@@ -233,6 +358,8 @@ export default function ExpenseOverviewPage() {
           <button
             onClick={()=>{
               setEditExpense(null);
+              setFilePreview(null);
+              setSelectedClientId('');
               setShowFormModal(true);
             }}
             className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-md text-sm hover:bg-indigo-700"
@@ -281,11 +408,18 @@ export default function ExpenseOverviewPage() {
           </div>
           
           <button
-            onClick={exportExcel}
+            onClick={() => setShowExportModal(true)}
             className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded text-sm hover:bg-green-700"
           >
             <Download size={16}/>
             Export Excel
+          </button>
+          <button
+            onClick={() => { setShowUploadModal(true); setUploadResult(null); }}
+            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700"
+          >
+            <Download size={16} className="rotate-180"/>
+            Upload Excel
           </button>
         </div>
 
@@ -303,11 +437,13 @@ export default function ExpenseOverviewPage() {
               <thead className="bg-gray-50 text-gray-600 text-xs uppercase tracking-wider">
                 <tr>
                   <th className="p-3 text-left">Employee</th>
+                  <th className="p-3 text-left">Client</th>
                   <th className="p-3 text-left">Category</th>
                   <th className="p-3 text-left">Amount</th>
                   <th className="p-3 text-left">Date</th>
                   <th className="p-3 text-left">Evidence</th>
                   <th className="p-3 text-left">Status</th>
+                  <th className="p-3 text-left">Rejection Reason</th>
                   <th className="p-3 text-right">Actions</th>
                 </tr>
               </thead>
@@ -341,6 +477,11 @@ export default function ExpenseOverviewPage() {
 
                     {/* CATEGORY */}
                     <td className="p-3">
+                      <span className="text-xs text-gray-600">{e.clientName || '-'}</span>
+                    </td>
+
+                    {/* CATEGORY */}
+                    <td className="p-3">
                       <span className="bg-indigo-100 text-indigo-600 px-2 py-1 rounded text-xs">
                         {e.category}
                       </span>
@@ -364,7 +505,7 @@ export default function ExpenseOverviewPage() {
                         e.receiptUrl.match(/\.(jpg|jpeg|png)$/i) ?
 
                           <img
-                            src={`https://api.yashrajent.com${e.receiptUrl}`}
+                            src={`http://localhost:8080${e.receiptUrl}`}
                             onClick={() => setPreviewImage(e.receiptUrl)}
                             className="w-10 h-10 rounded object-cover border cursor-pointer"
                           />
@@ -372,7 +513,7 @@ export default function ExpenseOverviewPage() {
                           :
 
                           <a
-                            href={`https://api.yashrajent.com${e.receiptUrl}`}
+                            href={`http://localhost:8080${e.receiptUrl}`}
                             target="_blank"
                             className="text-indigo-600 text-xs underline"
                           >
@@ -392,6 +533,15 @@ export default function ExpenseOverviewPage() {
                       <StatusBadge status={e.status}/>
                     </td>
 
+                    {/* REJECTION REASON */}
+                    <td className="p-3">
+                      {e.rejectionReason ? (
+                        <span className="text-xs text-red-600 bg-red-50 px-2 py-1 rounded">{e.rejectionReason}</span>
+                      ) : (
+                        <span className="text-xs text-gray-400">-</span>
+                      )}
+                    </td>
+
                     {/* ACTIONS */}
                     <td className="p-3">
 
@@ -400,6 +550,8 @@ export default function ExpenseOverviewPage() {
                         <button
                           onClick={()=>{
                             setEditExpense(e);
+                            setFilePreview(null);
+                            setSelectedClientId(e.clientId || '');
                             setShowFormModal(true);
                           }}
                           className="p-2 bg-gray-100 rounded"
@@ -413,7 +565,7 @@ export default function ExpenseOverviewPage() {
                               <Check size={14}/>
                             </button>
 
-                            <button onClick={()=>handleReject(e.id)} className="p-2 bg-red-100 text-red-700 rounded">
+                            <button onClick={()=>{ setRejectModal({ id: e.id }); setRejectReason(''); }} className="p-2 bg-red-100 text-red-700 rounded">
                               <X size={14}/>
                             </button>
                           </>
@@ -497,7 +649,7 @@ export default function ExpenseOverviewPage() {
             </button>
 
             <img
-              src={`https://api.yashrajent.com${previewImage}`}
+              src={`http://localhost:8080${previewImage}`}
               className="w-full object-contain"
             />
 
@@ -530,70 +682,155 @@ export default function ExpenseOverviewPage() {
               {editExpense ? "Edit Expense" : "Add Expense"}
             </h2>
 
-            <form onSubmit={handleSubmit} className="space-y-4" key={editExpense?.id || "new"}>
+            <form onSubmit={handleSubmit} className="space-y-3 max-h-[70vh] overflow-y-auto pr-1" key={editExpense?.id || "new"}>
 
-              <select
-                name="employeeId"
-                defaultValue={editExpense?.employeeId || ""}
-                className="w-full border rounded px-3 py-2"
-              >
-                <option value="">Select Employee</option>
-                {employees.map(emp => (
-                  <option key={emp.id} value={emp.id}>
-                    {emp.firstName} {emp.lastName} — {emp.departmentName || 'No Department'} ({emp.roleName})
-                  </option>
-                ))}
-              </select>
+              {/* Employee */}
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Employee *</label>
+                <select
+                  name="employeeId"
+                  defaultValue={editExpense?.employeeId || ""}
+                  required
+                  className="w-full border rounded px-3 py-2 text-sm"
+                >
+                  <option value="">Select Employee</option>
+                  {employees.map(emp => (
+                    <option key={emp.id} value={emp.id}>
+                      {emp.firstName} {emp.lastName} — {emp.departmentName || 'No Dept'} ({emp.roleName})
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-              <input
-                name="category"
-                defaultValue={editExpense?.category || ""}
-                placeholder="Category"
-                className="w-full border rounded px-3 py-2"
-              />
+              {/* Client */}
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Client (optional)</label>
+                <select
+                  name="clientId"
+                  value={selectedClientId}
+                  onChange={e => setSelectedClientId(e.target.value)}
+                  className="w-full border rounded px-3 py-2 text-sm"
+                >
+                  <option value="">No Client</option>
+                  {clients.map(c => (
+                    <option key={c.id} value={c.id}>
+                      {c.name || c.clientName || c.companyName}
+                    </option>
+                  ))}
+                </select>
+                {selectedClientId && (
+                  <p className="text-xs text-indigo-600 mt-1">
+                    Client: {clients.find(c => String(c.id) === String(selectedClientId))?.name || clients.find(c => String(c.id) === String(selectedClientId))?.clientName || clients.find(c => String(c.id) === String(selectedClientId))?.companyName}
+                  </p>
+                )}
+              </div>
 
-              <input
-                name="amount"
-                defaultValue={editExpense?.amount || ""}
-                placeholder="Amount"
-                className="w-full border rounded px-3 py-2"
-              />
+              {/* Category + Amount */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Category *</label>
+                  <input
+                    name="category"
+                    defaultValue={editExpense?.category || ""}
+                    placeholder="e.g. Travel"
+                    required
+                    className="w-full border rounded px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Amount (₹) *</label>
+                  <input
+                    name="amount"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    defaultValue={editExpense?.amount || ""}
+                    placeholder="0.00"
+                    required
+                    className="w-full border rounded px-3 py-2 text-sm"
+                  />
+                </div>
+              </div>
 
-              <textarea
-                name="description"
-                defaultValue={editExpense?.description || ""}
-                placeholder="Description"
-                className="w-full border rounded px-3 py-2"
-              />
+              {/* Description */}
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Description</label>
+                <textarea
+                  name="description"
+                  defaultValue={editExpense?.description || ""}
+                  placeholder="Brief description..."
+                  rows={2}
+                  className="w-full border rounded px-3 py-2 text-sm"
+                />
+              </div>
 
-              <input
-                name="expenseDate"
-                type="date"
-                defaultValue={editExpense?.expenseDate || ""}
-                className="w-full border rounded px-3 py-2"
-              />
+              {/* Date + Status */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Date *</label>
+                  <input
+                    name="expenseDate"
+                    type="date"
+                    defaultValue={editExpense?.expenseDate || ""}
+                    required
+                    className="w-full border rounded px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Status</label>
+                  <select
+                    name="status"
+                    defaultValue={editExpense?.status || "PENDING"}
+                    className="w-full border rounded px-3 py-2 text-sm"
+                  >
+                    <option value="PENDING">Pending</option>
+                    <option value="APPROVED">Approved</option>
+                    <option value="REJECTED">Rejected</option>
+                    <option value="PAID">Paid</option>
+                  </select>
+                </div>
+              </div>
 
-              <select
-                name="status"
-                defaultValue={editExpense?.status || "PENDING"}
-                className="w-full border rounded px-3 py-2"
-              >
-                <option value="PENDING">Pending</option>
-                <option value="APPROVED">Approved</option>
-                <option value="REJECTED">Rejected</option>
-                <option value="PAID">Paid</option>
-              </select>
-
-              <input
-                name="receipt"
-                type="file"
-                className="w-full border rounded px-3 py-2"
-              />
+              {/* File Upload */}
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Evidence / Receipt</label>
+                <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-indigo-400 hover:bg-indigo-50 transition-colors">
+                  <input
+                    name="receipt"
+                    type="file"
+                    accept="image/*,.pdf"
+                    className="hidden"
+                    onChange={e => {
+                      const f = e.target.files[0];
+                      if (f && f.type.startsWith('image/')) {
+                        setFilePreview(URL.createObjectURL(f));
+                      } else {
+                        setFilePreview(f ? f.name : null);
+                      }
+                    }}
+                  />
+                  {filePreview ? (
+                    filePreview.startsWith('blob:') ? (
+                      <img src={filePreview} className="h-20 object-contain rounded" />
+                    ) : (
+                      <span className="text-sm text-indigo-600">{filePreview}</span>
+                    )
+                  ) : (
+                    <>
+                      <span className="text-2xl text-gray-400">📎</span>
+                      <span className="text-xs text-gray-500 mt-1">Click to upload image or PDF (max 5MB)</span>
+                    </>
+                  )}
+                </label>
+                {editExpense?.receiptUrl && !filePreview && (
+                  <p className="text-xs text-gray-400 mt-1">Current: <a href={`http://localhost:8080${editExpense.receiptUrl}`} target="_blank" className="text-indigo-500 underline">View existing</a></p>
+                )}
+              </div>
 
               <button
                 type="submit"
                 disabled={saving}
-                className="w-full bg-indigo-600 text-white py-2 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full bg-indigo-600 text-white py-2 rounded text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:bg-indigo-700"
               >
                 {saving ? "Saving..." : (editExpense ? "Update Expense" : "Add Expense")}
               </button>
@@ -639,6 +876,174 @@ export default function ExpenseOverviewPage() {
 
         </div>
 
+      )}
+
+      {/* EXPORT MODAL */}
+      {showExportModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowExportModal(false)} />
+          <div className="relative bg-white rounded-lg shadow-lg w-[460px] p-6">
+            <button onClick={() => setShowExportModal(false)} className="absolute top-3 right-3"><XCircle size={22}/></button>
+            <h2 className="text-lg font-semibold mb-4">Export Expenses to Excel</h2>
+
+            {/* Type toggle */}
+            <div className="flex gap-3 mb-5">
+              <button
+                onClick={() => { setExportType('all'); setExportEmployeeId(''); }}
+                className={`flex-1 py-2 rounded border text-sm font-medium transition-colors ${
+                  exportType === 'all' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                }`}
+              >
+                All Employees
+              </button>
+              <button
+                onClick={() => setExportType('employee')}
+                className={`flex-1 py-2 rounded border text-sm font-medium transition-colors ${
+                  exportType === 'employee' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                }`}
+              >
+                By Employee
+              </button>
+            </div>
+
+            {/* Employee dropdown — only when 'employee' selected */}
+            {exportType === 'employee' && (
+              <div className="mb-4">
+                <label className="block text-xs text-gray-500 mb-1">Select Employee *</label>
+                <select
+                  value={exportEmployeeId}
+                  onChange={e => setExportEmployeeId(e.target.value)}
+                  className="w-full border rounded px-3 py-2 text-sm"
+                >
+                  <option value="">-- Select Employee --</option>
+                  {employees.map(emp => (
+                    <option key={emp.id} value={emp.id}>
+                      {emp.firstName} {emp.lastName} {emp.departmentName ? `(${emp.departmentName})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Date range */}
+            <div className="grid grid-cols-2 gap-3 mb-5">
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">From Date</label>
+                <input
+                  type="date"
+                  value={exportFromDate}
+                  onChange={e => setExportFromDate(e.target.value)}
+                  className="w-full border rounded px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">To Date</label>
+                <input
+                  type="date"
+                  value={exportToDate}
+                  onChange={e => setExportToDate(e.target.value)}
+                  className="w-full border rounded px-3 py-2 text-sm"
+                />
+              </div>
+            </div>
+
+            {/* Color legend */}
+            <div className="flex gap-3 mb-5 text-xs">
+              <span className="px-2 py-1 rounded bg-yellow-100 text-yellow-700">■ Pending</span>
+              <span className="px-2 py-1 rounded bg-green-100 text-green-700">■ Approved / Paid</span>
+              <span className="px-2 py-1 rounded bg-red-100 text-red-700">■ Rejected</span>
+            </div>
+
+            <div className="flex gap-3">
+              <button onClick={() => setShowExportModal(false)} className="flex-1 border rounded py-2 text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
+              <button
+                onClick={exportExcel}
+                disabled={exportType === 'employee' && !exportEmployeeId}
+                className="flex-1 bg-green-600 text-white rounded py-2 text-sm font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Download size={14} className="inline mr-1"/> Download
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* REJECT REASON MODAL */}
+      {rejectModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setRejectModal(null)} />
+          <div className="relative bg-white rounded-lg shadow-lg w-[420px] p-6">
+            <button onClick={() => setRejectModal(null)} className="absolute top-3 right-3"><XCircle size={22}/></button>
+            <h2 className="text-lg font-semibold mb-3">Reject Expense</h2>
+            <p className="text-sm text-gray-500 mb-3">Enter a reason for rejection (required):</p>
+            <textarea
+              value={rejectReason}
+              onChange={e => setRejectReason(e.target.value)}
+              placeholder="e.g. Receipt missing, amount exceeds limit..."
+              rows={3}
+              className="w-full border rounded px-3 py-2 text-sm mb-4 focus:outline-none focus:ring-1 focus:ring-red-400"
+            />
+            <div className="flex gap-3">
+              <button onClick={() => setRejectModal(null)} className="flex-1 border rounded py-2 text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
+              <button
+                onClick={() => handleReject(rejectModal.id, rejectReason)}
+                disabled={!rejectReason.trim()}
+                className="flex-1 bg-red-600 text-white rounded py-2 text-sm hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Confirm Reject
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* BULK UPLOAD MODAL */}
+      {showUploadModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowUploadModal(false)} />
+          <div className="relative bg-white rounded-lg shadow-lg w-[480px] p-6">
+            <button onClick={() => setShowUploadModal(false)} className="absolute top-3 right-3">
+              <XCircle size={22}/>
+            </button>
+            <h2 className="text-lg font-semibold mb-1">Bulk Upload Expenses</h2>
+            <p className="text-xs text-gray-500 mb-4">Upload an Excel file with expense records. Download the template first to see the required format.</p>
+
+            <button
+              onClick={downloadTemplate}
+              className="flex items-center gap-2 text-sm text-indigo-600 underline mb-4 hover:text-indigo-800"
+            >
+              <Download size={14}/> Download Template
+            </button>
+
+            <label className="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-indigo-400 hover:bg-indigo-50 transition-colors">
+              <input
+                type="file"
+                accept=".xlsx,.xls"
+                className="hidden"
+                onChange={e => {
+                  const f = e.target.files[0];
+                  if (f) handleBulkUpload(f);
+                }}
+              />
+              {uploading ? (
+                <span className="text-sm text-indigo-600">Uploading...</span>
+              ) : (
+                <>
+                  <span className="text-2xl text-gray-400">📊</span>
+                  <span className="text-xs text-gray-500 mt-1">Click to select .xlsx file</span>
+                </>
+              )}
+            </label>
+
+            {uploadResult && (
+              <div className={`mt-4 p-3 rounded text-sm ${
+                uploadResult.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+              }`}>
+                {uploadResult.message}
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
     </DashboardLayout>

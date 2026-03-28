@@ -108,28 +108,41 @@ export default function OrganizationPage() {
     const [editingEmployee, setEditingEmployee] = useState(null);
     const [emailModalOpen, setEmailModalOpen] = useState(false);
     const [selectedEmployee, setSelectedEmployee] = useState(null);
-    const [emailStatus, setEmailStatus] = useState('idle'); // idle, sending, success, error
+    const [emailStatus, setEmailStatus] = useState('idle');
     const [emailMessage, setEmailMessage] = useState('');
+    const [selectedIds, setSelectedIds] = useState([]);
+    const [bulkDeleting, setBulkDeleting] = useState(false);
 
     // ✅ FIXED: Get dynamic user data
     const userName = getCurrentUserName();
     const userRole = getCurrentUserRole();
 
-    // Handle employee deletion
+    // Handle employee deletion — permanent with FK cleanup
     const handleDeleteEmployee = async (employeeId) => {
-        if (!confirm('Are you sure you want to delete this employee?')) {
-            return;
-        }
-
+        if (!confirm('Permanently delete this employee? This cannot be undone.')) return;
         try {
             await backendApi.delete(`/employees/${employeeId}`);
-            // Refresh the employee list
-            const updatedEmployees = employees.filter(emp => emp.id !== employeeId);
-            setEmployees(updatedEmployees);
-            alert('Employee deleted successfully');
+            setEmployees(prev => prev.filter(emp => emp.id !== employeeId));
         } catch (error) {
             console.error('Error deleting employee:', error);
-            alert('Failed to delete employee');
+            alert('Failed to delete employee: ' + (error?.message || 'Unknown error'));
+        }
+    };
+
+    // Bulk delete
+    const handleBulkDelete = async () => {
+        if (selectedIds.length === 0) return;
+        if (!confirm(`Permanently delete ${selectedIds.length} employee(s)? This cannot be undone.`)) return;
+        setBulkDeleting(true);
+        try {
+            await backendApi.delete('/employees/bulk', { data: selectedIds });
+            setEmployees(prev => prev.filter(emp => !selectedIds.includes(emp.id)));
+            setSelectedIds([]);
+        } catch (error) {
+            console.error('Bulk delete failed:', error);
+            alert('Bulk delete failed: ' + (error?.message || 'Unknown error'));
+        } finally {
+            setBulkDeleting(false);
         }
     };
 
@@ -137,7 +150,7 @@ export default function OrganizationPage() {
     const handleExport = async () => {
         try {
             console.log('Exporting employees...');
-            const response = await fetch('https://api.yashrajent.com/api/employees/export/excel', {
+            const response = await fetch('http://localhost:8080/api/employees/export/excel', {
                 method: 'GET',
                 headers: {
                     'Authorization': `Bearer ${localStorage.getItem('token') || 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhZG1pbkB5YXNoZW50ZXJwcmlzZXMuY29tIiwiaWF0IjoxNzM1ODk2NzQ0LCJleHAiOjE3MzU5ODAzNDR9.test'}`
@@ -266,7 +279,7 @@ export default function OrganizationPage() {
                     name,
                     userId: e.userId,
                     employeeId: e.employeeId,
-                    email: e.email, // Add email field
+                    email: e.email,
                     phone: e.phone,
                     dateOfBirth: e.dateOfBirth || "-",
                     gender: e.gender || "-",
@@ -274,24 +287,14 @@ export default function OrganizationPage() {
                     joiningDate: e.hiredAt,
                     reportingManager: e.reportingManagerName || "-",
                     team: e.teamName || "-",
-                    // ✅ FIXED: Show TL name + department for EMPLOYEE
                     department: e.roleName === 'EMPLOYEE' && e.tlId
                       ? `${e.tlFullName || `${e.tlFirstName || ''} ${e.tlLastName || ''}`.trim()} (${getCorrectDepartmentName(e.tlDepartmentName)})`
                       : getCorrectDepartmentName(e.departmentName),
                     designation: e.customDesignation || e.designationName || "-",
                     role: e.roleName || "-",
                     status: e.status || "-",
-                    leavePolicy: e.leavePolicy || "-",
-                    holidayPlan: e.holidayPlan || "-",
-                    baseSite: e.baseSite || "-",
-                    sitePool: e.sitePool || "-",
-                    city: e.city || "-",
-                    attendanceRestriction: e.attendanceRestriction || "-",
-                    inOutNotification: e.inOutNotification || "-",
-                    workRestriction: e.workRestriction || "-",
-                    defaultTransport: e.defaultTransport || "-",
-                    profileImageUrl: e.profileImageUrl || null,
-                    // Keep original data for editing
+                    panNumber: e.panNumber || "-",
+                    bankAccountNumber: e.bankAccountNumber || "-",
                     originalData: e
                 };
             });
@@ -350,6 +353,15 @@ export default function OrganizationPage() {
                             </svg>
                             <span>Export</span>
                         </button>
+                        {selectedIds.length > 0 && (
+                          <button
+                            onClick={handleBulkDelete}
+                            disabled={bulkDeleting}
+                            className="flex items-center space-x-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+                          >
+                            <span>{bulkDeleting ? 'Deleting...' : `Delete ${selectedIds.length} Selected`}</span>
+                          </button>
+                        )}
                         <button className="flex items-center space-x-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                                 <path fillRule="evenodd" d="M6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0z" clipRule="evenodd" />
@@ -382,31 +394,26 @@ export default function OrganizationPage() {
                             <thead className="bg-slate-50">
                                 <tr>
                                     <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
-                                        <input type="checkbox" className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" />
+                                        <input
+                                          type="checkbox"
+                                          className="h-4 w-4 rounded border-gray-300"
+                                          checked={employees.length > 0 && employees.every(e => selectedIds.includes(e.id))}
+                                          onChange={ev => {
+                                            if (ev.target.checked) setSelectedIds(employees.map(e => e.id));
+                                            else setSelectedIds([]);
+                                          }}
+                                        />
                                     </th>
                                     <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">Employee</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">User ID</th>
                                     <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">Employee ID</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">Email</th>
                                     <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">Phone</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">Birth Date</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">Gender</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">Photo</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">Joining Date</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">Reporting Manager</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">Team</th>
                                     <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">Department</th>
                                     <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">Role</th>
                                     <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">Designation</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">Leave Policy</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">Holiday Plan</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">Base Site</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">Site Pool</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">City</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">Attendance Restriction</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">In/Out Notification</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">Work Restriction</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">Default Transport</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">Active</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">PAN Number</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">Bank Account</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">Status</th>
                                     <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">Action</th>
                                 </tr>
                             </thead>
@@ -416,161 +423,65 @@ export default function OrganizationPage() {
                                         <td className="whitespace-nowrap px-6 py-4">
                                             <input
                                                 type="checkbox"
-                                                className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                                className="h-4 w-4 rounded border-gray-300"
+                                                checked={selectedIds.includes(employee.id)}
+                                                onChange={ev => {
+                                                    if (ev.target.checked) setSelectedIds(prev => [...prev, employee.id]);
+                                                    else setSelectedIds(prev => prev.filter(id => id !== employee.id));
+                                                }}
                                             />
                                         </td>
+                                        {/* Employee name + avatar */}
                                         <td className="whitespace-nowrap px-6 py-4">
-                                            <div className="flex items-center">
-                                                {employee.profileImageUrl && employee.profileImageUrl !== 'null' && employee.profileImageUrl !== '' ? (
+                                            <div className="flex items-center gap-3">
+                                                {employee.profileImageUrl ? (
                                                     <img
-                                                        src={employee.profileImageUrl.startsWith('http') 
-                                                            ? employee.profileImageUrl 
-                                                            : `https://api.yashrajent.com${employee.profileImageUrl}`}
+                                                        src={employee.profileImageUrl.startsWith('http') ? employee.profileImageUrl : `http://localhost:8080${employee.profileImageUrl}`}
                                                         alt={employee.name}
-                                                        className="w-10 h-10 rounded-full object-cover border-2 border-gray-300 mr-4"
-                                                        onError={(e) => {
-                                                            e.target.onerror = null;
-                                                            e.target.src = `data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgdmVyc2lvbj0iMS4xIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+Pjwvc3ZnPg==`;
-                                                        }}
+                                                        className="w-9 h-9 rounded-full object-cover border border-gray-200"
+                                                        onError={e => { e.target.style.display='none'; }}
                                                     />
                                                 ) : (
-                                                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-100 text-sm font-medium text-indigo-700 mr-4">
-                                                        {employee.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                                                    <div className="w-9 h-9 rounded-full bg-indigo-100 flex items-center justify-center text-xs font-medium text-indigo-700">
+                                                        {employee.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0,2)}
                                                     </div>
                                                 )}
-                                                <div>
-                                                    <div className="text-sm font-medium text-slate-900">{employee.name}</div>
-                                                </div>
+                                                <span className="text-sm font-medium text-slate-900">{employee.name}</span>
                                             </div>
                                         </td>
-                                        <td className="whitespace-nowrap px-6 py-4 text-sm text-slate-500">
-                                            {employee.userId}
-                                        </td>
-                                        <td className="whitespace-nowrap px-6 py-4 text-sm text-slate-500">
-                                            {employee.employeeId}
-                                        </td>
-                                        <td className="whitespace-nowrap px-6 py-4 text-sm text-slate-500">
-                                            {employee.phone}
-                                        </td>
-                                        <td className="whitespace-nowrap px-6 py-4 text-sm text-slate-500">
-                                            {employee.dateOfBirth !== "-" ? new Date(employee.dateOfBirth).toLocaleDateString() : "-"}
-                                        </td>
-                                        <td className="whitespace-nowrap px-6 py-4 text-sm text-slate-500">
-                                            {employee.gender}
-                                        </td>
-                                        <td className="whitespace-nowrap px-6 py-4 text-sm text-slate-500">
-                                            {employee.profileImageUrl && employee.profileImageUrl !== 'null' && employee.profileImageUrl !== '' ? (
-                                                <img
-                                                    src={employee.profileImageUrl.startsWith('http') 
-                                                        ? employee.profileImageUrl 
-                                                        : `https://api.yashrajent.com${employee.profileImageUrl}`}
-                                                    alt={employee.name}
-                                                    className="w-8 h-8 rounded-full object-cover border border-gray-300"
-                                                    onError={(e) => {
-                                                        e.target.onerror = null;
-                                                        e.target.src = `data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgdmVyc2lvbj0iMS4xIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+Pjwvc3ZnPg==`;
-                                                    }}
-                                                />
-                                            ) : (
-                                                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-100 text-xs font-medium text-gray-600">
-                                                    {employee.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
-                                                </div>
-                                            )}
-                                        </td>
-                                        <td className="whitespace-nowrap px-6 py-4 text-sm text-slate-500">
-                                            {new Date(employee.joiningDate).toLocaleDateString()}
-                                        </td>
-                                        <td className="whitespace-nowrap px-6 py-4 text-sm text-slate-500">
-                                            {typeof employee.reportingManager === 'object'
-                                              ? employee.reportingManager.name
-                                              : employee.reportingManager || '-'}
-                                        </td>
+                                        <td className="whitespace-nowrap px-6 py-4 text-sm text-slate-500">{employee.employeeId}</td>
+                                        <td className="whitespace-nowrap px-6 py-4 text-sm text-slate-500">{employee.email}</td>
+                                        <td className="whitespace-nowrap px-6 py-4 text-sm text-slate-500">{employee.phone}</td>
                                         <td className="whitespace-nowrap px-6 py-4">
-                                            <span className="inline-flex items-center rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-800">
-                                                {typeof employee.team === 'object'
-                                                  ? employee.team.name
-                                                  : employee.team || '-'}
+                                            <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800">
+                                                {employee.department}
                                             </span>
                                         </td>
+                                        <td className="whitespace-nowrap px-6 py-4 text-sm text-slate-500">{employee.role}</td>
+                                        <td className="whitespace-nowrap px-6 py-4 text-sm text-slate-500">{employee.designation}</td>
+                                        <td className="whitespace-nowrap px-6 py-4 text-sm text-slate-500">{employee.panNumber}</td>
+                                        <td className="whitespace-nowrap px-6 py-4 text-sm text-slate-500">{employee.bankAccountNumber}</td>
                                         <td className="whitespace-nowrap px-6 py-4">
-                                            <span className="inline-flex items-center rounded-full bg-blue-100 px-3 py-1 text-xs font-medium text-blue-800">
-                                                {typeof employee.department === 'object'
-                                                  ? employee.department.name
-                                                  : employee.department || '-'}
-                                            </span>
+                                            <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                                                employee.status === 'ACTIVE' ? 'bg-green-100 text-green-800' :
+                                                employee.status === 'INACTIVE' ? 'bg-red-100 text-red-800' :
+                                                'bg-gray-100 text-gray-800'
+                                            }`}>{employee.status}</span>
                                         </td>
-                                        <td className="whitespace-nowrap px-6 py-4 text-sm text-slate-500">
-                                            {typeof employee.role === 'object'
-                                              ? employee.role.name
-                                              : employee.role || '-'}
-                                        </td>
-                                        <td className="whitespace-nowrap px-6 py-4 text-sm text-slate-500">
-                                            {typeof employee.designation === 'object'
-                                              ? employee.designation.name
-                                              : employee.designation || '-'}
-                                        </td>
-                                        <td className="whitespace-nowrap px-6 py-4 text-sm text-slate-500">
-                                            {employee.leavePolicy}
-                                        </td>
-                                        <td className="whitespace-nowrap px-6 py-4 text-sm text-slate-500">
-                                            {employee.holidayPlan}
-                                        </td>
-                                        <td className="whitespace-nowrap px-6 py-4 text-sm text-slate-500">
-                                            {employee.baseSite}
-                                        </td>
-                                        <td className="whitespace-nowrap px-6 py-4 text-sm text-slate-500">
-                                            {employee.sitePool}
-                                        </td>
-                                        <td className="whitespace-nowrap px-6 py-4 text-sm text-slate-500">
-                                            {employee.city}
-                                        </td>
-                                        <td className="whitespace-nowrap px-6 py-4 text-sm text-slate-500">
-                                            {employee.attendanceRestriction}
-                                        </td>
-                                        <td className="whitespace-nowrap px-6 py-4 text-sm text-slate-500">
-                                            {employee.inOutNotification}
-                                        </td>
-                                        <td className="whitespace-nowrap px-6 py-4 text-sm text-slate-500">
-                                            {employee.workRestriction}
-                                        </td>
-                                        <td className="whitespace-nowrap px-6 py-4 text-sm text-slate-500">
-                                            {employee.defaultTransport}
-                                        </td>
-                                        <td className="whitespace-nowrap px-6 py-4">
-                                            <label className="relative inline-flex items-center cursor-pointer">
-                                                <input type="checkbox" value="" className="sr-only peer" defaultChecked={employee.status === "Active"} />
-                                                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
-                                                <span className="ml-3 text-sm font-medium text-slate-500">
-                                                    {employee.status}
-                                                </span>
-                                            </label>
-                                        </td>
-                                        <td className="whitespace-nowrap px-6 py-4 text-sm text-slate-500">
-                                            <div className="flex items-center space-x-3">
-                                                <button
-                                                    onClick={() => handleLoginDetailsClick(employee)}
-                                                    className="text-green-600 hover:text-green-900 p-1 rounded-full hover:bg-green-50"
-                                                    title="Send Login Details"
-                                                >
-                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                        <td className="whitespace-nowrap px-6 py-4 text-sm">
+                                            <div className="flex items-center gap-2">
+                                                <button onClick={() => handleLoginDetailsClick(employee)} className="text-green-600 hover:text-green-900 p-1 rounded hover:bg-green-50" title="Send Login Details">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                                                         <path fillRule="evenodd" d="M18 8a6 6 0 01-7.743 5.743L10 14l-1 1-1 1H6v2H2v-4l4.257-4.257A6 6 0 1118 8zm-6-4a1 1 0 100 2 2 2 0 012 2 1 1 0 102 0 4 4 0 00-4-4z" clipRule="evenodd" />
                                                     </svg>
                                                 </button>
-                                                <button
-                                                    onClick={() => handleEditEmployee(employee)}
-                                                    className="text-indigo-600 hover:text-indigo-900 p-1 rounded-full hover:bg-indigo-50"
-                                                    title="Edit"
-                                                >
-                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                                        <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.793.793-.793zM11.379 5.793L3 14.172V17h2.828L8.38-8.379-2.83-2.828z" />
+                                                <button onClick={() => handleEditEmployee(employee)} className="text-indigo-600 hover:text-indigo-900 p-1 rounded hover:bg-indigo-50" title="Edit">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                                        <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
                                                     </svg>
                                                 </button>
-                                                <button
-                                                    onClick={() => handleDeleteEmployee(employee.id)}
-                                                    className="text-red-600 hover:text-red-900 p-1 rounded-full hover:bg-red-50"
-                                                    title="Delete"
-                                                >
-                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                                <button onClick={() => handleDeleteEmployee(employee.id)} className="text-red-600 hover:text-red-900 p-1 rounded hover:bg-red-50" title="Delete">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                                                         <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
                                                     </svg>
                                                 </button>

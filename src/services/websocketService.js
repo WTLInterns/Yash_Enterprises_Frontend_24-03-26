@@ -49,7 +49,7 @@ class WebSocketService {
 
     return new Promise((resolve, reject) => {
       try {
-        const socket = new SockJS('https://api.yashrajent.com/ws');
+        const socket = new SockJS('http://localhost:8080/ws');
         this.client = new Client({
           webSocketFactory: () => socket,
           connectHeaders: {},

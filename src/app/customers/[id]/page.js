@@ -6,7 +6,7 @@
 
 
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 
 import ApprovalModal from "@/components/common/ApprovalModal";
 
@@ -234,7 +234,7 @@ export default function CustomerDetailPage() {
       // ── Fetch fresh addresses ──
       const authUser = loggedInUser;
       const addrResponse = await fetch(
-        `https://api.yashrajent.com/api/clients/${customerId}/addresses`,
+        `http://localhost:8080/api/clients/${customerId}/addresses`,
         {
           headers: {
             "X-User-Id":         authUser?.id         ?? "",
@@ -345,25 +345,7 @@ export default function CustomerDetailPage() {
 
       
 
-      console.log("🔵 [LOGGED IN USER]", {
 
-        id: user?.id,
-
-        firstName: user?.firstName,
-
-        lastName: user?.lastName,
-
-        fullName: user?.fullName,
-
-        role: user?.role,
-
-        department: user?.department,
-
-        storageSource: rawUserData ? (sessionStorage.getItem("user_data") ? "sessionStorage" : getTabSafeItem("user_data") ? "tabSafeStorage" : "localStorage") : "none",
-
-        full: user
-
-      });
 
       
 
@@ -395,7 +377,6 @@ export default function CustomerDetailPage() {
 
       if (e.key === 'user_data' || e.key === 'user') {
 
-        console.log("🔄 User data changed in another tab, refreshing...");
 
         window.location.reload(); // Simple refresh to get latest user context
 
@@ -411,7 +392,6 @@ export default function CustomerDetailPage() {
 
       if (e.detail?.type === 'DEAL_STAGE_CHANGED') {
 
-        console.log("🔄 Deal stage changed in another tab, refreshing data...");
 
         // Update current stage immediately for UI refresh
 
@@ -435,7 +415,6 @@ export default function CustomerDetailPage() {
 
       if (e.detail?.type === 'CUSTOMER_UPDATED') {
 
-        console.log("🔄 Customer updated in another tab, refreshing...");
 
         loadCustomer();
 
@@ -457,7 +436,6 @@ export default function CustomerDetailPage() {
 
         if (e.data?.type === 'DEAL_STAGE_CHANGED' && e.data?.dealId !== dealId) {
 
-          console.log("🔄 Deal stage changed in another tab via BroadcastChannel");
 
           // Update current stage immediately for UI refresh
 
@@ -479,7 +457,6 @@ export default function CustomerDetailPage() {
 
         if (e.data?.type === 'DEAL_APPROVAL_COMPLETED') {
 
-          console.log("🔄 Deal approval completed in another tab, refreshing data");
 
           // Refresh all data when approval is completed
 
@@ -497,7 +474,6 @@ export default function CustomerDetailPage() {
 
         if (e.data?.type === 'CUSTOMER_UPDATED' && e.data?.customerId !== customerId) {
 
-          console.log("🔄 Customer updated in another tab via BroadcastChannel");
 
           loadCustomer();
 
@@ -589,13 +565,11 @@ export default function CustomerDetailPage() {
 
   const resolveUserName = (value) => {
 
-    console.log("🟡 [RESOLVE USER NAME] Input:", value);
 
     
 
     if (!value) {
 
-      console.log("🟡 [RESOLVE USER NAME] Output: '-' (empty value)");
 
       return "-";
 
@@ -607,7 +581,6 @@ export default function CustomerDetailPage() {
 
     if (typeof value === "string" && isNaN(value)) {
 
-      console.log("🟡 [RESOLVE USER NAME] Output:", value, "(already a name)");
 
       return value;
 
@@ -625,7 +598,6 @@ export default function CustomerDetailPage() {
 
         || "You";
 
-      console.log("🟢 [RESOLVE USER NAME] Output:", resolved, "(matched logged-in user ID)");
 
       return resolved;
 
@@ -633,7 +605,6 @@ export default function CustomerDetailPage() {
 
 
 
-    console.log("🔴 [RESOLVE USER NAME] Output: 'User' (fallback - no match)");
 
     return "User";
 
@@ -873,7 +844,7 @@ export default function CustomerDetailPage() {
       return;
     }
     try {
-      const response = await fetch('https://api.yashrajent.com/api/clients/geocode', {
+      const response = await fetch('http://localhost:8080/api/clients/geocode', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -909,7 +880,7 @@ export default function CustomerDetailPage() {
     const lng = parseFloat(address.longitude);
     if (!lat || !lng) { addToast("Enter latitude and longitude first", "warning"); return; }
     try {
-      const response = await fetch('https://api.yashrajent.com/api/clients/reverse-geocode', {
+      const response = await fetch('http://localhost:8080/api/clients/reverse-geocode', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ latitude: lat, longitude: lng })
@@ -1096,7 +1067,7 @@ export default function CustomerDetailPage() {
 
         const authUser = loggedInUser;
 
-        const addressesResponse = await fetch(`https://api.yashrajent.com/api/clients/${customerId}/addresses`, {
+        const addressesResponse = await fetch(`http://localhost:8080/api/clients/${customerId}/addresses`, {
 
           headers: {
 
@@ -1248,25 +1219,52 @@ export default function CustomerDetailPage() {
 
   const [products, setProducts] = useState([]);
 
+  // 🔥 NEW: Expenses state for CRM accounting
+  const [expenses, setExpenses] = useState([]);
 
+  // 🔥 FINAL AMOUNT CALCULATION (Product - Expense)
+  const finalAmount = useMemo(() => {
+    const productTotal = products.reduce(
+      (sum, p) => sum + (p.price * p.qty - (p.discount || 0) + (p.tax || 0)),
+      0
+    );
 
-  // Calculate grand total for confirmation dialog
+    const expenseTotal = expenses.reduce(
+      (sum, e) => sum + Number(e.amount || 0),
+      0
+    );
 
-  const grandTotal = useMemo(
+    return productTotal - expenseTotal;
+  }, [products, expenses]);
 
-    () =>
-
-      products.reduce(
-
-        (sum, p) => sum + (p.price * p.qty - (p.discount || 0) + (p.tax || 0)),
-
-        0
-
-      ),
-
-    [products]
-
-  );
+  // Sync finalAmount -> deal.valueAmount. Uses dealRef so deal is NOT a dep (prevents infinite loop).
+  const syncFinalAmountRef = React.useRef(null);
+  const lastSyncedAmountRef = React.useRef(null);
+  const dealRef = React.useRef(null);
+  useEffect(() => { dealRef.current = deal; }, [deal]);
+  useEffect(() => {
+    if (!dealId || (products.length === 0 && expenses.length === 0)) return;
+    if (lastSyncedAmountRef.current === finalAmount) return;
+    clearTimeout(syncFinalAmountRef.current);
+    syncFinalAmountRef.current = setTimeout(async () => {
+      if (lastSyncedAmountRef.current === finalAmount) return;
+      const d = dealRef.current;
+      try {
+        await backendApi.put(`/deals/${dealId}`, {
+          name: d?.name || '',
+          clientId: d?.clientId ?? customerId,
+          bankId: d?.bankId ?? null,
+          stageCode: d?.stageCode || d?.stage || '',
+          department: d?.department || '',
+          valueAmount: finalAmount,
+          closingDate: d?.closingDate || null,
+          description: d?.description || '',
+        });
+        lastSyncedAmountRef.current = finalAmount;
+      } catch (_e) { /* silent */ }
+    }, 2000);
+    return () => clearTimeout(syncFinalAmountRef.current);
+  }, [finalAmount, dealId]);
 
 
 
@@ -1404,13 +1402,11 @@ export default function CustomerDetailPage() {
 
   const adaptTimeline = (items) => {
 
-    console.log("📅 [ADAPT TIMELINE] Raw input:", items);
 
 
 
     const list = Array.isArray(items?.content) ? items.content : Array.isArray(items) ? items : [];
 
-    console.log("📅 [ADAPT TIMELINE] Extracted list:", list);
 
 
 
@@ -1430,7 +1426,6 @@ export default function CustomerDetailPage() {
 
         const actorRaw = it.actor || it.by || it.user || it.createdByName || it.createdBy;
 
-        console.log("📅 [ADAPT TIMELINE] Item actorRaw:", actorRaw, "from:", it);
 
         const actor = resolveUserName(actorRaw);
 
@@ -1456,7 +1451,6 @@ export default function CustomerDetailPage() {
 
     
 
-    console.log("📅 [ADAPT TIMELINE] Final output:", result);
 
     return result;
 
@@ -1472,13 +1466,11 @@ export default function CustomerDetailPage() {
 
   const adaptStages = (items) => {
 
-    console.log("🔄 [ADAPT STAGES] Raw input:", items);
 
 
 
     const list = Array.isArray(items?.content) ? items.content : Array.isArray(items) ? items : [];
 
-    console.log("🔄 [ADAPT STAGES] Extracted list:", list);
 
 
 
@@ -1500,7 +1492,6 @@ export default function CustomerDetailPage() {
 
       const modifiedByRaw = it.modifiedByName || it.changedByName || it.modifiedBy || it.changedBy;
 
-      console.log("🔄 [ADAPT STAGES] Item modifiedByRaw:", modifiedByRaw, "from:", it);
 
       const modifiedBy = resolveUserName(modifiedByRaw);
 
@@ -1518,7 +1509,7 @@ export default function CustomerDetailPage() {
 
 
 
-        amount: Number(it.amount ?? it.valueAmount ?? it.dealValue ?? grandTotal) || 0,
+        amount: Number(it.amount ?? it.valueAmount ?? it.dealValue ?? finalAmount) || 0,
 
 
 
@@ -1542,7 +1533,6 @@ export default function CustomerDetailPage() {
 
     
 
-    console.log("🔄 [ADAPT STAGES] Final output:", result);
 
     return result;
 
@@ -1841,61 +1831,89 @@ export default function CustomerDetailPage() {
 
 
   // Load product catalog for dropdown
-
-
-
   async function loadCatalogProducts() {
-
-
-
     try {
-
-
-
       setLoadingCatalog(true);
-
-
-
       const res = await backendApi.get('/products?size=200');
-
-
-
       // normalizeList if you have it; else use res.content fallback
-
-
-
       const list = Array.isArray(res?.content) ? res.content : (Array.isArray(res) ? res : []);
-
-
-
       setCatalogProducts(list);
-
-
-
     } catch (e) {
-
-
-
       console.error('Failed to load product catalog', e);
-
-
-
       setCatalogProducts([]);
-
-
-
     } finally {
-
-
-
       setLoadingCatalog(false);
-
-
-
     }
+  }
 
+  // 🔥 NEW: Fetch expenses by clientId for CRM accounting
+  async function fetchExpenses(clientIdOverride) {
+    try {
+      const cid = clientIdOverride ?? deal?.clientId ?? customerId;
+      if (!cid) return;
+      const res = await backendApi.get(`/expenses?clientId=${cid}`);
+      setExpenses(Array.isArray(res) ? res : []);
+    } catch (e) {
+      console.error("Expense fetch failed", e);
+      setExpenses([]);
+    }
+  }
 
+  async function fetchEmailHistory() {
+    if (!dealId) return;
+    try {
+      setLoadingEmailHistory(true);
+      const res = await backendApi.get(`/deals/${dealId}/emails`);
+      setEmailHistory(Array.isArray(res) ? res : []);
+    } catch (e) {
+      setEmailHistory([]);
+    } finally {
+      setLoadingEmailHistory(false);
+    }
+  }
 
+  async function handleSendEmail() {
+    if (!emailForm.to?.trim()) { addToast('Recipient email is required', 'error'); return; }
+    if (!dealId) { addToast('No deal linked to this customer', 'error'); return; }
+    try {
+      setSendingEmail(true);
+      const fd = new FormData();
+      fd.append('toAddress', emailForm.to.trim());
+      if (emailForm.cc?.trim()) fd.append('ccAddress', emailForm.cc.trim());
+      fd.append('subject', emailForm.subject || '');
+      fd.append('body', emailForm.body || '');
+      if (emailFile) fd.append('attachment', emailFile);
+      const userId = loggedInUser?.id ?? '';
+      const res = await fetch(`http://localhost:8080/api/deals/${dealId}/emails/send`, {
+        method: 'POST',
+        headers: { 'X-User-Id': String(userId) },
+        body: fd,
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const sent = await res.json();
+      if (sent.status === 'FAILED') {
+        addToast('Email delivery failed. Check credentials.', 'error');
+      } else {
+        addToast('Email sent successfully!', 'success');
+        setShowEmailModal(false);
+        setEmailForm({ to: '', cc: '', subject: '', body: '' });
+        setEmailFile(null);
+        await fetchEmailHistory();
+      }
+    } catch (e) {
+      addToast('Failed to send email: ' + e.message, 'error');
+    } finally {
+      setSendingEmail(false);
+    }
+  }
+
+  async function loadExpenseEmployees() {
+    try {
+      const res = await backendApi.get('/employees');
+      setExpenseEmployees(Array.isArray(res) ? res : []);
+    } catch (e) {
+      console.error("Failed to load employees", e);
+    }
   }
 
 
@@ -1903,6 +1921,34 @@ export default function CustomerDetailPage() {
 
 
 
+
+
+
+  async function handleDeleteExpense(expenseId) {
+    if (!confirm('Delete this expense?')) return;
+    try {
+      await fetch(`http://localhost:8080/api/expenses/${expenseId}`, { method: 'DELETE' });
+      await fetchExpenses(deal?.clientId ?? customerId);
+      addToast('Expense deleted', 'success');
+    } catch (e) {
+      addToast('Failed to delete expense', 'error');
+    }
+  }
+
+  function openExpenseEdit(expense) {
+    setEditingExpenseId(expense.id);
+    setExpenseForm({
+      employeeId: String(expense.employeeId || ''),
+      amount: String(expense.amount || ''),
+      category: expense.category || '',
+      description: expense.description || '',
+      expenseDate: expense.expenseDate ? String(expense.expenseDate).slice(0, 10) : new Date().toISOString().split('T')[0],
+      status: expense.status || 'PENDING',
+    });
+    setExpenseFilePreview(expense.receiptUrl || null);
+    setExpenseFile(null);
+    setShowExpenseModal(true);
+  }
 
   // Load product field definitions for dynamic columns
 
@@ -2678,7 +2724,6 @@ export default function CustomerDetailPage() {
 
         const stageRows = stagesSettled.status === "fulfilled" ? adaptStages(stagesSettled.value) : [];
 
-        console.log("🔄 [LOAD DEAL] Stage history rows:", stageRows);
 
 
 
@@ -2776,7 +2821,6 @@ export default function CustomerDetailPage() {
 
         const notesRes = notesSettled.status === "fulfilled" ? notesSettled.value : [];
 
-        console.log("📝 [NOTES] Raw response:", notesRes);
 
 
 
@@ -2784,7 +2828,6 @@ export default function CustomerDetailPage() {
 
         const notesArray = safeArray(notesRes?.content || notesRes);
 
-        console.log("📝 [NOTES] Safe array:", notesArray);
 
         setNotes(notesArray);
 
@@ -2843,14 +2886,20 @@ export default function CustomerDetailPage() {
 
 
         // Load product catalog and field definitions
-
-
-
         await loadCatalogProducts();
-
-
-
         await loadProductFieldDefs();
+
+        // 🔥 NEW: Load expenses for CRM accounting (pass clientId directly since deal may not be in state yet)
+        await fetchExpenses(dealRes?.clientId ?? customerId);
+        await loadExpenseEmployees();
+
+        // Load email history
+        try {
+          const emailRes = await backendApi.get(`/deals/${resolvedDealId}/emails`);
+          if (isMounted) setEmailHistory(Array.isArray(emailRes) ? emailRes : []);
+        } catch (_e) {
+          if (isMounted) setEmailHistory([]);
+        }
 
 
 
@@ -3015,6 +3064,29 @@ export default function CustomerDetailPage() {
 
 
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
+
+  // 🔥 NEW: Expense modal state
+  const [showExpenseModal, setShowExpenseModal] = useState(false);
+  // 🔥 Email modal + history state
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [emailForm, setEmailForm] = useState({ to: '', cc: '', subject: '', body: '' });
+  const [emailFile, setEmailFile] = useState(null);
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const [emailHistory, setEmailHistory] = useState([]);
+  const [loadingEmailHistory, setLoadingEmailHistory] = useState(false);
+  const [expenseForm, setExpenseForm] = useState({
+    employeeId: "",
+    amount: "",
+    category: "",
+    description: "",
+    expenseDate: new Date().toISOString().split('T')[0],
+    status: "PENDING"
+  });
+  const [expenseEmployees, setExpenseEmployees] = useState([]);
+  const [expenseFilePreview, setExpenseFilePreview] = useState(null);
+  const [expenseFile, setExpenseFile] = useState(null);
+  const [savingExpense, setSavingExpense] = useState(false);
+  const [editingExpenseId, setEditingExpenseId] = useState(null);
 
 
 
@@ -3716,7 +3788,7 @@ export default function CustomerDetailPage() {
 
 
 
-      const res = await fetch("https://api.yashrajent.com/api/case-documents/upload", {
+      const res = await fetch("http://localhost:8080/api/case-documents/upload", {
 
 
 
@@ -3848,7 +3920,7 @@ export default function CustomerDetailPage() {
 
 
 
-    window.open(`https://api.yashrajent.com/api/case-documents/download/${doc.id}`, "_blank");
+    window.open(`http://localhost:8080/api/case-documents/download/${doc.id}`, "_blank");
 
 
 
@@ -4216,7 +4288,6 @@ Your request will be reviewed by the Manager/Admin before transfer.`,
 
 
 
-      console.log("🔄 [STAGE CHANGE] API Response:", response);
 
 
 
@@ -4244,7 +4315,6 @@ Your request will be reviewed by the Manager/Admin before transfer.`,
 
       const timelineData = adaptTimeline(timelineRes);
 
-      console.log("🔄 [STAGE CHANGE] Timeline data:", timelineData);
 
       setTimeline(timelineData);
 
@@ -4252,7 +4322,6 @@ Your request will be reviewed by the Manager/Admin before transfer.`,
 
       const stageRows = adaptStages(stagesRes);
 
-      console.log("🔄 [STAGE CHANGE] Stage history rows:", stageRows);
 
       setStageHistory(stageRows);
 
@@ -4645,9 +4714,6 @@ Your request will be reviewed by the Manager/Admin before transfer.`,
 
 
   function openProductModal() {
-
-
-
     setProductForm({
 
 
@@ -5227,7 +5293,7 @@ async function ensureDealId() {
       await clientApi.update(editForm.id, customerPayload);
 
       // Save addresses
-      await fetch(`https://api.yashrajent.com/api/clients/${editForm.id}/addresses`, {
+      await fetch(`http://localhost:8080/api/clients/${editForm.id}/addresses`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(addresses),
@@ -6325,7 +6391,6 @@ async function ensureDealId() {
 
       ]);
 
-      console.log("📝 [ADD NOTE] Raw notes response:", notesRes);
 
 
 
@@ -6333,7 +6398,6 @@ async function ensureDealId() {
 
       const notesArray = safeArray(notesRes?.content || notesRes);
 
-      console.log("📝 [ADD NOTE] Safe array:", notesArray);
 
       setNotes(notesArray);
 
@@ -6383,20 +6447,14 @@ async function ensureDealId() {
 
 
 
-  // 🔥 PATCH 3: BLOCK CRM UI RENDERING UNTIL deal.id EXISTS
-
-  if (!deal?.id) {
-
+    if (!deal?.id) {
     return (
-
-      <div className="py-10 text-center text-slate-500">
-
-        No deal linked to this customer
-
-      </div>
-
+      <DashboardLayout header={{ project: 'Customer Details', user: getLoggedInUser(), notifications: [] }}>
+        <div className="py-10 text-center text-slate-500">
+          {loadingCustomer ? 'Loading...' : 'No deal linked to this customer'}
+        </div>
+      </DashboardLayout>
     );
-
   }
 
 
@@ -6535,7 +6593,7 @@ async function ensureDealId() {
 
 
 
-                  {formatCurrency(grandTotal)}
+                  {formatCurrency(finalAmount)}
 
 
 
@@ -6629,7 +6687,7 @@ async function ensureDealId() {
 
 
 
-              <button className="inline-flex items-center gap-2 rounded-full border border-sky-500/80 bg-sky-50/80 px-4 py-2 text-sm font-medium text-sky-900 shadow-sm shadow-sky-500/20 transition duration-150 hover:bg-sky-100 hover:shadow-md">
+              <button onClick={() => { setEmailForm({ to: customer?.email || '', cc: '', subject: '', body: '' }); setEmailFile(null); setShowEmailModal(true); }} className="inline-flex items-center gap-2 rounded-full border border-sky-500/80 bg-sky-50/80 px-4 py-2 text-sm font-medium text-sky-900 shadow-sm shadow-sky-500/20 transition duration-150 hover:bg-sky-100 hover:shadow-md">
 
 
 
@@ -6751,51 +6809,27 @@ async function ensureDealId() {
                 const isCloseStage = s === "CLOSE_WON" || s === "CLOSE_LOST" || s === "CLOSE_WIN" || s === "CLOSE_LOST";
                 
                 // 🔍 COMPREHENSIVE DEBUG LOGGING
-                console.log("🔍 [STAGE ANALYSIS] =======================");
-                console.log("🔍 [STAGE ANALYSIS] Stage:", s);
-                console.log("🔍 [STAGE ANALYSIS] loggedInUser:", loggedInUser);
-                console.log("🔍 [STAGE ANALYSIS] User Department:", loggedInUser?.department);
-                console.log("🔍 [STAGE ANALYSIS] isAccountDepartment:", isAccountDepartment);
-                console.log("🔍 [STAGE ANALYSIS] currentStage:", currentStage);
-                console.log("🔍 [STAGE ANALYSIS] isBillPassStage:", isBillPassStage);
-                console.log("🔍 [STAGE ANALYSIS] isCloseStage:", isCloseStage);
-                console.log("🔍 [STAGE ANALYSIS] isTerminal:", isTerminal);
-                console.log("🔍 [STAGE ANALYSIS] stageData:", stageData);
                 
                 // 🔥 For ACCOUNT department at BILL PASS, allow terminal close stages
                 let allowTerminalStage = isTerminal;
                 if (isAccountDepartment && isBillPassStage && isCloseStage) {
                   allowTerminalStage = false; // Don't treat as disabled terminal
-                  console.log("✅ [STAGE ANALYSIS] OVERRIDING terminal restriction for:", s);
                 } else {
-                  console.log("❌ [STAGE ANALYSIS] NOT overriding terminal - Conditions not met");
-                  console.log("❌ [STAGE ANALYSIS] Account Dept:", isAccountDepartment, "Bill Pass:", isBillPassStage, "Close Stage:", isCloseStage);
                 }
 
                 const currentStageOrder = currentStageData?.stageOrder || 0;
                 const thisStageOrder = stageData?.stageOrder || 0;
                 let canProgress = thisStageOrder <= currentStageOrder + 1;
                 
-                console.log("🔍 [STAGE ANALYSIS] currentStageOrder:", currentStageOrder);
-                console.log("🔍 [STAGE ANALYSIS] thisStageOrder:", thisStageOrder);
-                console.log("🔍 [STAGE ANALYSIS] Initial canProgress:", canProgress, "(calc:", thisStageOrder, "<=", currentStageOrder + 1, ")");
                 
                 // 🔥 SPECIAL: For ACCOUNT department, allow CLOSE_WON and CLOSE_LOST when current stage is BILL PASS
                 if (isAccountDepartment && isBillPassStage && isCloseStage) {
                   // Allow both CLOSE_WON and CLOSE_LOST for ACCOUNT department when at BILL PASS stage
                   canProgress = true;
-                  console.log("✅ [STAGE ANALYSIS] OVERRIDING progression restriction for:", s);
                 } else {
-                  console.log("❌ [STAGE ANALYSIS] NOT overriding progression - Conditions not met");
                 }
                 
                 // Final comprehensive state
-                console.log("🎯 [STAGE ANALYSIS] FINAL STATE for", s, ":");
-                console.log("🎯 [STAGE ANALYSIS] - canProgress:", canProgress);
-                console.log("🎯 [STAGE ANALYSIS] - allowTerminalStage:", allowTerminalStage);
-                console.log("🎯 [STAGE ANALYSIS] - isTerminal:", isTerminal);
-                console.log("🎯 [STAGE ANALYSIS] - Cursor class:", canProgress ? "cursor-pointer" : "cursor-not-allowed");
-                console.log("🎯 [STAGE ANALYSIS] =======================");
 
                 
 
@@ -7603,7 +7637,15 @@ async function ensureDealId() {
 
 
 
-                                      <div className="text-sm font-medium text-slate-900">{item.message}</div>
+                                      <div className="text-sm font-medium text-slate-900">
+                                      {item.message.includes("Expense") ? (
+                                        <span className="text-red-600">🔴 {item.message}</span>
+                                      ) : item.message.includes("Product") ? (
+                                        <span className="text-green-600">🟢 {item.message}</span>
+                                      ) : (
+                                        item.message
+                                      )}
+                                    </div>
 
 
 
@@ -10421,7 +10463,7 @@ async function ensureDealId() {
 
 
 
-                              src={`https://api.yashrajent.com/api/case-documents/view/${viewingDoc.id}`}
+                              src={`http://localhost:8080/api/case-documents/view/${viewingDoc.id}`}
 
 
 
@@ -10441,7 +10483,7 @@ async function ensureDealId() {
 
 
 
-                                window.open(`https://api.yashrajent.com/api/case-documents/view/${viewingDoc.id}`, '_blank');
+                                window.open(`http://localhost:8080/api/case-documents/view/${viewingDoc.id}`, '_blank');
 
 
 
@@ -10661,210 +10703,119 @@ async function ensureDealId() {
 
 
 
+                        {/* 🔥 COMBINED ACCOUNTS TABLE (Products + Expenses) */}
                         <tbody className="divide-y divide-slate-100 bg-white/90">
+                        
+                        {/* Combine products and expenses */}
+                        {[
+                          ...products.map(p => ({ ...p, type: "product", name: p.name || p.productName, amount: p.price * p.qty - (p.discount || 0) + (p.tax || 0) })),
+                          ...expenses.map(e => ({ ...e, type: "expense", name: e.category, amount: e.amount }))
+                        ]
+                          .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
+                          .map((item, index) => (
 
 
 
-                        {products.map((p) => (
-
-
-
-                          <tr key={p.id} className="transition hover:bg-slate-50/80">
+                          <tr key={`${item.type}-${item.id || index}`} className="transition hover:bg-slate-50/80">
 
 
 
                             <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-900">
-
-
-
                               <span className="inline-flex items-center gap-2">
-
-
-
-                                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-indigo-500 text-[10px] font-bold text-white shadow-sm">
-
-
-
-                                  {p.code}
-
-
-
-                                </span>
-
-
-
-                                {p.name}
-
-
-
+                                {item.type === "product" ? (
+                                  <span className="text-green-600">🟢</span>
+                                ) : (
+                                  <span className="text-red-600">🔴</span>
+                                )}
+                                {item.name}
                               </span>
-
-
-
                             </td>
 
 
 
-                            <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">{(p.price || 0).toLocaleString("en-IN")}</td>
+                            <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">{(item.price || 0).toLocaleString("en-IN")}</td>
 
 
 
-                            <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">{(p.qty || 0).toFixed(2)}</td>
+                            <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">{(item.qty || 0).toFixed(2)}</td>
 
 
 
-                            <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">{(p.discount || 0).toLocaleString("en-IN")}</td>
+                            <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">{(item.discount || 0).toLocaleString("en-IN")}</td>
 
 
 
-                            <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">{(p.tax || 0).toLocaleString("en-IN")}</td>
+                            <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">{(item.tax || 0).toLocaleString("en-IN")}</td>
 
 
 
                             {productFieldDefs.map((def) => {
-
-
-
-                              const custom = p.customFields || p.fields || {};
-
-
-
+                              const custom = item.customFields || item.fields || {};
                               let v = "";
-
-
-
                               try {
-
-
-
                                 const obj = typeof custom === "string" ? JSON.parse(custom || "{}") : custom;
-
-
-
                                 v = obj?.[def.key] ?? "";
-
-
-
                               } catch { v = ""; }
-
-
-
                               return (
-
-
-
                                 <td key={def.key} className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">
-
-
-
                                   {String(v)}
-
-
-
                                 </td>
-
-
-
                               );
-
-
-
                             })}
 
 
 
-                            <td className="whitespace-nowrap px-4 py-3 text-xs font-semibold text-slate-900">
-
-
-
-                              {((p.price || 0) * (p.qty || 0) - (p.discount || 0) + (p.tax || 0)).toLocaleString("en-IN")}
-
-
-
+            <td className="whitespace-nowrap px-4 py-3 text-xs font-semibold text-slate-900">
+                              {item.type === "product" 
+                                ? ((item.price || 0) * (item.qty || 0) - (item.discount || 0) + (item.tax || 0)).toLocaleString("en-IN")
+                                : item.amount.toLocaleString("en-IN")
+                              }
                             </td>
 
 
 
-                            <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">
-
-
-
+            <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">
                               <div className="flex items-center gap-2">
-
-
-
-                                <button
-
-
-
-                                  type="button"
-
-
-
-                                  onClick={() => openProductEdit(p)}
-
-
-
-                                  className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:border-indigo-300 hover:text-indigo-700"
-
-
-
-                                >
-
-
-
-                                  <Edit3 className="h-3.5 w-3.5" />
-
-
-
-                                </button>
-
-
-
-                                <button
-
-
-
-                                  type="button"
-
-
-
-                                  onClick={async () => {
-
-
-
-                                    if (!confirm("Delete this product?")) return;
-
-
-
-                                    await handleDeleteDealProduct(p.dealProductId ?? p.id);
-
-
-
-                                  }}
-
-
-
-                                  className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white text-rose-500 shadow-sm transition hover:border-rose-300 hover:text-rose-600"
-
-
-
-                                >
-
-
-
-                                  <TrashIcon />
-
-
-
-                                </button>
-
-
-
+                                {item.type === "product" && (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => openProductEdit(item)}
+                                      className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:border-indigo-300 hover:text-indigo-700"
+                                    >
+                                      <Edit3 className="h-3.5 w-3.5" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={async () => {
+                                        if (!confirm("Delete this product?")) return;
+                                        await handleDeleteDealProduct(item.dealProductId ?? item.id);
+                                      }}
+                                      className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white text-rose-500 shadow-sm transition hover:border-rose-300 hover:text-rose-600"
+                                    >
+                                      <TrashIcon />
+                                    </button>
+                                  </>
+                                )}
+                                {item.type === "expense" && (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => openExpenseEdit(item)}
+                                      className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:border-indigo-300 hover:text-indigo-700"
+                                    >
+                                      <Edit3 className="h-3.5 w-3.5" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteExpense(item.id)}
+                                      className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white text-rose-500 shadow-sm transition hover:border-rose-300 hover:text-rose-600"
+                                    >
+                                      <TrashIcon />
+                                    </button>
+                                  </>
+                                )}
                               </div>
-
-
-
                             </td>
 
 
@@ -10921,15 +10872,39 @@ async function ensureDealId() {
 
 
 
+                    <button
+
+
+
+                      onClick={() => setShowExpenseModal(true)}
+
+
+
+                      className="inline-flex items-center gap-2 rounded-full border border-rose-300 px-3 py-2 text-xs font-medium text-rose-800 shadow-sm transition hover:border-rose-400 hover:text-rose-700"
+
+
+
+                    >
+
+
+
+                      <Plus className="h-4 w-4" /> Expense
+
+
+
+                    </button>
+
+
+
                     <div className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-slate-50 shadow-md shadow-slate-900/40">
 
 
 
-                      <span className="text-slate-400">Grand Total</span>
+                      <span className="text-slate-400">Final Amount</span>
 
 
 
-                      <span>{formatCurrency(grandTotal)}</span>
+                      <span>{formatCurrency(finalAmount)}</span>
 
 
 
@@ -10940,147 +10915,260 @@ async function ensureDealId() {
                   </div>
 
 
-
                 </div>
-
-
 
               )}
 
+              {/* 🔥 EXPENSE MODAL - Full form matching /expenses page */}
+              {showExpenseModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                  <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowExpenseModal(false)} />
+                  <div className="relative w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
+                    <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-6 py-4">
+                      <div>
+                        <h3 className="text-lg font-semibold text-slate-900">{editingExpenseId ? 'Edit Expense' : 'Add Expense'}</h3>
+                        <p className="text-xs text-slate-500 mt-0.5">Client: <span className="font-medium text-indigo-600">{customer?.name}</span></p>
+                      </div>
+                      <button type="button" onClick={() => setShowExpenseModal(false)} className="rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600">
+                        <XCircle className="h-5 w-5" />
+                      </button>
+                    </div>
+                    <div className="p-6 space-y-3 max-h-[70vh] overflow-y-auto">
 
+                      {/* Employee */}
+                      <div>
+                        <label className="block text-xs text-slate-500 mb-1">Employee *</label>
+                        <select
+                          value={expenseForm.employeeId}
+                          onChange={e => setExpenseForm(p => ({ ...p, employeeId: e.target.value }))}
+                          required
+                          className="w-full border rounded-lg px-3 py-2 text-sm"
+                        >
+                          <option value="">Select Employee</option>
+                          {expenseEmployees.map(emp => (
+                            <option key={emp.id} value={emp.id}>
+                              {emp.firstName} {emp.lastName} — {emp.departmentName || emp.tlDepartmentName || 'No Dept'} ({emp.roleName})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
 
+                      {/* Category + Amount */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs text-slate-500 mb-1">Category *</label>
+                          <input
+                            type="text"
+                            value={expenseForm.category}
+                            onChange={e => setExpenseForm(p => ({ ...p, category: e.target.value }))}
+                            placeholder="e.g. Travel"
+                            className="w-full border rounded-lg px-3 py-2 text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-slate-500 mb-1">Amount (₹) *</label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={expenseForm.amount}
+                            onChange={e => setExpenseForm(p => ({ ...p, amount: e.target.value }))}
+                            placeholder="0.00"
+                            className="w-full border rounded-lg px-3 py-2 text-sm"
+                          />
+                        </div>
+                      </div>
 
+                      {/* Description */}
+                      <div>
+                        <label className="block text-xs text-slate-500 mb-1">Description</label>
+                        <textarea
+                          value={expenseForm.description}
+                          onChange={e => setExpenseForm(p => ({ ...p, description: e.target.value }))}
+                          rows={2}
+                          placeholder="Brief description..."
+                          className="w-full border rounded-lg px-3 py-2 text-sm"
+                        />
+                      </div>
 
+                      {/* Date + Status */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs text-slate-500 mb-1">Date *</label>
+                          <input
+                            type="date"
+                            value={expenseForm.expenseDate}
+                            onChange={e => setExpenseForm(p => ({ ...p, expenseDate: e.target.value }))}
+                            className="w-full border rounded-lg px-3 py-2 text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-slate-500 mb-1">Status</label>
+                          <select
+                            value={expenseForm.status}
+                            onChange={e => setExpenseForm(p => ({ ...p, status: e.target.value }))}
+                            className="w-full border rounded-lg px-3 py-2 text-sm"
+                          >
+                            <option value="PENDING">Pending</option>
+                            <option value="APPROVED">Approved</option>
+                            <option value="REJECTED">Rejected</option>
+                            <option value="PAID">Paid</option>
+                          </select>
+                        </div>
+                      </div>
 
+                      {/* File Upload */}
+                      <div>
+                        <label className="block text-xs text-slate-500 mb-1">Evidence / Receipt</label>
+                        <label className="flex flex-col items-center justify-center w-full h-20 border-2 border-dashed border-slate-300 rounded-lg cursor-pointer hover:border-indigo-400 hover:bg-indigo-50 transition-colors">
+                          <input
+                            type="file"
+                            accept="image/*,.pdf"
+                            className="hidden"
+                            onChange={e => {
+                              const f = e.target.files[0];
+                              setExpenseFile(f || null);
+                              if (f && f.type.startsWith('image/')) {
+                                setExpenseFilePreview(URL.createObjectURL(f));
+                              } else {
+                                setExpenseFilePreview(f ? f.name : null);
+                              }
+                            }}
+                          />
+                          {expenseFilePreview ? (
+                            expenseFilePreview.startsWith('blob:') ? (
+                              <img src={expenseFilePreview} className="h-16 object-contain rounded" />
+                            ) : (
+                              <span className="text-sm text-indigo-600">{expenseFilePreview}</span>
+                            )
+                          ) : (
+                            <>
+                              <span className="text-2xl text-slate-400">📎</span>
+                              <span className="text-xs text-slate-500 mt-1">Click to upload image or PDF (max 5MB)</span>
+                            </>
+                          )}
+                        </label>
+                      </div>
+
+                      <div className="flex justify-end gap-3 pt-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowExpenseModal(false);
+                            setExpenseFilePreview(null);
+                            setExpenseFile(null);
+                            setEditingExpenseId(null);
+                          }}
+                          className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          disabled={savingExpense}
+                          onClick={async () => {
+                            if (!expenseForm.amount || !expenseForm.category) {
+                              addToast('Please fill in amount and category', 'error');
+                              return;
+                            }
+                            if (expenseFile && expenseFile.size > 5 * 1024 * 1024) {
+                              addToast('File must be under 5MB', 'error');
+                              return;
+                            }
+                            try {
+                              setSavingExpense(true);
+                              const payload = {
+                                ...expenseForm,
+                                clientId: customerId,
+                                clientName: customer?.name || '',
+                                amount: Number(expenseForm.amount)
+                              };
+                              const uploadData = new FormData();
+                              uploadData.append('expense', JSON.stringify(payload));
+                              if (expenseFile) uploadData.append('file', expenseFile);
+                              const expUrl = editingExpenseId
+                                ? `http://localhost:8080/api/expenses/${editingExpenseId}`
+                                : 'http://localhost:8080/api/expenses';
+                              await fetch(expUrl, {
+                                method: editingExpenseId ? 'PUT' : 'POST',
+                                body: uploadData
+                              });
+                              setExpenseForm({ employeeId: "", amount: "", category: "", description: "", expenseDate: new Date().toISOString().split('T')[0], status: "PENDING" });
+                              setExpenseFilePreview(null);
+                              setExpenseFile(null);
+                              setEditingExpenseId(null);
+                              setShowExpenseModal(false);
+                              await fetchExpenses(deal?.clientId ?? customerId);
+                            } catch (error) {
+                              console.error('Failed to save expense:', error);
+                              addToast('Failed to save expense', 'error');
+                            } finally {
+                              setSavingExpense(false);
+                            }
+                          }}
+                          className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:opacity-50"
+                        >
+                          {savingExpense ? 'Saving...' : 'Save Expense'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {activeTab === "emails" && (
-
-
-
                 <div className="mt-5 animate-[fadeIn_0.25s_ease-out]">
-
-
-
-                  <div className="mb-3 flex items-center justify-between">
-
-
-
-                    <div className="text-sm font-semibold text-slate-900">Emails</div>
-
-
-
-                    <div className="text-xs text-slate-500">Send and track emails directly from this case</div>
-
-
-
+                  <div className="mb-4 flex items-center justify-between">
+                    <div className="text-sm font-semibold text-slate-900">Email History</div>
+                    <button
+                      onClick={() => {
+                        setEmailForm({ to: customer?.email || '', cc: '', subject: '', body: '' });
+                        setEmailFile(null);
+                        setShowEmailModal(true);
+                      }}
+                      className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-teal-500 to-emerald-500 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-emerald-500/40 transition hover:translate-y-[1px] hover:shadow-lg"
+                    >
+                      <Mail className="h-4 w-4" /> Compose Email
+                    </button>
                   </div>
-
-
-
-                  <div className="space-y-3">
-
-
-
-                    <input
-
-
-
-                      type="text"
-
-
-
-                      className="w-full rounded-full border border-slate-200 px-3 py-2 text-xs text-slate-800 placeholder:text-slate-400 focus:border-indigo-400"
-
-
-
-                      placeholder="To"
-
-
-
-                      defaultValue={customer?.email || ""}
-
-
-
-                    />
-
-
-
-                    <input
-
-
-
-                      type="text"
-
-
-
-                      className="w-full rounded-full border border-slate-200 px-3 py-2 text-xs text-slate-800 placeholder:text-slate-400 focus:border-indigo-400"
-
-
-
-                      placeholder="Subject"
-
-
-
-                    />
-
-
-
-                    <textarea
-
-
-
-                      className="h-40 w-full rounded-2xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 shadow-inner shadow-slate-200/60 focus:border-indigo-400 focus:bg-white"
-
-
-
-                      placeholder="Compose your message"
-
-
-
-                    />
-
-
-
-                    <div className="flex items-center justify-end gap-3">
-
-
-
-                      <button className="inline-flex items-center gap-2 rounded-full border border-slate-300 px-3 py-2 text-xs font-medium text-slate-700 hover:border-slate-400 hover:bg-slate-50">
-
-
-
-                        Save Draft
-
-
-
-                      </button>
-
-
-
-                      <button className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-teal-500 to-emerald-500 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-emerald-500/40 transition hover:translate-y-[1px] hover:shadow-lg">
-
-
-
-                        <Mail className="h-4 w-4" /> Send
-
-
-
-                      </button>
-
-
-
+                  {loadingEmailHistory ? (
+                    <div className="py-6 text-center text-xs text-slate-500">Loading...</div>
+                  ) : emailHistory.length === 0 ? (
+                    <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/70 px-4 py-8 text-center text-xs text-slate-500">
+                      No emails sent yet. Click Compose Email to send the first one.
                     </div>
-
-
-
-                  </div>
-
-
-
+                  ) : (
+                    <div className="space-y-3 max-h-[400px] overflow-auto">
+                      {emailHistory.map((em) => (
+                        <div key={em.id} className="rounded-2xl border border-slate-200/80 bg-white/90 p-4 shadow-sm">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${em.status === 'SENT' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
+                                  {em.status}
+                                </span>
+                                <span className="text-xs font-medium text-slate-900 truncate">{em.subject || '(no subject)'}</span>
+                              </div>
+                              <div className="mt-1 text-[11px] text-slate-500">
+                                To: <span className="font-medium text-slate-700">{em.toAddress}</span>
+                                {em.ccAddress && <span> Â· CC: {em.ccAddress}</span>}
+                              </div>
+                              {em.body && (
+                                <div className="mt-2 text-xs text-slate-600 line-clamp-2 whitespace-pre-wrap">{em.body}</div>
+                              )}
+                              {em.attachmentName && (
+                                <div className="mt-1 text-[11px] text-indigo-600">ðŸ“Ž {em.attachmentName}</div>
+                              )}
+                            </div>
+                            <div className="text-[11px] text-slate-400 whitespace-nowrap">
+                              {em.sentAt ? new Date(em.sentAt).toLocaleString('en-IN', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' }) : ''}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-
-
-
               )}
 
 
@@ -11101,6 +11189,100 @@ async function ensureDealId() {
 
 
 
+        {/* Email Compose Modal */}
+        {showEmailModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowEmailModal(false)} />
+            <div className="relative w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
+              <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-6 py-4">
+                <div>
+                  <h3 className="text-lg font-semibold text-slate-900">Compose Email</h3>
+                  <p className="text-xs text-slate-500 mt-0.5">To: <span className="font-medium text-indigo-600">{emailForm.to || customer?.email}</span></p>
+                </div>
+                <button type="button" onClick={() => setShowEmailModal(false)} className="rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600">
+                  <XCircle className="h-5 w-5" />
+                </button>
+              </div>
+              <div className="p-6 space-y-3">
+                <div>
+                  <label className="block text-xs text-slate-500 mb-1">To *</label>
+                  <input
+                    type="email"
+                    value={emailForm.to}
+                    onChange={e => setEmailForm(p => ({ ...p, to: e.target.value }))}
+                    placeholder="recipient@example.com"
+                    className="w-full border rounded-lg px-3 py-2 text-sm focus:border-indigo-400 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-slate-500 mb-1">CC</label>
+                  <input
+                    type="email"
+                    value={emailForm.cc}
+                    onChange={e => setEmailForm(p => ({ ...p, cc: e.target.value }))}
+                    placeholder="cc@example.com"
+                    className="w-full border rounded-lg px-3 py-2 text-sm focus:border-indigo-400 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-slate-500 mb-1">Subject</label>
+                  <input
+                    type="text"
+                    value={emailForm.subject}
+                    onChange={e => setEmailForm(p => ({ ...p, subject: e.target.value }))}
+                    placeholder="Email subject"
+                    className="w-full border rounded-lg px-3 py-2 text-sm focus:border-indigo-400 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-slate-500 mb-1">Body</label>
+                  <textarea
+                    value={emailForm.body}
+                    onChange={e => setEmailForm(p => ({ ...p, body: e.target.value }))}
+                    rows={5}
+                    placeholder="Write your message..."
+                    className="w-full border rounded-lg px-3 py-2 text-sm focus:border-indigo-400 outline-none resize-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-slate-500 mb-1">Attach File</label>
+                  <label className="flex items-center gap-3 w-full border-2 border-dashed border-slate-300 rounded-lg px-4 py-3 cursor-pointer hover:border-indigo-400 hover:bg-indigo-50 transition-colors">
+                    <input
+                      type="file"
+                      className="hidden"
+                      onChange={e => setEmailFile(e.target.files?.[0] || null)}
+                    />
+                    <span className="text-slate-400 text-lg">ðŸ“Ž</span>
+                    <span className="text-xs text-slate-500">
+                      {emailFile ? emailFile.name : 'Click to attach a file'}
+                    </span>
+                    {emailFile && (
+                      <button type="button" onClick={e => { e.preventDefault(); setEmailFile(null); }} className="ml-auto text-rose-500 hover:text-rose-700 text-xs">Remove</button>
+                    )}
+                  </label>
+                </div>
+                <div className="flex justify-end gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => { setShowEmailModal(false); setEmailFile(null); }}
+                    className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={sendingEmail}
+                    onClick={handleSendEmail}
+                    className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-teal-500 to-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-md transition hover:translate-y-[1px] disabled:opacity-50"
+                  >
+                    <Mail className="h-4 w-4" />
+                    {sendingEmail ? 'Sending...' : 'Send Email'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
         {isProductModalOpen && (
 
 
@@ -14970,7 +15152,7 @@ async function ensureDealId() {
 
       customerProducts={products || []}
 
-      dealValue={grandTotal} // ✅ FIXED: Use calculated grandTotal instead of dealValue
+      dealValue={finalAmount} // ✅ FIXED: Use calculated finalAmount instead of dealValue
 
       onConfirm={async () => {
 

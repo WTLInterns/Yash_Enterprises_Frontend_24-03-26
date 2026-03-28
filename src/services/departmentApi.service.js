@@ -17,26 +17,10 @@ const getAuthUser = () => {
     user.role = user.role || user.roleName || null;
     user.department = user.department || user.departmentName || user.tlDepartmentName || null;
     
-    // 🔥 CRITICAL: If user exists but no department, try to get it from separate storage
     if (user && !user.department) {
       const departmentFromStorage = getTabSafeItem("user_department") || localStorage.getItem("user_department");
-      if (departmentFromStorage) {
-        user.department = departmentFromStorage;
-        console.log("🔄 [DEPARTMENT API] Added department from storage:", departmentFromStorage);
-      }
+      if (departmentFromStorage) user.department = departmentFromStorage;
     }
-    
-    // 🔥 DEBUG: Log user data to debug department issue
-    console.log("🔍 [DEPARTMENT API] User data:", {
-      user: user,
-      department: user?.department,
-      role: user?.role,
-      roleName: user?.roleName,
-      departmentName: user?.departmentName,
-      hasDepartment: !!user?.department,
-      rawUserData: rawUserData,
-      fullUserObject: JSON.stringify(user, null, 2)
-    });
     
     return user;
   } catch (error) {
@@ -82,67 +66,30 @@ export const departmentApiService = {
     return response || [];
   },
 
-  // 🎯 Department-wise customers API
   getCustomers: async (params = {}) => {
     const user = getAuthUser();
     const department = user?.department;
     
-    // 🔥 DEBUG: Log detailed info for troubleshooting
-    console.log("🔍 [GET CUSTOMERS] Detailed debug:", {
-      user: user,
-      department: department,
-      role: user?.role,
-      hasDepartment: !!department,
-      params: params
-    });
-    
-    // 🔥 Admin & Account users can access all customers without department restriction
     if (user?.role === 'ADMIN' || user?.role === 'MANAGER' || user?.role === 'ACCOUNT') {
-      console.log('Admin/Manager/Account user - fetching all customers without department filter');
-      const queryParams = { ...params };
-      const queryString = new URLSearchParams(queryParams).toString();
+      const queryString = new URLSearchParams({ ...params }).toString();
       const response = await backendApi.get(`/clients${queryString ? '?' + queryString : ''}`);
       return response || [];
     }
     
-    // 🔥 TL users need department filtering
     if (!department) {
-      console.error('❌ [GET CUSTOMERS] Department information required for customers access. User:', user);
-      
-      // 🔥 TEMPORARY: Try to get department from localStorage as fallback
       const fallbackDepartment = getTabSafeItem("user_department") || localStorage.getItem('user_department');
       if (fallbackDepartment) {
-        console.log('🔄 [GET CUSTOMERS] Using fallback department from storage:', fallbackDepartment);
-        const queryParams = {
-          department: fallbackDepartment,
-          ...params
-        };
-        const queryString = new URLSearchParams(queryParams).toString();
-        const response = await backendApi.get(`/clients?${queryString}`);
-        return response || [];
+        const queryString = new URLSearchParams({ department: fallbackDepartment, ...params }).toString();
+        return await backendApi.get(`/clients?${queryString}`) || [];
       }
-      
-      // 🔥 TEMPORARY: For TL users without department, use default department to prevent error
       if (user?.role === 'TL' || user?.role === 'TEAM_LEAD') {
-        console.log('🔄 [GET CUSTOMERS] Using default department for TL user without department');
-        const queryParams = {
-          department: 'PPE', // Default department
-          ...params
-        };
-        const queryString = new URLSearchParams(queryParams).toString();
-        const response = await backendApi.get(`/clients?${queryString}`);
-        return response || [];
+        const queryString = new URLSearchParams({ department: 'PPE', ...params }).toString();
+        return await backendApi.get(`/clients?${queryString}`) || [];
       }
-      
       throw new Error('Department information required for customers access');
     }
     
-    const queryParams = {
-      department,
-      ...params
-    };
-    
-    const queryString = new URLSearchParams(queryParams).toString();
+    const queryString = new URLSearchParams({ department, ...params }).toString();
     const response = await backendApi.get(`/clients?${queryString}`);
     return response || [];
   },

@@ -69,21 +69,20 @@ const CustomerExcelUploadModal = ({ isOpen, onClose, onUploadSuccess }) => {
 
   const handleDownloadTemplate = async () => {
     try {
-      const response = await backendApi.get('/deals/download-template', {
-        responseType: 'blob',
-      });
-
-      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const res = await fetch('http://localhost:8080/api/deals/download-template');
+      if (!res.ok) throw new Error(`Server error ${res.status}`);
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', 'deal-import-template.xlsx');
+      link.download = 'deal-import-template.xlsx';
       document.body.appendChild(link);
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Template download failed:', error);
-      alert('Failed to download template');
+      alert('Failed to download template: ' + error.message);
     }
   };
 

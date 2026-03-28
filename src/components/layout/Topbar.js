@@ -386,6 +386,7 @@ export default function Topbar({ tabs, activeTabKey, onTabClick }) {
               <button
                 key={tab.key}
                 onClick={() => onTabClick(tab)}
+                suppressHydrationWarning
                 className={`py-3 px-1 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                   isActive
                     ? 'border-indigo-600 text-slate-900'

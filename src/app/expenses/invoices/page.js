@@ -118,7 +118,7 @@ export default function InvoicesPage() {
     setIsDownloading(invoice.id);
     try {
       // Try server PDF first
-      const response = await fetch(`https://api.yashrajent.com/api/invoices/${invoice.id}/pdf`, {
+      const response = await fetch(`http://localhost:8080/api/invoices/${invoice.id}/pdf`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
@@ -229,7 +229,7 @@ export default function InvoicesPage() {
     setIsDownloading('preview');
     try {
       // Try server first
-      const response = await fetch(`https://api.yashrajent.com/api/invoices/${selectedInvoice.id}/pdf`, {
+      const response = await fetch(`http://localhost:8080/api/invoices/${selectedInvoice.id}/pdf`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,

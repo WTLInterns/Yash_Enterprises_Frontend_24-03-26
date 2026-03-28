@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
-import { Pencil, Trash2, Plus, Search, Eye, UserPlus, MoreVertical } from 'lucide-react';
+import { Pencil, Trash2, Plus, Search, Eye, UserPlus, MoreVertical, UserX } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { backendApi } from '@/services/api';
 import { getCurrentUserName, getCurrentUserRole } from '@/utils/userUtils';
@@ -14,6 +14,8 @@ export default function EmployeesPage() {
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [bulkLoading, setBulkLoading] = useState(false);
   
   // ✅ FIXED: Get dynamic user data
   const userName = getCurrentUserName();
@@ -50,11 +52,29 @@ export default function EmployeesPage() {
   );
 
   const handleDelete = async (id) => {
+    if (!confirm('Deactivate this employee?')) return;
     try {
-      await backendApi.delete(`/employees/${id}`);
-      setEmployees((prev) => prev.filter((e) => e.id !== id));
+      await backendApi.put(`/employees/${id}/deactivate`);
+      setEmployees(prev => prev.map(e => e.id === id ? { ...e, status: 'INACTIVE' } : e));
     } catch (err) {
-      console.error('Failed to delete employee', err);
+      console.error('Failed to deactivate employee', err);
+      alert('Failed to deactivate employee');
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.length === 0) return;
+    if (!confirm(`Deactivate ${selectedIds.length} selected employee(s)?`)) return;
+    setBulkLoading(true);
+    try {
+      await backendApi.delete('/employees/bulk', { data: selectedIds });
+      setEmployees(prev => prev.map(e => selectedIds.includes(e.id) ? { ...e, status: 'INACTIVE' } : e));
+      setSelectedIds([]);
+    } catch (err) {
+      console.error('Bulk deactivate failed', err);
+      alert('Bulk deactivate failed');
+    } finally {
+      setBulkLoading(false);
     }
   };
 
@@ -137,6 +157,17 @@ export default function EmployeesPage() {
                 />
               </div>
 
+              {selectedIds.length > 0 && (
+                <button
+                  onClick={handleBulkDelete}
+                  disabled={bulkLoading}
+                  className="flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-red-700 disabled:opacity-50"
+                >
+                  <UserX size={16} />
+                  {bulkLoading ? 'Deactivating...' : `Deactivate ${selectedIds.length} Selected`}
+                </button>
+              )}
+
               {/* Add Button */}
               <button
                 onClick={() => router.push('/employees/add')}
@@ -153,7 +184,14 @@ export default function EmployeesPage() {
               <thead className="bg-gray-50 border-y">
                 <tr className="text-left text-gray-600">
                   <th className="p-3 w-10">
-                    <input type="checkbox" />
+                    <input
+                      type="checkbox"
+                      checked={filteredEmployees.length > 0 && filteredEmployees.every(e => selectedIds.includes(e.id))}
+                      onChange={ev => {
+                        if (ev.target.checked) setSelectedIds(filteredEmployees.map(e => e.id));
+                        else setSelectedIds([]);
+                      }}
+                    />
                   </th>
                   <th className="p-3">Employee ID</th>
                   <th className="p-3">Name</th>
@@ -186,7 +224,14 @@ export default function EmployeesPage() {
                     className="border-b last:border-none hover:bg-gray-50"
                   >
                     <td className="p-3">
-                      <input type="checkbox" />
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.includes(employee.id)}
+                        onChange={ev => {
+                          if (ev.target.checked) setSelectedIds(prev => [...prev, employee.id]);
+                          else setSelectedIds(prev => prev.filter(id => id !== employee.id));
+                        }}
+                      />
                     </td>
                     <td className="p-3 text-gray-800 font-medium">{employee.employeeId || 'N/A'}</td>
                     <td className="p-3">

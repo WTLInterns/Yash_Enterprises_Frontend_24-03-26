@@ -5,7 +5,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 
 
 
-import { Search, Edit2, Trash2, Eye, Settings, X, Plus, Calendar, DollarSign, Building, User, Phone, Mail, MapPin, Map, Home, Shield, Upload, Download } from "lucide-react";
+import { Search, Edit2, Trash2, Eye, Settings, X, Plus, Calendar, DollarSign, Building, User, Phone, Mail, MapPin, Map, Home, Shield, Upload } from "lucide-react";
 
 
 
@@ -267,13 +267,28 @@ export default function CustomersPage() {
 
 
 
-
+  // Listen for BroadcastChannel messages for real-time updates
+  useEffect(() => {
+    let broadcastChannel = null;
+    if (typeof BroadcastChannel !== 'undefined') {
+      broadcastChannel = new BroadcastChannel('crm-updates');
+      broadcastChannel.onmessage = (e) => {
+        if (e.data?.type === 'CUSTOMER_UPDATED') {
+          console.log("🔄 Customer updated in another tab, refreshing list...");
+          fetchCustomers();
+        }
+      };
+    }
+    return () => {
+      if (broadcastChannel) {
+        broadcastChannel.close();
+      }
+    };
+  }, []);
 
   const [customers, setCustomers] = useState([]);
   const [banks, setBanks] = useState([]);
   const [deals, setDeals] = useState([]);
-  const [selectedDealIds, setSelectedDealIds] = useState([]);  // array, not Set — avoids stale reference bug
-  const [bulkDeleting, setBulkDeleting] = useState(false);
   const [search, setSearch] = useState("");
 
   const [loading, setLoading] = useState(true);
@@ -721,51 +736,162 @@ export default function CustomersPage() {
 
 
 
-  const fetchCustomers = async (skipAddresses = false) => {
+  const fetchCustomers = async () => {
+
     setLoading(true);
+
     try {
-      const [customersData, allAddresses] = await Promise.all([
-        departmentApiService.getCustomers(),
-        fetch('http://localhost:8080/api/clients/addresses/all')
-          .then(r => r.ok ? r.json() : [])
-          .catch(() => []),
-      ]);
 
-      // Group addresses by clientId for O(1) lookup
-      const addrByClient = {};
-      allAddresses.forEach(addr => {
-        const cid = addr.clientId;
-        if (!addrByClient[cid]) addrByClient[cid] = [];
-        addrByClient[cid].push(addr);
-      });
+      // 1 Fetch customers — departmentApiService already returns all fields
 
-      setCustomers(customersData.map(c => ({
-        ...c,
-        addresses: addrByClient[c.id] || [],
-      })));
+      const customersData = await departmentApiService.getCustomers();
+
+      console.log("✅ fetchCustomers: loaded", customersData.length, "customers");
+
+      // 2 Set customers IMMEDIATELY — don't wait for addresses
+
+      // Each customer may already have addresses in the response,
+
+      // or we show the table right away and fetch addresses in background
+
+      setCustomers(customersData.map(c => ({ ...c, addresses: c.addresses || [] })));
+
+      // 3 Build dynamic columns from customFields
 
       const keys = new Set();
+
       customersData.forEach((customer) => {
+
         if (customer?.customFields && typeof customer.customFields === "object") {
+
           Object.keys(customer.customFields).forEach((k) => keys.add(k));
+
         }
+
       });
+
       setDynamicColumns([...keys]);
+
+      // 4 Fetch addresses in background WITHOUT blocking the table render
+
+      // Use batches of 10 to avoid overwhelming the server
+
+      fetchAddressesInBackground(customersData);
+
     } catch (err) {
+
       console.error("Failed to fetch customers:", err);
+
       addToast("Failed to load customers", "error");
+
     } finally {
-      setLoading(false);
+
+      setLoading(false); // ← table renders immediately after step 2
+
     }
+
+  };
+
+  const fetchAddressesInBackground = async (customersData) => {
+
+    if (!customersData || customersData.length === 0) return;
+
+    const authUser = getTabSafeAuthUser();
+
+    const BATCH_SIZE = 10; // fetch 10 addresses at a time to avoid overload
+
+    for (let i = 0; i < customersData.length; i += BATCH_SIZE) {
+
+      const batch = customersData.slice(i, i + BATCH_SIZE);
+
+      const batchResults = await Promise.allSettled(
+
+        batch.map(async (customer) => {
+
+          try {
+
+            const res = await fetch(
+
+              `http://localhost:8080/api/clients/${customer.id}/addresses`,
+
+              {
+
+                headers: {
+
+                  "X-User-Id": authUser?.id || "",
+
+                  "X-User-Role": authUser?.role || "",
+
+                  "X-User-Department": authUser?.department || "",
+
+                },
+
+              }
+
+            );
+
+            const addresses = res.ok ? await res.json() : [];
+
+            return { id: customer.id, addresses };
+
+          } catch {
+
+            return { id: customer.id, addresses: [] };
+
+          }
+
+        })
+
+      );
+
+      // Merge fetched addresses into customers state without re-rendering everything
+
+      setCustomers(prev => {
+
+        const updatedMap = {};
+
+        batchResults.forEach(result => {
+
+          if (result.status === "fulfilled") {
+
+            updatedMap[result.value.id] = result.value.addresses;
+
+          }
+
+        });
+
+        return prev.map(c =>
+
+          updatedMap[c.id] !== undefined
+
+            ? { ...c, addresses: updatedMap[c.id] }
+
+            : c
+
+        );
+
+      });
+
+    }
+
+    console.log("✅ fetchAddressesInBackground: all addresses loaded");
+
   };
 
   const fetchBanks = async () => {
+
     try {
-      const res = await backendApi.get("/banks?size=9999");
+
+      const res = await backendApi.get("/banks");
+
       setBanks(normalizeList(res));
+
     } catch (err) {
+
       console.error("Failed to fetch banks:", err);
+
     }
+
   };
 
 
@@ -778,17 +904,37 @@ export default function CustomersPage() {
 
     try {
 
-      const res = await backendApi.get("/deals/all");
+      // size=9999 to get ALL deals (fixes pagination issue)
+
+      const res = await backendApi.get("/deals?size=9999");
 
       const list = normalizeList(res);
+
+      console.log("✅ fetchDeals: loaded", list.length, "deals (no per-deal product calls)");
+
+      // Normalize fields only — NO per-deal API calls
+
       const normalized = list.map((d) => ({
+
         ...d,
+
+        // Normalize clientId field name variations
+
         clientId: d.clientId ?? d.client_id ?? d.client ?? null,
+
+        // Normalize stageCode field name variations
+
         stageCode: d.stage || d.stageCode || "",
-        valueAmount: d.calculatedValue ?? d.valueAmount ?? d.value_amount ?? 0,
-        dealCode: d.dealCode || null,
+
+        // Use valueAmount directly from deal — no product calculation needed for table
+
+        valueAmount: d.valueAmount ?? d.value_amount ?? 0,
+
       }));
+
       setDeals(normalized);
+
+      console.log("✅ fetchDeals: stored", normalized.length, "normalized deals");
 
     } catch (err) {
 
@@ -827,34 +973,39 @@ export default function CustomersPage() {
 
 
   useEffect(() => {
-    fetchCustomers();
-    fetchBanks();
-    fetchDeals();
-    fetchClientFields();
+    // ✅ Run all fetches IN PARALLEL — not one after another
+    // fetchCustomers sets loading=false when customers arrive,
+    // deals/banks/clientFields load in background simultaneously
+    Promise.all([
+      fetchCustomers(),
+      fetchBanks(),
+      fetchDeals(),
+      fetchClientFields(),
+    ]).catch(err => {
+      console.error("Initial data load error:", err);
+    });
   }, []);
 
-  // Detect edit query param and open edit drawer — runs ONCE when customers first load
-  const editOpenedRef = useRef(false);
-  const customersRef = useRef([]);
-  useEffect(() => { customersRef.current = customers; }, [customers]);
+  // Detect edit query param and open edit drawer
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    if (editOpenedRef.current) return;
     const params = new URLSearchParams(window.location.search);
     const editId = params.get('edit');
-    if (!editId) return;
-    // Poll until customers are loaded
-    const interval = setInterval(() => {
-      if (customersRef.current.length === 0) return;
-      clearInterval(interval);
-      const found = customersRef.current.find(c => String(c.id) === editId);
-      if (found && !editOpenedRef.current) {
-        editOpenedRef.current = true;
-        openEdit(found).then(() => window.history.replaceState({}, '', '/customers'));
+    if (editId) {
+      // Find customer and open edit
+      const tryOpen = async () => {
+        const found = customers.find(c => String(c.id) === editId);
+        if (found) {
+          await openEdit(found);
+          // Clean URL
+          window.history.replaceState({}, '', '/customers');
+        }
+      };
+      if (customers.length > 0) {
+        tryOpen();
       }
-    }, 200);
-    return () => clearInterval(interval);
-  }, []); // runs once on mount — no customers dep = no loop
+    }
+  }, [customers]); // runs when customers load
 
   // Close column filter dropdown when clicking outside
   useEffect(() => {
@@ -873,17 +1024,10 @@ export default function CustomersPage() {
 
       .replace(/([A-Z])/g, " $1")
 
-      .replace(/^./, (str) => str.toUpperCase());
+      .replace(/^./, (str) => str.toUpperCase())
 
-  };
+      .trim();
 
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(amount);
   };
 
 
@@ -1694,26 +1838,23 @@ export default function CustomersPage() {
   // 🔥 STEP 2: BANK DETAILS HELPER FUNCTION
 
   const getBankDetails = (deal) => {
-    // Priority 1: taluka/district embedded directly on deal DTO (from bank relation in mapper)
-    const talukaFromDeal = deal?.taluka || null;
-    const districtFromDeal = deal?.district || null;
-
-    // Priority 2: bank name/branch from deal fields
+    // Priority 1: values embedded directly on the deal (from Excel upload or manual entry)
     const nameFromDeal = deal?.bankName || deal?.relatedBankName || null;
     const branchFromDeal = deal?.branchName || deal?.branch || null;
 
-    // Priority 3: fall back to banks[] array by bankId
+    // Priority 2: fall back to the banks[] array by bankId
     const bankObj = deal?.bankId
       ? banks.find(b => Number(b.id) === Number(deal.bankId))
       : null;
 
+    // bankObj field names vary — try both 'branchName' and 'branch'
     const branchFromBank = bankObj?.branchName || bankObj?.branch || null;
 
     return {
       name: nameFromDeal || bankObj?.name || "-",
       branch: branchFromDeal || branchFromBank || "-",
-      taluka: talukaFromDeal || bankObj?.taluka || "-",
-      district: districtFromDeal || bankObj?.district || "-",
+      taluka: deal?.taluka || bankObj?.taluka || "-",
+      district: deal?.district || bankObj?.district || "-",
     };
   };
 
@@ -1746,10 +1887,6 @@ export default function CustomersPage() {
         // ✅ ADDED: createdAt was missing before
         createdAt: customer.createdAt
           ? new Date(customer.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
-          : null,
-        // ✅ ADDED: updatedAt 
-        updatedAt: customer.updatedAt
-          ? new Date(customer.updatedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
           : null,
       };
 
@@ -1859,10 +1996,6 @@ export default function CustomersPage() {
           createdAt: customer.createdAt
             ? new Date(customer.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
             : '',
-          // ✅ ADDED: updatedAt filter matching
-          updatedAt: customer.updatedAt
-            ? new Date(customer.updatedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
-            : '',
         };
 
         const val = valueMap[colKey];
@@ -1895,7 +2028,6 @@ export default function CustomersPage() {
             department: deal?.department || '',
             ownerName: customer.ownerName || '',
             createdAt: customer.createdAt || '',
-            updatedAt: customer.updatedAt || '',
           };
           return vm[sortConfig.key] || '';
         };
@@ -2975,7 +3107,7 @@ export default function CustomersPage() {
 
 
 
-      await fetchCustomers(true);
+      await fetchCustomers();
 
 
 
@@ -3175,7 +3307,7 @@ export default function CustomersPage() {
 
 
 
-        await fetchCustomers(true);
+        await fetchCustomers();
 
 
 
@@ -3223,69 +3355,6 @@ export default function CustomersPage() {
 
 
 
-
-
-  const handleBulkDelete = async () => {
-    if (selectedDealIds.length === 0) return;
-    const count = selectedDealIds.length;
-    if (!confirm(`Delete ${count} selected customer(s) and all their deals? This cannot be undone.`)) return;
-    setBulkDeleting(true);
-    try {
-      const authUser = getTabSafeAuthUser();
-      const res = await fetch('http://localhost:8080/api/clients/bulk', {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-User-Id': authUser?.id || '',
-          'X-User-Role': authUser?.role || '',
-        },
-        body: JSON.stringify({ ids: selectedDealIds })
-      });
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || `Server error ${res.status}`);
-      }
-      addToast(`${count} customer(s) deleted successfully`, 'success');
-      setSelectedDealIds([]);
-      await fetchCustomers(true);
-      await fetchDeals();
-    } catch (err) {
-      addToast('Failed to delete: ' + err.message, 'error');
-    } finally {
-      setBulkDeleting(false);
-    }
-  };
-
-  const handleExportData = () => {
-    if (!customers.length) { addToast('No data to export', 'error'); return; }
-    const headers = ['ID', 'Name', 'Email', 'Phone', 'City', 'State', 'Country', 'Address', 'Pincode', 'Contact Name', 'Contact Number', 'Notes', 'Created At'];
-    const rows = customers.map(c => [
-      c.id ?? '',
-      c.name ?? '',
-      c.email ?? '',
-      c.contactPhone ?? c.contact_phone ?? '',
-      c.city ?? '',
-      c.state ?? '',
-      c.country ?? '',
-      c.address ?? '',
-      c.pincode ?? '',
-      c.contactName ?? c.contact_name ?? '',
-      c.contactNumber ?? c.contact_number ?? '',
-      (c.notes ?? '').replace(/,/g, ';'),
-      c.createdAt ?? c.created_at ?? '',
-    ]);
-    const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `customers-export-${new Date().toISOString().slice(0,10)}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-    addToast(`Exported ${customers.length} records`, 'success');
-  };
   const handleDelete = async (id) => {
 
 
@@ -3380,7 +3449,7 @@ export default function CustomersPage() {
 
 
 
-      await fetchCustomers(true);
+      await fetchCustomers();
 
 
 
@@ -3446,7 +3515,7 @@ export default function CustomersPage() {
 
 
 
-        await fetchCustomers(true);
+        await fetchCustomers();
 
 
 
@@ -3548,40 +3617,63 @@ export default function CustomersPage() {
 
           <div className="flex items-center gap-3">
 
-            {selectedDealIds.length > 0 && (
-              <button
-                onClick={handleBulkDelete}
-                disabled={bulkDeleting}
-                className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
-              >
-                <Trash2 className="h-4 w-4" />
-                <span>{bulkDeleting ? 'Deleting...' : `Delete ${selectedDealIds.length} Selected`}</span>
-              </button>
-            )}
+
 
             <button
+
+
+
               onClick={openCreate}
+
+
+
               className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+
+
+
             >
+
+
+
               <Plus className="h-4 w-4" />
+
+
+
               <span>Add Customer</span>
+
+
+
             </button>
 
-            <button
-              onClick={handleExportData}
-              className="inline-flex items-center gap-2 rounded-lg bg-slate-600 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
-            >
-              <Download className="h-4 w-4" />
-              <span>Export Data</span>
-            </button>
+
 
             <button
+
+
+
               onClick={() => setShowExcelUploadModal(true)}
+
+
+
               className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
+
+
+
             >
+
+
+
               <Upload className="h-4 w-4" />
+
+
+
               <span>Upload Excel</span>
+
+
+
             </button>
+
+
 
           </div>   {/* closes "flex items-center gap-3" */}
         </div>     {/* closes "flex flex-wrap items-center justify-between gap-3" */}
@@ -3683,24 +3775,8 @@ export default function CustomersPage() {
 
                   <thead className="bg-slate-50" style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                     <tr>
-                      {/* Select all checkbox */}
-                      <th className="px-3 py-3 sticky left-0 bg-slate-50 z-20" style={{ position: 'sticky', left: 0, backgroundColor: 'rgb(248 250 252)', zIndex: 20, width: 40 }}>
-                        <input
-                          type="checkbox"
-                          checked={filtered.length > 0 && filtered.every(c => selectedDealIds.includes(c.id))}
-                          onChange={e => {
-                            const pageIds = filtered.map(c => c.id);
-                            if (e.target.checked) {
-                              setSelectedDealIds(prev => [...new Set([...prev, ...pageIds])]);
-                            } else {
-                              setSelectedDealIds(prev => prev.filter(id => !pageIds.includes(id)));
-                            }
-                          }}
-                          className="cursor-pointer"
-                        />
-                      </th>
                       {/* Sticky ID column */}
-                      <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500 sticky left-[40px] bg-slate-50 z-20 border-r border-slate-200" style={{ position: 'sticky', left: '40px', backgroundColor: 'rgb(248 250 252)', zIndex: 20 }}>ID</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500 sticky left-0 bg-slate-50 z-20 border-r border-slate-200" style={{ position: 'sticky', left: 0, backgroundColor: 'rgb(248 250 252)', zIndex: 20 }}>ID</th>
 
                       {/* Sticky Customer Name column */}
                       <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500 sticky left-[72px] bg-slate-50 z-20 border-r border-slate-200" style={{ position: 'sticky', left: '72px', backgroundColor: 'rgb(248 250 252)', zIndex: 20 }}>
@@ -3708,18 +3784,14 @@ export default function CustomersPage() {
                       </th>
 
                       {/* Filterable columns — use ColFilterTh */}
-                      <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">Address</th>
                       <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">Phone + Contact</th>
                       <ColFilterTh label="Bank" colKey="bankName"   {...colFilterProps} />
                       <ColFilterTh label="Branch" colKey="branchName" {...colFilterProps} />
                       <ColFilterTh label="Taluka" colKey="taluka"     {...colFilterProps} />
                       <ColFilterTh label="District" colKey="district"   {...colFilterProps} />
                       <ColFilterTh label="Deal Stage" colKey="stageCode"  {...colFilterProps} />
-                      <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">Deal Value</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">Amount</th>
                       <ColFilterTh label="Owner" colKey="ownerName"  {...colFilterProps} />
-                      <ColFilterTh label="Department" colKey="department" {...colFilterProps} />
-                      <ColFilterTh label="Created At" colKey="createdAt" {...colFilterProps} />
-                      <ColFilterTh label="Updated At" colKey="updatedAt" {...colFilterProps} />
                       <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">Closing Date</th>
 
 
@@ -3789,24 +3861,11 @@ export default function CustomersPage() {
 
 
 
-                          {/* Row checkbox */}
-                          <td className="px-3 py-4 sticky left-0 bg-white z-10" style={{ position: 'sticky', left: 0, backgroundColor: 'white', zIndex: 10, width: 40 }}>
-                            <input
-                              type="checkbox"
-                              checked={selectedDealIds.includes(customer.id)}
-                              onChange={e => {
-                                if (e.target.checked) {
-                                  setSelectedDealIds(prev => prev.includes(customer.id) ? prev : [...prev, customer.id]);
-                                } else {
-                                  setSelectedDealIds(prev => prev.filter(id => id !== customer.id));
-                                }
-                              }}
-                              className="cursor-pointer"
-                            />
-                          </td>
                           {/* Sticky ID column */}
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900 sticky left-[40px] bg-white z-10 border-r border-slate-200" style={{ position: 'sticky', left: '40px', backgroundColor: 'white', zIndex: 10 }}>
-                            {customerDeal?.dealCode ? customerDeal.dealCode.toLowerCase() : "-"}
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900 sticky left-0 bg-white z-10 border-r border-slate-200" style={{ position: 'sticky', left: 0, backgroundColor: 'white', zIndex: 10 }}>
+
+                            {customer.id}
+
                           </td>
 
 
@@ -3834,22 +3893,6 @@ export default function CustomersPage() {
 
 
 
-
-                          {/* Address column */}
-                          <td className="px-6 py-4 text-sm text-slate-700" style={{ maxWidth: 220 }}>
-                            {customer.addresses && customer.addresses.length > 0
-                              ? (() => {
-                                  const primary = customer.addresses.find(a => a.addressType === 'PRIMARY');
-                                  const addr = primary || customer.addresses[0];
-                                  const parts = [addr.addressLine, addr.city, addr.pincode].filter(Boolean);
-                                  return (
-                                    <span title={parts.join(', ')} style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                      {parts.join(', ')}
-                                    </span>
-                                  );
-                                })()
-                              : <span className="text-slate-400">-</span>}
-                          </td>
 
                           {/* Phone + Contact Person column */}
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700">
@@ -3879,42 +3922,6 @@ export default function CustomersPage() {
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700">{bankDetails.branch}</td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700">{bankDetails.taluka}</td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700">{bankDetails.district}</td>
-
-                          {/* Deal Stage */}
-                          <td className="px-6 py-4 whitespace-nowrap text-sm">
-                            {normStageCode ? (
-                              <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${getDealStageStyle(normStageCode, dealDepartment).bg} ${getDealStageStyle(normStageCode, dealDepartment).text} ${getDealStageStyle(normStageCode, dealDepartment).border}`}>
-                                {getStageDisplayName(normStageCode, dealDepartment)}
-                              </span>
-                            ) : (
-                              <span className="text-slate-400">-</span>
-                            )}
-                          </td>
-
-                          {/* Amount */}
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700">
-                            {customerDeal?.valueAmount ? formatCurrency(customerDeal.valueAmount) : "-"}
-                          </td>
-
-                          {/* Owner */}
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700">
-                            {formatOwnerDisplay(customer)}
-                          </td>
-
-                          {/* Department */}
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700">
-                            {dealDepartment || "-"}
-                          </td>
-
-                          {/* Created At */}
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700">
-                            {customer.createdAt ? new Date(customer.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : "-"}
-                          </td>
-
-                          {/* Updated At */}
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700">
-                            {customer.updatedAt ? new Date(customer.updatedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : "-"}
-                          </td>
 
 
 
@@ -3948,7 +3955,7 @@ export default function CustomersPage() {
                           
                           {/* Closing Date column */}
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700">
-                            {customerDeal?.closingDate ? new Date(customerDeal.closingDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : "-"}
+                            {customer.closingDate ? new Date(customer.closingDate).toLocaleDateString() : "-"}
                           </td>
 
                           <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
@@ -6936,215 +6943,751 @@ export default function CustomersPage() {
 
 
 
-{/* DETAILS DRAWER */}
+        {/* DETAILS DRAWER */}
+
+
+
         {showDetailsDrawer && selectedCustomer && (
+
+
+
           <>
+
+
+
             <div
+
+
+
               className="fixed inset-0 z-[60] bg-slate-900/60 backdrop-blur-sm"
+
+
+
               onClick={() => setShowDetailsDrawer(false)}
+
+
+
             />
+
+
+
+
+
+
+
             <div className="fixed inset-0 z-[70] flex justify-end">
-              <div className="relative w-full max-w-md h-full bg-white shadow-2xl transform transition-transform duration-300 ease-in-out flex flex-col">
-                <div className="flex items-start justify-between border-b border-slate-200 px-6 py-4 shrink-0">
+
+
+
+              <div className="relative w-full max-w-md h-full bg-white shadow-2xl transform transition-transform duration-300 ease-in-out">
+
+
+
+                <div className="flex items-start justify-between border-b border-slate-200 px-6 py-4">
+
+
+
                   <h2 className="text-lg font-semibold text-slate-900">Customer Details</h2>
+
+
+
                   <button
+
+
+
                     onClick={() => setShowDetailsDrawer(false)}
+
+
+
                     className="rounded-full p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+
+
+
                   >
+
+
+
                     <X className="h-5 w-5" />
+
+
+
                   </button>
+
+
+
                 </div>
+
+
+
+
+
+
 
                 <div className="flex-1 overflow-y-auto px-6 py-4">
+
+
+
                   <div className="space-y-6">
+
+
+
+                    {/* Customer Info */}
+
+
+
                     <div>
+
+
+
                       <h3 className="text-sm font-medium text-slate-900 mb-3">Customer Information</h3>
+
+
+
                       <div className="space-y-3">
+
+
+
                         <div className="flex items-start gap-3">
+
+
+
                           <User className="h-4 w-4 text-slate-400 mt-0.5" />
+
+
+
                           <div>
+
+
+
                             <div className="text-sm font-medium text-slate-900">Name</div>
+
+
+
                             <div className="text-sm text-slate-600">{selectedCustomer.name}</div>
+
+
+
                           </div>
+
+
+
                         </div>
+
+
+
+
+
+
+
                         <div className="flex items-start gap-3">
+
+
+
                           <Mail className="h-4 w-4 text-slate-400 mt-0.5" />
+
+
+
                           <div>
+
+
+
                             <div className="text-sm font-medium text-slate-900">Email</div>
+
+
+
                             <div className="text-sm text-slate-600">{selectedCustomer.email || "-"}</div>
+
+
+
                           </div>
+
+
+
                         </div>
+
+
+
+
+
+
+
                         <div className="flex items-start gap-3">
+
+
+
                           <Phone className="h-4 w-4 text-slate-400 mt-0.5" />
+
+
+
                           <div>
+
+
+
                             <div className="text-sm font-medium text-slate-900">Phone</div>
+
+
+
                             <div className="text-sm text-slate-600">{selectedCustomer.contactPhone || "-"}</div>
+
+
+
                           </div>
+
+
+
                         </div>
 
-                        {(selectedCustomer.contactName || selectedCustomer.contactNumber) && (
-                          <div className="flex items-start gap-3">
-                            <User className="h-4 w-4 text-slate-400 mt-0.5" />
-                            <div>
-                              <div className="text-sm font-medium text-slate-900">Contact Person</div>
-                              {selectedCustomer.contactName && (
-                                <div className="text-sm text-slate-600">{selectedCustomer.contactName}</div>
-                              )}
-                              {selectedCustomer.contactNumber && (
-                                <div className="text-sm text-slate-600">{selectedCustomer.contactNumber}</div>
-                              )}
-                            </div>
-                          </div>
-                        )}
+
+
+
+
+
 
                         <div className="flex items-start gap-3">
+
+
+
                           <MapPin className="h-4 w-4 text-slate-400 mt-0.5" />
-                          <div className="w-full">
-                            <div className="text-sm font-medium text-slate-900">Addresses</div>
+
+
+
+                          <div>
+
+
+
+                            <div className="text-sm font-medium text-slate-900">Address</div>
+
+
+
                             {selectedCustomer.addresses && selectedCustomer.addresses.length > 0 ? (
-                              <div className="space-y-2 mt-1">
+
+
+
+                              <div className="space-y-2">
+
+
+
                                 {selectedCustomer.addresses
-                                  .slice()
+
+
+
                                   .sort((a, b) => {
+
+
+
                                     const order = ["PRIMARY", "POLICE", "BRANCH", "TAHSIL"];
+
+
+
                                     return order.indexOf(a.addressType) - order.indexOf(b.addressType);
+
+
+
                                   })
+
+
+
                                   .map((addr) => (
+
+
+
                                     <div key={addr.id} className="flex items-start gap-2">
+
+
+
                                       {getAddressTypeIcon(addr.addressType)}
+
+
+
                                       <div>
+
+
+
                                         <span className="text-sm font-medium text-slate-900">
+
+
+
                                           {getAddressTypeDisplayName(addr.addressType)}:
+
+
+
                                         </span>{" "}
+
+
+
                                         <span className="text-sm text-slate-700">
+
+
+
                                           {addr.addressLine}, {addr.city}
+
+
+
                                         </span>
-                                        {addr.pincode && (
-                                          <span className="text-slate-500">, {addr.pincode}</span>
-                                        )}
+
+
+
+                                        {addr.pincode && <span className="text-slate-500">, {addr.pincode}</span>}
+
+
+
                                       </div>
+
+
+
                                     </div>
+
+
+
                                   ))}
-                              </div>
-                            ) : (
-                              <div className="text-sm text-slate-500">No addresses found</div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
 
-                    {/* Deal Info */}
-                    {(() => {
-                      const customerDeal = deals.find(
-                        (deal) =>
-                          Number(deal?.clientId ?? deal?.client_id) === Number(selectedCustomer.id)
-                      );
-                      if (!customerDeal) return null;
-                      return (
-                        <div>
-                          <h3 className="text-sm font-medium text-slate-900 mb-3">Deal Information</h3>
-                          <div className="space-y-3">
-                            <div className="flex items-start gap-3">
-                              <DollarSign className="h-4 w-4 text-slate-400 mt-0.5" />
-                              <div>
-                                <div className="text-sm font-medium text-slate-900">Amount</div>
-                                <div className="text-sm text-slate-600">${customerDeal.valueAmount || 0}</div>
-                              </div>
-                            </div>
-                            <div className="flex items-start gap-3">
-                              <Building className="h-4 w-4 text-slate-400 mt-0.5" />
-                              <div>
-                                <div className="text-sm font-medium text-slate-900">Stage</div>
-                                <div className="text-sm text-slate-600">
-                                  {getStageDisplayName(customerDeal.stageCode, customerDeal.department)}
-                                </div>
-                                {customerDeal.department && (
-                                  <div className="text-xs text-slate-500">{customerDeal.department}</div>
-                                )}
-                              </div>
-                            </div>
 
-                            {selectedCustomer.addresses && selectedCustomer.addresses.filter((a) => a.addressType !== "PRIMARY").length > 0 && (
-                              <div className="flex items-start gap-3">
-                                <MapPin className="h-4 w-4 text-slate-400 mt-0.5" />
-                                <div className="w-full">
-                                  <div className="text-sm font-medium text-slate-900">Related Addresses</div>
-                                  <div className="space-y-2 mt-2">
-                                    {selectedCustomer.addresses
-                                      .filter((addr) => addr.addressType !== "PRIMARY")
-                                      .sort((a, b) => {
-                                        const order = ["POLICE", "BRANCH", "TAHSIL"];
-                                        return order.indexOf(a.addressType) - order.indexOf(b.addressType);
-                                      })
-                                      .map((addr) => (
-                                        <div key={addr.id} className="bg-slate-50 p-3 rounded-lg border border-slate-200">
-                                          <div className="flex items-center gap-2 mb-2">
-                                            {getAddressTypeIcon(addr.addressType)}
-                                            <span className="font-medium text-slate-900 text-sm">
-                                              {getAddressTypeDisplayName(addr.addressType)}
-                                            </span>
-                                          </div>
-                                          <div className="text-sm text-slate-700">
-                                            {addr.addressLine}
-                                            {addr.city && <span>, {addr.city}</span>}
-                                            {addr.pincode && <span>, {addr.pincode}</span>}
-                                          </div>
-                                          {addr.latitude && addr.longitude && (
-                                            <div className="text-xs text-slate-500 mt-2 flex items-center gap-1">
-                                              <MapPin className="h-3 w-3" />
-                                              {Number(addr.latitude).toFixed(6)}, {Number(addr.longitude).toFixed(6)}
-                                            </div>
+                                <h3 className="text-sm font-medium text-slate-900 mb-3">Deal Information</h3>
+
+
+
+                                <div className="space-y-3">
+
+
+
+                                  <div className="flex items-start gap-3">
+
+
+
+                                    <DollarSign className="h-4 w-4 text-slate-400 mt-0.5" />
+
+
+                                    {(selectedCustomer.contactName || selectedCustomer.contactNumber) && (
+
+
+
+                                      <div className="flex items-start gap-3">
+
+
+
+                                        <User className="h-4 w-4 text-slate-400 mt-0.5" />
+
+
+
+                                        <div>
+
+
+
+                                          <div className="text-sm font-medium text-slate-900">Contact Person</div>
+
+
+
+                                          {selectedCustomer.contactName && (
+
+
+
+                                            <div className="text-sm text-slate-600">{selectedCustomer.contactName}</div>
+
+
+
                                           )}
+
+
+
+                                          {selectedCustomer.contactNumber && (
+
+
+
+                                            <div className="text-sm text-slate-600">{selectedCustomer.contactNumber}</div>
+
+
+
+                                          )}
+
+
+
                                         </div>
-                                      ))}
+
+
+
+                                      </div>
+
+
+
+                                    )}
+
+
+
                                   </div>
-                                </div>
-                              </div>
-                            )}
 
-                            {customerDeal.closingDate && (
-                              <div className="flex items-start gap-3">
-                                <Calendar className="h-4 w-4 text-slate-400 mt-0.5" />
-                                <div>
-                                  <div className="text-sm font-medium text-slate-900">Closing Date</div>
-                                  <div className="text-sm text-slate-600">{customerDeal.closingDate}</div>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })()}
 
-                    {/* Custom Fields */}
-                    {selectedCustomer.customFields &&
-                      Object.keys(selectedCustomer.customFields).length > 0 && (
-                        <div>
-                          <h3 className="text-sm font-medium text-slate-900 mb-3">Custom Fields</h3>
-                          <div className="space-y-2">
-                            {Object.entries(selectedCustomer.customFields).map(([key, value]) => (
-                              <div key={key} className="flex justify-between">
-                                <span className="text-sm font-medium text-slate-700">{formatLabel(key)}:</span>
-                                <span className="text-sm text-slate-600">{value || "-"}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                  </div>
+
+                                </div>
+
+
+
+
+
+
+
+                                {/* Deal Info */}
+
+
+
+                                {(() => {
+
+
+
+                                  // 🔥 CRITICAL FIX: Normalize clientId mapping for deal lookup
+
+
+
+                                  const customerDeal = deals.find(deal => Number(deal?.clientId ?? deal?.client_id) === Number(selectedCustomer.id));
+
+
+
+                                  if (!customerDeal) return null;
+
+
+
+
+
+
+
+                                  return (
+
+
+
+                                    <div>
+
+
+
+                                      <h3 className="text-sm font-medium text-slate-900 mb-3">Deal Information</h3>
+
+
+
+                                      <div className="space-y-3">
+
+
+
+                                        <div className="flex items-start gap-3">
+
+
+
+                                          <DollarSign className="h-4 w-4 text-slate-400 mt-0.5" />
+
+
+
+                                          <div>
+
+
+
+                                            <div className="text-sm font-medium text-slate-900">Amount</div>
+
+
+
+                                            <div className="text-sm text-slate-600">${customerDeal.valueAmount || 0}</div>
+
+
+
+                                          </div>
+
+
+
+                                        </div>
+
+
+
+
+
+
+
+                                        <div className="flex items-start gap-3">
+
+
+
+                                          <Building className="h-4 w-4 text-slate-400 mt-0.5" />
+
+
+
+                                          <div>
+
+
+
+                                            <div className="text-sm font-medium text-slate-900">Stage</div>
+
+
+
+                                            <div className="text-sm text-slate-600">
+
+
+
+                                              {getStageDisplayName(customerDeal.stageCode, customerDeal.department)}
+
+
+
+                                            </div>
+
+
+
+                                            {customerDeal.department && (
+
+
+
+                                              <div className="text-xs text-slate-500">{customerDeal.department}</div>
+
+
+
+                                            )}
+
+
+
+                                          </div>
+
+
+
+                                        </div>
+
+
+
+
+
+
+
+                                        {/* Dynamic Address Display in Deal Section */}
+
+
+
+                                        {selectedCustomer.addresses && selectedCustomer.addresses.length > 0 && (
+
+
+
+                                          <div className="flex items-start gap-3">
+
+
+
+                                            <MapPin className="h-4 w-4 text-slate-400 mt-0.5" />
+
+
+
+                                            <div>
+
+
+
+                                              <div className="text-sm font-medium text-slate-900">Related Addresses</div>
+
+
+
+                                              <div className="space-y-2 mt-2">
+
+
+
+                                                {selectedCustomer.addresses
+
+
+
+                                                  .filter(addr => addr.addressType !== 'PRIMARY') // Show only non-primary addresses in deal
+
+
+
+                                                  .sort((a, b) => {
+
+
+
+                                                    const order = ["POLICE", "BRANCH", "TAHSIL"];
+
+
+
+                                                    return order.indexOf(a.addressType) - order.indexOf(b.addressType);
+
+
+
+                                                  })
+
+
+
+                                                  .map((addr) => (
+
+
+
+                                                    <div key={addr.id} className="bg-slate-50 p-3 rounded-lg border border-slate-200">
+
+
+
+                                                      <div className="flex items-center gap-2 mb-2">
+
+
+
+                                                        {getAddressTypeIcon(addr.addressType)}
+
+
+
+                                                        <span className="font-medium text-slate-900 text-sm">
+
+
+
+                                                          {getAddressTypeDisplayName(addr.addressType)}
+
+
+
+                                                        </span>
+
+
+
+                                                      </div>
+
+
+
+                                                      <div className="text-sm text-slate-700">
+
+
+
+                                                        {addr.addressLine}
+
+
+
+                                                        {addr.city && <span>, {addr.city}</span>}
+
+
+
+                                                        {addr.pincode && <span>, {addr.pincode}</span>}
+
+
+
+                                                      </div>
+
+
+
+                                                      {addr.latitude && addr.longitude && (
+
+
+
+                                                        <div className="text-xs text-slate-500 mt-2 flex items-center gap-1">
+
+
+
+                                                          <MapPin className="h-3 w-3" />
+
+
+
+                                                          {addr.latitude.toFixed(6)}, {addr.longitude.toFixed(6)}
+
+
+
+                                                        </div>
+
+
+
+                                                      )}
+
+
+
+                                                    </div>
+
+
+
+                                                  ))}
+
+
+
+                                              </div>
+
+
+
+                                            </div>
+
+
+
+                                          </div>
+
+
+
+                                        )}
+
+
+
+
+
+
+
+                                        {customerDeal.closingDate && (
+
+
+
+                                          <div className="flex items-start gap-3">
+
+
+
+                                            <Calendar className="h-4 w-4 text-slate-400 mt-0.5" />
+
+
+
+                                            <div>
+
+
+
+                                              <div className="text-sm font-medium text-slate-900">Closing Date</div>
+
+
+
+                                              <div className="text-sm text-slate-600">{customerDeal.closingDate}</div>
+
+
+
+                                            </div>
+
+
+
+                                          </div>
+
+
+
+                                        )}
+
+
+
+                                      </div>
+
+
+
+                                    </div>
+
+
+
+                                  );
+
+
+
+                                })()}
+
+        {/* Custom Fields Section */}
+        {selectedCustomer && selectedCustomer.customFields && Object.keys(selectedCustomer.customFields).length > 0 && (
+          <div className="mt-6">
+            <h3 className="text-sm font-medium text-slate-900 mb-3">Custom Fields</h3>
+            <div className="space-y-2">
+              {Object.entries(selectedCustomer.customFields).map(([key, value]) => (
+                <div key={key} className="flex justify-between">
+                  <span className="text-sm font-medium text-slate-700">{formatLabel(key)}:</span>
+                  <span className="text-sm text-slate-600">{value || "-"}</span>
                 </div>
+              ))}
+            </div>
+          </div>
+        )}
               </div>
             </div>
-          </>
-        )}
+          ) : (
+            <div className="text-sm text-slate-500">No addresses found</div>
+          )}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</>
+)}
 
         {/* Excel Upload Modal */}
         <CustomerExcelUploadModal
           isOpen={showExcelUploadModal}
           onClose={() => setShowExcelUploadModal(false)}
           onUploadSuccess={(result) => {
-            addToast(`Successfully imported ${result.success} customers/deals`, "success");
+            addToast(`Successfully imported ${result.success} customers/deals`, 'success');
             fetchCustomers();
             fetchDeals();
             setShowExcelUploadModal(false);
@@ -7167,11 +7710,13 @@ export default function CustomersPage() {
             setPendingStageChange(null);
           }}
         />
+
       </div>
     </DashboardLayout>
   );
 }
 
+// Column Filter Table Header Component
 function ColFilterTh({
   label,
   colKey,
@@ -7190,223 +7735,179 @@ function ColFilterTh({
 }) {
   const isOpen = openFilterCol === colKey;
   const isActive = isColFilterActive(colKey);
-  const isAsc = sortConfig.key === colKey && sortConfig.dir === "asc";
-  const isDesc = sortConfig.key === colKey && sortConfig.dir === "desc";
-  const searchVal = filterSearch[colKey] || "";
+  const isAsc = sortConfig.key === colKey && sortConfig.dir === 'asc';
+  const isDesc = sortConfig.key === colKey && sortConfig.dir === 'desc';
+  const searchVal = filterSearch[colKey] || '';
   const allVals = getUniqueColValues(colKey);
   const allowed = columnFilters[colKey] ?? new Set(allVals);
-  const visible = allVals.filter((v) => v.toLowerCase().includes(searchVal.toLowerCase()));
+
+  const visible = allVals.filter(v =>
+    v.toLowerCase().includes(searchVal.toLowerCase())
+  );
 
   return (
     <th
       className="col-filter-th"
-      style={{
-        padding: "10px 12px",
-        textAlign: "left",
-        fontWeight: 500,
-        fontSize: 11,
-        textTransform: "uppercase",
-        letterSpacing: "0.05em",
-        color: isActive ? "#185FA5" : undefined,
-        borderBottom: "0.5px solid var(--color-border-tertiary)",
-        whiteSpace: "nowrap",
-        position: "relative",
-        userSelect: "none",
-        background: isOpen ? "var(--color-background-secondary)" : undefined,
-        cursor: "pointer",
-      }}
-    >
-      <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-        <span
-          onClick={() => handleColSort(colKey)}
-          style={{ display: "flex", alignItems: "center", gap: 4, flex: 1 }}
-        >
-          {label}
-          <span style={{ fontSize: 10, opacity: 0.5 }}>
-            {isAsc ? "↑" : isDesc ? "↓" : "⇅"}
-          </span>
-        </span>
-        <span
-          onClick={(e) => {
-            e.stopPropagation();
-            setOpenFilterCol(isOpen ? null : colKey);
-            setFilterSearch((prev) => ({ ...prev, [colKey]: "" }));
-          }}
-          title="Filter column"
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-            width: 20,
-            height: 20,
-            borderRadius: 4,
-            background: isActive
-              ? "#185FA5"
-              : isOpen
-              ? "var(--color-border-tertiary)"
-              : "transparent",
-            color: isActive ? "#fff" : "var(--color-text-secondary)",
-            fontSize: 11,
-            cursor: "pointer",
-            flexShrink: 0,
-          }}
-        >
-          ▼
-        </span>
-        {isActive && (
-          <span
-            style={{
-              background: "#185FA5",
-              color: "#fff",
-              borderRadius: 999,
-              fontSize: 9,
-              padding: "1px 5px",
-              flexShrink: 0,
-            }}
-          >
-            {allowed.size}
-          </span>
-        )}
-      </div>
+                  style={{
+                    padding: '10px 12px',
+                    textAlign: 'left',
+                    fontWeight: 500,
+                    fontSize: 11,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    color: isActive ? '#185FA5' : undefined,
+                    borderBottom: '0.5px solid var(--color-border-tertiary)',
+                    whiteSpace: 'nowrap',
+                    position: 'relative',
+                    userSelect: 'none',
+                    background: isOpen ? 'var(--color-background-secondary)' : undefined,
+                    cursor: 'pointer',
+                  }}
+                >
+                  {/* Header row: label + sort arrow + filter icon */}
+                  <div
+                    style={{ display: 'flex', alignItems: 'center', gap: 4 }}
+                  >
+                    {/* Sort area — left side of heading */}
+                    <span
+                      onClick={() => handleColSort(colKey)}
+                      style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1 }}
+                    >
+                      {label}
+                      <span style={{ fontSize: 10, opacity: 0.5 }}>
+                        {isAsc ? '↑' : isDesc ? '↓' : '⇅'}
+                      </span>
+                    </span>
 
-      {isOpen && (
-        <div
-          onClick={(e) => e.stopPropagation()}
-          style={{
-            position: "absolute",
-            top: "100%",
-            left: 0,
-            zIndex: 9999,
-            background: "#ffffff",
-            border: "0.5px solid var(--color-border-secondary)",
-            borderRadius: "var(--border-radius-lg)",
-            boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
-            padding: 12,
-            minWidth: 220,
-            fontWeight: 400,
-            fontSize: 13,
-          }}
-        >
-          <input
-            type="text"
-            placeholder={`Search ${label}...`}
-            value={searchVal}
-            onChange={(e) =>
-              setFilterSearch((prev) => ({ ...prev, [colKey]: e.target.value }))
-            }
-            autoFocus
-            style={{
-              width: "100%",
-              boxSizing: "border-box",
-              fontSize: 12,
-              padding: "6px 8px",
-              border: "0.5px solid var(--color-border-secondary)",
-              borderRadius: "var(--border-radius-md)",
-              marginBottom: 8,
-              background: "var(--color-background-secondary)",
-              color: "var(--color-text-primary)",
-              outline: "none",
-            }}
-          />
-          <div
-            style={{
-              maxHeight: 180,
-              overflowY: "auto",
-              display: "flex",
-              flexDirection: "column",
-              gap: 3,
-            }}
-          >
-            {visible.length === 0 && (
-              <div
-                style={{
-                  color: "var(--color-text-secondary)",
-                  fontSize: 12,
-                  padding: "4px 0",
-                }}
-              >
-                No results
-              </div>
-            )}
-            {visible.map((val) => (
-              <label
-                key={val}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  cursor: "pointer",
-                  fontSize: 12,
-                  padding: "2px 0",
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={allowed.has(val)}
-                  onChange={() => toggleColFilterValue(colKey, val)}
-                  style={{ cursor: "pointer" }}
-                />
-                <span style={{ color: "var(--color-text-primary)" }}>{val}</span>
-              </label>
-            ))}
-          </div>
-          <div
-            style={{
-              display: "flex",
-              gap: 6,
-              marginTop: 10,
-              borderTop: "0.5px solid var(--color-border-tertiary)",
-              paddingTop: 10,
-            }}
-          >
-            <button
-              onClick={() => selectAllColValues(colKey)}
-              style={{
-                flex: 1,
-                fontSize: 11,
-                padding: "5px 0",
-                borderRadius: "var(--border-radius-md)",
-                cursor: "pointer",
-                border: "0.5px solid var(--color-border-secondary)",
-                background: "transparent",
-                color: "var(--color-text-primary)",
-              }}
-            >
-              Select all
-            </button>
-            <button
-              onClick={() => clearAllColValues(colKey)}
-              style={{
-                flex: 1,
-                fontSize: 11,
-                padding: "5px 0",
-                borderRadius: "var(--border-radius-md)",
-                cursor: "pointer",
-                border: "0.5px solid var(--color-border-secondary)",
-                background: "transparent",
-                color: "var(--color-text-primary)",
-              }}
-            >
-              Clear
-            </button>
-            <button
-              onClick={() => setOpenFilterCol(null)}
-              style={{
-                flex: 1,
-                fontSize: 11,
-                padding: "5px 0",
-                borderRadius: "var(--border-radius-md)",
-                cursor: "pointer",
-                border: "none",
-                background: "#185FA5",
-                color: "#fff",
-              }}
-            >
-              Done
-            </button>
-          </div>
-        </div>
-      )}
-    </th>
-  );
+                    {/* Filter icon — right side, opens dropdown */}
+                    <span
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setOpenFilterCol(isOpen ? null : colKey);
+                        setFilterSearch(prev => ({ ...prev, [colKey]: '' }));
+                      }}
+                      title="Filter column"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: 20,
+                        height: 20,
+                        borderRadius: 4,
+                        background: isActive ? '#185FA5' : isOpen ? 'var(--color-border-tertiary)' : 'transparent',
+                        color: isActive ? '#fff' : 'var(--color-text-secondary)',
+                        fontSize: 11,
+                        cursor: 'pointer',
+                        flexShrink: 0,
+                      }}
+                    >
+                      ▼
+                    </span>
+
+                    {/* Active filter count badge */}
+                    {isActive && (
+                      <span style={{
+                        background: '#185FA5',
+                        color: '#fff',
+                        borderRadius: 999,
+                        fontSize: 9,
+                        padding: '1px 5px',
+                        flexShrink: 0,
+                      }}>
+                        {allowed.size}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Dropdown panel */}
+                  {isOpen && (
+                    <div
+                      onClick={e => e.stopPropagation()}
+                      style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        zIndex: 9999,
+                        background: '#ffffff',
+                        border: '0.5px solid var(--color-border-secondary)',
+                        borderRadius: 'var(--border-radius-lg)',
+                        boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                        padding: 12,
+                        minWidth: 220,
+                        fontWeight: 400,
+                        fontSize: 13,
+                      }}
+                    >
+                      {/* Search inside dropdown */}
+                      <input
+                        type="text"
+                        placeholder={`Search ${label}...`}
+                        value={searchVal}
+                        onChange={e => setFilterSearch(prev => ({ ...prev, [colKey]: e.target.value }))}
+                        autoFocus
+                        style={{
+                          width: '100%',
+                          boxSizing: 'border-box',
+                          fontSize: 12,
+                          padding: '6px 8px',
+                          border: '0.5px solid var(--color-border-secondary)',
+                          borderRadius: 'var(--border-radius-md)',
+                          marginBottom: 8,
+                          background: 'var(--color-background-secondary)',
+                          color: 'var(--color-text-primary)',
+                          outline: 'none',
+                        }}
+                      />
+
+                      {/* Checkbox list */}
+                      <div style={{ maxHeight: 180, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 3 }}>
+                        {visible.length === 0 && (
+                          <div style={{ color: 'var(--color-text-secondary)', fontSize: 12, padding: '4px 0' }}>
+                            No results
+                          </div>
+                        )}
+                        {visible.map(val => (
+                          <label
+                            key={val}
+                            style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 12, padding: '2px 0' }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={allowed.has(val)}
+                              onChange={() => toggleColFilterValue(colKey, val)}
+                              style={{ cursor: 'pointer' }}
+                            />
+                            <span style={{ color: 'var(--color-text-primary)' }}>{val}</span>
+                          </label>
+                        ))}
+                      </div>
+
+                      {/* Action buttons */}
+                      <div style={{ display: 'flex', gap: 6, marginTop: 10, borderTop: '0.5px solid var(--color-border-tertiary)', paddingTop: 10 }}>
+                        <button
+                          onClick={() => selectAllColValues(colKey)}
+                          style={{ flex: 1, fontSize: 11, padding: '5px 0', borderRadius: 'var(--border-radius-md)', cursor: 'pointer', border: '0.5px solid var(--color-border-secondary)', background: 'transparent', color: 'var(--color-text-primary)' }}
+                        >
+                          Select all
+                        </button>
+                        <button
+                          onClick={() => clearAllColValues(colKey)}
+                          style={{ flex: 1, fontSize: 11, padding: '5px 0', borderRadius: 'var(--border-radius-md)', cursor: 'pointer', border: '0.5px solid var(--color-border-secondary)', background: 'transparent', color: 'var(--color-text-primary)' }}
+                        >
+                          Clear
+                        </button>
+                        <button
+                          onClick={() => setOpenFilterCol(null)}
+                          style={{ flex: 1, fontSize: 11, padding: '5px 0', borderRadius: 'var(--border-radius-md)', cursor: 'pointer', border: 'none', background: '#185FA5', color: '#fff' }}
+                        >
+                          Done
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </th>
+                );
 }
+
+
+

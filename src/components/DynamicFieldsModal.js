@@ -24,7 +24,7 @@ export default function DynamicFieldsModal({ isOpen, onClose, entity, onFieldsUp
 
   const fetchFields = async () => {
     try {
-      const response = await fetch(`http://localhost:8080/api/fields?entity=${entity}`);
+      const response = await fetch(`https://api.yashrajent.com/api/fields?entity=${entity}`);
       if (response.ok) {
         const data = await response.json();
         setFields(data);
@@ -48,7 +48,7 @@ export default function DynamicFieldsModal({ isOpen, onClose, entity, onFieldsUp
         payload.optionsJson = '["Option 1", "Option 2"]';
       }
 
-      const response = await fetch(`http://localhost:8080/api/fields?entity=${entity}`, {
+      const response = await fetch(`https://api.yashrajent.com/api/fields?entity=${entity}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
@@ -82,7 +82,7 @@ export default function DynamicFieldsModal({ isOpen, onClose, entity, onFieldsUp
     if (!confirm("Are you sure you want to delete this field?")) return;
 
     try {
-      const response = await fetch(`http://localhost:8080/api/fields/${fieldId}`, {
+      const response = await fetch(`https://api.yashrajent.com/api/fields/${fieldId}`, {
         method: "DELETE"
       });
 

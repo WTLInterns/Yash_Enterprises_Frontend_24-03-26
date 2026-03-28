@@ -23,15 +23,6 @@ export const getCurrentUser = () => {
     
     const userData = JSON.parse(userDataStr || "{}");
     
-    // Debug log to help identify the issue
-    console.log('🔍 [USER_UTILS] getCurrentUser result:', {
-      sessionStorage_userData: sessionStorage.getItem('user_data'),
-      localStorage_userData: localStorage.getItem('user_data'),
-      sessionStorage_authUser: sessionStorage.getItem('authUser'),
-      localStorage_authUser: localStorage.getItem('authUser'),
-      finalUserData: userData
-    });
-    
     return userData;
   } catch (error) {
     console.error("Error parsing user data:", error);
@@ -56,14 +47,6 @@ export const getCurrentUserId = () => {
   const user = getCurrentUser();
   const userId = user?.id || user?.userId || null;
   
-  console.log('🔍 [USER_UTILS] getCurrentUserId:', {
-    user: user,
-    userId: userId,
-    // Note: ID 1 is actually valid in this system (it's the real user ID)
-    hasValidId: !!userId
-  });
-  
-  // Return the actual user ID (ID 1 is valid in this system)
   return userId;
 };
 

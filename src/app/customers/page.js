@@ -6,9 +6,6 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 
 
 import { Search, Edit2, Trash2, Eye, Settings, X, Plus, Calendar, DollarSign, Building, User, Phone, Mail, MapPin, Map, Home, Shield, Upload, Download } from "lucide-react";
-
-
-
 import Link from "next/link";
 
 
@@ -726,7 +723,7 @@ export default function CustomersPage() {
     try {
       const [customersData, allAddresses] = await Promise.all([
         departmentApiService.getCustomers(),
-        fetch('http://localhost:8080/api/clients/addresses/all')
+        fetch('https://api.yashrajent.com/api/clients/addresses/all')
           .then(r => r.ok ? r.json() : [])
           .catch(() => []),
       ]);
@@ -778,15 +775,28 @@ export default function CustomersPage() {
 
     try {
 
-      const res = await backendApi.get("/deals/all");
+      const authUser = getTabSafeAuthUser();
+
+      const res = await backendApi.get("/deals/filtered", {
+
+        headers: {
+
+          "X-User-Role": authUser?.role ?? "",
+
+          "X-User-Department": authUser?.department ?? "",
+
+        },
+
+      });
 
       const list = normalizeList(res);
       const normalized = list.map((d) => ({
         ...d,
-        clientId: d.clientId ?? d.client_id ?? d.client ?? null,
+        clientId: d.clientId ?? d.client_id ?? (typeof d.client === 'object' ? d.client?.id : d.client) ?? null,
         stageCode: d.stage || d.stageCode || "",
         valueAmount: d.calculatedValue ?? d.valueAmount ?? d.value_amount ?? 0,
-        dealCode: d.dealCode || null,
+        dealCode: d.dealCode ?? d.deal_code ?? null,
+        movedToApproval: d.movedToApproval ?? d.moved_to_approval ?? false,
       }));
       setDeals(normalized);
 
@@ -827,10 +837,13 @@ export default function CustomersPage() {
 
 
   useEffect(() => {
-    fetchCustomers();
-    fetchBanks();
-    fetchDeals();
-    fetchClientFields();
+    const loadData = async () => {
+      await fetchDeals();
+      await fetchCustomers();
+      fetchBanks();
+      fetchClientFields();
+    };
+    loadData();
   }, []);
 
   // Detect edit query param and open edit drawer — runs ONCE when customers first load
@@ -1351,7 +1364,7 @@ export default function CustomersPage() {
 
 
 
-      const response = await fetch('http://localhost:8080/api/clients/geocode', {
+      const response = await fetch('https://api.yashrajent.com/api/clients/geocode', {
 
 
 
@@ -1579,7 +1592,7 @@ export default function CustomersPage() {
 
 
 
-      const response = await fetch('http://localhost:8080/api/clients/reverse-geocode', {
+      const response = await fetch('https://api.yashrajent.com/api/clients/reverse-geocode', {
 
 
 
@@ -1723,7 +1736,7 @@ export default function CustomersPage() {
 
     customers.forEach(customer => {
       const customerDeals = deals.filter(
-        d => Number(d?.clientId ?? d?.client_id) === Number(customer.id)
+        d => Number(d?.clientId ?? d?.client_id ?? (typeof d?.client === 'object' ? d?.client?.id : d?.client)) === Number(customer.id)
       );
       const deal = customerDeals
         .slice()
@@ -1797,35 +1810,72 @@ export default function CustomersPage() {
     );
   };
 
+  // Build clientId → latest deal map at component scope for table rows
+  const dealByClient = useMemo(() => {
+    const map = {};
+    deals.forEach(d => {
+      const cid = Number(d.clientId ?? d.client_id ?? (typeof d.client === 'object' ? d.client?.id : d.client) ?? null);
+      if (!cid) return;
+      const existing = map[cid];
+      if (!existing) { map[cid] = d; return; }
+      const tDiff = new Date(d.createdAt) - new Date(existing.createdAt);
+      if (tDiff > 0 || (tDiff === 0 && Number(d.id) > Number(existing.id))) {
+        map[cid] = d;
+      }
+    });
+    return map;
+  }, [deals]);
+
   const filtered = useMemo(() => {
-    // ── existing text + department + stage filters ──────────────────
+    const authUser = getTabSafeAuthUser();
+    const role = (authUser?.role || userRole || "").toUpperCase();
+    const userDept = (authUser?.department || "").toUpperCase();
+
+    // ── text search ──────────────────────────────────────────────
     let result = customers.filter((customer) => {
-      const name = (customer.name || "").toLowerCase();
-      const email = (customer.email || "").toLowerCase();
-      const phone = (customer.contactPhone || "").toLowerCase();
       const q = search.toLowerCase();
-      const textMatch = name.includes(q) || email.includes(q) || phone.includes(q);
+      const textMatch =
+        (customer.name || "").toLowerCase().includes(q) ||
+        (customer.email || "").toLowerCase().includes(q) ||
+        (customer.contactPhone || "").toLowerCase().includes(q);
+      if (!textMatch) return false;
 
-      const isAccountUser = userRole === "ACCOUNT";
-      if (isAccountUser) return textMatch;
+      const deal = dealByClient[Number(customer.id)] ?? null;
+      if (!deal) return role === "ADMIN" || role === "MANAGER" || role === "HR";
+      const dealDept = (deal?.department || "").toUpperCase();
 
-      let deptStageMatch = true;
-      if (filterDepartment || filterStage) {
+      // ADMIN / MANAGER / HR → full access
+      if (role === "ADMIN" || role === "MANAGER" || role === "HR") return true;
+
+      // Department-based users → only their department
+      // ACCOUNT dept: also hide CLOSE_WIN / CLOSE_LOST
+      if (userDept) {
+        if (dealDept !== userDept) return false;
+        if (userDept === "ACCOUNT") {
+          const stage = (deal?.stageCode || "").toUpperCase().replace(/ /g, "_");
+          return !deal?.movedToApproval && stage !== "CLOSE_WIN" && stage !== "CLOSE_LOST";
+        }
+        return true;
+      }
+
+      return false;
+    });
+
+    // ── legacy dept/stage dropdown filters ───────────────────────
+    if (filterDepartment || filterStage) {
+      result = result.filter(customer => {
         const customerDeals = deals.filter(
-          deal => Number(deal?.clientId ?? deal?.client_id) === Number(customer.id)
+          d => Number(d?.clientId ?? d?.client_id) === Number(customer.id)
         );
         if (filterDepartment && filterStage) {
-          deptStageMatch = customerDeals.some(
-            deal => deal.department === filterDepartment && deal.stageCode === filterStage
-          );
+          return customerDeals.some(d => d.department === filterDepartment && d.stageCode === filterStage);
         } else if (filterDepartment) {
-          deptStageMatch = customerDeals.some(deal => deal.department === filterDepartment);
-        } else if (filterStage) {
-          deptStageMatch = customerDeals.some(deal => deal.stageCode === filterStage);
+          return customerDeals.some(d => d.department === filterDepartment);
+        } else {
+          return customerDeals.some(d => d.stageCode === filterStage);
         }
-      }
-      return textMatch && deptStageMatch;
-    });
+      });
+    }
 
     // ── NEW: per-column filters ─────────────────────────────────────
     Object.entries(columnFilters).forEach(([colKey, allowedSet]) => {
@@ -2067,7 +2117,7 @@ export default function CustomersPage() {
       // but backendApi.get("/api/clients/...") becomes /api/api/clients/... → 500!
       const authUser = getTabSafeAuthUser();
       const addrResponse = await fetch(
-        `http://localhost:8080/api/clients/${customer.id}/addresses`,
+        `https://api.yashrajent.com/api/clients/${customer.id}/addresses`,
         {
           headers: {
             "X-User-Id": authUser?.id ?? "",
@@ -2607,7 +2657,7 @@ export default function CustomersPage() {
 
 
 
-        await fetch(`http://localhost:8080/api/clients/${savedCustomer.id}/addresses`, {
+        await fetch(`https://api.yashrajent.com/api/clients/${savedCustomer.id}/addresses`, {
 
 
 
@@ -2661,7 +2711,7 @@ export default function CustomersPage() {
 
 
 
-        await fetch(`http://localhost:8080/api/clients/${savedCustomer.id}/addresses`, {
+        await fetch(`https://api.yashrajent.com/api/clients/${savedCustomer.id}/addresses`, {
 
 
 
@@ -3232,7 +3282,7 @@ export default function CustomersPage() {
     setBulkDeleting(true);
     try {
       const authUser = getTabSafeAuthUser();
-      const res = await fetch('http://localhost:8080/api/clients/bulk', {
+      const res = await fetch('https://api.yashrajent.com/api/clients/bulk', {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
@@ -3757,20 +3807,10 @@ export default function CustomersPage() {
 
                       // FIX 1 ▸ Filter deals for this customer
                       const customerDeals = deals.filter(
-                        d => Number(d?.clientId ?? d?.client_id) === Number(customer.id)
+                        d => Number(d?.clientId ?? d?.client_id ?? (typeof d?.client === 'object' ? d?.client?.id : d?.client)) === Number(customer.id)
                       );
 
-                      // FIX 2 ▸ Sort createdAt DESC + id DESC tiebreaker
-                      // Critical for Excel uploads: ALL deals may share the SAME createdAt
-                      // Without id tiebreaker, JS sort is unstable → wrong deal shown
-                      const customerDeal = customerDeals
-                        .slice()
-                        .sort((a, b) => {
-                          const timeDiff = new Date(b.createdAt) - new Date(a.createdAt);
-                          if (timeDiff !== 0) return timeDiff;
-                          return (Number(b.id) || 0) - (Number(a.id) || 0); // highest id = latest
-                        })[0]
-                        ?? null;
+                      const customerDeal = dealByClient[Number(customer.id)] ?? null;
 
                       // FIX 3 ▸ Normalise stageCode to UPPERCASE for consistent matching
                       const rawStageCode = customerDeal?.stageCode ?? customerDeal?.stage ?? "";
@@ -6284,15 +6324,7 @@ export default function CustomersPage() {
 
                           <select
 
-                            value={
-
-                              availableStages.some(s => s.stageCode === form.stage)
-
-                                ? form.stage
-
-                                : ""
-
-                            }
+                            value={form.stage}
 
                             disabled={!formDepartment}
 
@@ -6448,7 +6480,7 @@ export default function CustomersPage() {
 
 
 
-                                  const response = await fetch(`http://localhost:8080/api/banks/${bankId}`);
+                                  const response = await fetch(`https://api.yashrajent.com/api/banks/${bankId}`);
 
 
 

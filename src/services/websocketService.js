@@ -7,8 +7,8 @@ class WebSocketService {
     this.isConnected = false;
     this.isConnecting = false;
     this.subscriptions = new Map(); // Track subscriptions
-    this.tabId = Math.random().toString(36).substring(2); // 🔥 Tab-specific ID
-    this.channel = null; // 🔥 BroadcastChannel for cross-tab sync
+    this.tabId = Math.random().toString(36).substring(2);
+    this.channel = null;
     this.listeners = {
       attendance: [],
       task: [],
@@ -16,18 +16,15 @@ class WebSocketService {
       adminNotification: []
     };
     
-    console.log("🔌 WebSocket Tab ID:", this.tabId);
-    
-    // 🔥 Initialize BroadcastChannel
+    // Initialize BroadcastChannel
     if (typeof BroadcastChannel !== 'undefined') {
       try {
         this.channel = new BroadcastChannel("crm-notifications");
         this.channel.onmessage = (event) => {
           this.notifyListeners("adminNotification", event.data);
         };
-        console.log("🔔 BroadcastChannel initialized for cross-tab sync");
       } catch (error) {
-        console.log("🔔 BroadcastChannel not available");
+        // BroadcastChannel not available
       }
     }
   }
@@ -35,13 +32,11 @@ class WebSocketService {
   connect(user = null) {
     // 🔥 FIX: Force re-subscribe if connected and user becomes available
     if (this.isConnected && user) {
-      console.log("🔄 Updating subscriptions with new user context");
       this.subscribeToTopics(user);
       return Promise.resolve();
     }
 
     if (this.isConnecting || this.isConnected) {
-      console.log('WebSocket already connected or connecting');
       return Promise.resolve();
     }
 
@@ -49,20 +44,18 @@ class WebSocketService {
 
     return new Promise((resolve, reject) => {
       try {
-        const socket = new SockJS('http://localhost:8080/ws');
+        const socket = new SockJS('https://api.yashrajent.com/ws');
         this.client = new Client({
           webSocketFactory: () => socket,
           connectHeaders: {},
-          debug: (str) => {
-            console.log('STOMP Debug:', str);
-          },
+          debug: () => {},
+
           reconnectDelay: 5000,
           heartbeatIncoming: 4000,
           heartbeatOutgoing: 4000,
         });
 
-        this.client.onConnect = (frame) => {
-          console.log('WebSocket connected successfully:', frame);
+        this.client.onConnect = () => {
           this.isConnected = true;
           this.isConnecting = false;
           
@@ -72,7 +65,6 @@ class WebSocketService {
         };
 
         this.client.onStompError = (frame) => {
-          console.error('WebSocket STOMP error:', frame);
           this.isConnected = false;
           this.isConnecting = false;
           this.cleanupSubscriptions();
@@ -81,29 +73,19 @@ class WebSocketService {
 
         // 🔥 FIX: Add WebSocket close handler
         this.client.onWebSocketClose = () => {
-          console.log("⚠️ WebSocket closed. Reconnecting...");
           this.isConnected = false;
         };
 
-        this.client.onDisconnect = (frame) => {
-          console.log('WebSocket disconnected:', frame);
+        this.client.onDisconnect = () => {
           this.isConnected = false;
           this.isConnecting = false;
           this.cleanupSubscriptions();
-          
-          // Only try to reconnect if it wasn't a manual disconnect
-          if (!frame.wasClean) {
-            console.log('WebSocket disconnected unexpectedly, will retry...');
-          }
         };
 
         this.client.activate();
       } catch (error) {
-        console.error('WebSocket connection error:', error);
         this.isConnecting = false;
-        // Don't reject immediately - allow app to work even if WebSocket fails
-        console.warn('WebSocket failed to connect, app will continue without real-time features');
-        resolve(); // Resolve anyway so app doesn't break
+        resolve();
       }
     });
   }
@@ -113,7 +95,6 @@ class WebSocketService {
 
     // 🔥 CRITICAL FIX: Prevent re-subscription loop
     if (this.subscriptions.size > 0) {
-      console.log("🔌 Already subscribed to topics, skipping re-subscription");
       return;
     }
 
@@ -153,13 +134,6 @@ class WebSocketService {
 
       // USER-SPECIFIC NOTIFICATION SUBSCRIPTIONS
       if (user) {
-        console.log('🔔 Subscribing to user-specific notifications for:', {
-          userId: user.id,
-          role: user.role,
-          department: user.department
-        });
-
-        // Subscribe to role-based notifications
         if (user.role) {
           const roleTopic = `/topic/notifications/role/${user.role}`;
           const roleSub = this.client.subscribe(roleTopic, (message) => {
@@ -178,18 +152,13 @@ class WebSocketService {
             }
           });
           this.subscriptions.set('role', roleSub);
-          console.log("✅ Subscribed:", roleTopic);
         }
 
-        // Subscribe to department-based notifications
         if (user.department) {
           const deptTopic = `/topic/notifications/department/${user.department}`;
           const deptSub = this.client.subscribe(deptTopic, (message) => {
             try {
               const data = JSON.parse(message.body);
-              console.log('🔔 Received department-based notification:', data);
-              
-              // 🔥 Broadcast to other tabs
               if (this.channel) {
                 this.channel.postMessage(data);
               }
@@ -200,50 +169,28 @@ class WebSocketService {
             }
           });
           this.subscriptions.set('department', deptSub);
-          console.log("✅ Subscribed:", deptTopic);
         }
 
-        // Subscribe to user-specific notifications
         if (user.id) {
           const userTopic = `/topic/notifications/user/${user.id}`;
           const userSub = this.client.subscribe(userTopic, (message) => {
             try {
               const data = JSON.parse(message.body);
-              console.log('🔔 Received user-specific notification:', data);
-              
-              // 🔥 Broadcast to other tabs
-              if (this.channel) {
-                this.channel.postMessage(data);
-              }
-              
+              if (this.channel) this.channel.postMessage(data);
               this.notifyListeners('adminNotification', data);
-            } catch (error) {
-              console.error('Error parsing user notification:', error);
-            }
+            } catch (error) { /* ignore */ }
           });
           this.subscriptions.set('user', userSub);
-          console.log("✅ Subscribed:", userTopic);
         }
       } else {
-        // Fallback: Subscribe to general admin notifications (backward compatibility)
-        console.log('🔔 No user context, subscribing to general admin notifications');
         const adminSub = this.client.subscribe('/topic/admin-notifications', (message) => {
           try {
             const data = JSON.parse(message.body);
-            console.log('🔔 Received general admin notification:', data);
-            
-            // 🔥 Broadcast to other tabs
-            if (this.channel) {
-              this.channel.postMessage(data);
-            }
-            
+            if (this.channel) this.channel.postMessage(data);
             this.notifyListeners('adminNotification', data);
-          } catch (error) {
-            console.error('Error parsing admin notification:', error);
-          }
+          } catch (error) { /* ignore */ }
         });
         this.subscriptions.set('adminNotification', adminSub);
-        console.log("✅ Subscribed: /topic/admin-notifications (fallback)");
       }
 
     } catch (error) {

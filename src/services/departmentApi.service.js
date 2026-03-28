@@ -70,28 +70,22 @@ export const departmentApiService = {
     const user = getAuthUser();
     const department = user?.department;
     
-    if (user?.role === 'ADMIN' || user?.role === 'MANAGER' || user?.role === 'ACCOUNT') {
+    // ADMIN / MANAGER / HR → full access, all clients
+    if (user?.role === 'ADMIN' || user?.role === 'MANAGER' || user?.role === 'HR') {
       const queryString = new URLSearchParams({ ...params }).toString();
       const response = await backendApi.get(`/clients${queryString ? '?' + queryString : ''}`);
       return response || [];
     }
-    
-    if (!department) {
-      const fallbackDepartment = getTabSafeItem("user_department") || localStorage.getItem('user_department');
-      if (fallbackDepartment) {
-        const queryString = new URLSearchParams({ department: fallbackDepartment, ...params }).toString();
-        return await backendApi.get(`/clients?${queryString}`) || [];
-      }
-      if (user?.role === 'TL' || user?.role === 'TEAM_LEAD') {
-        const queryString = new URLSearchParams({ department: 'PPE', ...params }).toString();
-        return await backendApi.get(`/clients?${queryString}`) || [];
-      }
-      throw new Error('Department information required for customers access');
+
+    // Department-based users (ACCOUNT, HLC, PPE, PPO, PSD, ROP etc.) → filter by their department
+    const effectiveDept = department || getTabSafeItem("user_department") || localStorage.getItem('user_department');
+    if (effectiveDept) {
+      const queryString = new URLSearchParams({ department: effectiveDept, ...params }).toString();
+      const response = await backendApi.get(`/clients?${queryString}`);
+      return response || [];
     }
-    
-    const queryString = new URLSearchParams({ department, ...params }).toString();
-    const response = await backendApi.get(`/clients?${queryString}`);
-    return response || [];
+
+    throw new Error('Department information required for customers access');
   },
 
   // 🎯 Department-wise products API

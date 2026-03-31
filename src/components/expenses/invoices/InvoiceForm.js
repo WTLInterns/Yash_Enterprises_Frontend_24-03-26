@@ -294,34 +294,26 @@ export default function InvoiceForm({ initialData, onSave, onCancel, onChange })
 
     
 
-    // Use setTimeout to avoid setState during render
-
     setTimeout(() => {
 
+      const next = {
+
+        selectedCustomer: client || null,
+
+        billedToMobile: client?.contactPhone || client?.contactNumber || '',
+
+        billedToEmail: client?.email || '',
+
+        billedToGstin: client?.gstin || '',
+
+        billedToAddress: client?.address || ''
+
+      };
+
       setFormData((prev) => {
-
-        const next = {
-
-          ...prev,
-
-          selectedCustomer: client || null,
-
-          billedToMobile: client?.contactPhone || client?.contactNumber || '',
-
-          billedToEmail: client?.email || '',
-
-          billedToGstin: client?.gstin || '',
-
-          billedToAddress: client?.address || prev.billedToAddress
-
-        };
-
-        console.log('handleClientSelect - formData after:', { selectedCustomer: next.selectedCustomer?.name, selectedBankName: next.selectedBankName });
-
-        onChange?.(next);
-
-        return next;
-
+        const merged = { ...prev, ...next, billedToAddress: client?.address || prev.billedToAddress };
+        setTimeout(() => onChange?.(merged), 0);
+        return merged;
       });
 
     }, 0);
@@ -370,61 +362,9 @@ export default function InvoiceForm({ initialData, onSave, onCancel, onChange })
 
 
 
-    // If user starts typing, clear selected customer to avoid UI conflicts
+    if (formData.selectedCustomer || !value.trim()) {
 
-    if (formData.selectedCustomer) {
-
-      // Use setTimeout to avoid setState during render
-
-      setTimeout(() => {
-
-        setFormData((prev) => {
-
-          const next = {
-
-            ...prev,
-
-            selectedCustomer: null
-
-          };
-
-          onChange?.(next);
-
-          return next;
-
-        });
-
-      }, 0);
-
-    }
-
-
-
-    // If user clears the search, clear the selected customer
-
-    if (!value.trim()) {
-
-      // Use setTimeout to avoid setState during render
-
-      setTimeout(() => {
-
-        setFormData((prev) => {
-
-          const next = {
-
-            ...prev,
-
-            selectedCustomer: null
-
-          };
-
-          onChange?.(next);
-
-          return next;
-
-        });
-
-      }, 0);
+      setFormData((prev) => { const next = { ...prev, selectedCustomer: null }; setTimeout(() => onChange?.(next), 0); return next; });
 
     }
 
@@ -444,39 +384,29 @@ export default function InvoiceForm({ initialData, onSave, onCancel, onChange })
 
 
 
-    // Use setTimeout to avoid setState during render
+    setFormData((prev) => {
 
-    setTimeout(() => {
+      const branches = parseBranches(bank?.branchName);
 
-      setFormData((prev) => {
+      const next = {
 
-        const branches = parseBranches(bank?.branchName);
+        ...prev,
 
-        const nextSelectedBranch = branches.length === 1 ? branches[0] : '';
+        selectedBankName: bank?.name || '',
 
-        const next = {
+        selectedBranch: branches.length === 1 ? branches[0] : '',
 
-          ...prev,
+        billedToName: bank?.name || prev.billedToName,
 
-          selectedBankName: bank?.name || '',
+        billedToAddress: bank?.address || prev.billedToAddress
 
-          selectedBranch: nextSelectedBranch,
+      };
 
-          billedToName: bank?.name || prev.billedToName,
+      setTimeout(() => onChange?.(next), 0);
 
-          billedToAddress: bank?.address || prev.billedToAddress
+      return next;
 
-        };
-
-        console.log('handleBankSelect - formData after:', { selectedBankName: next.selectedBankName, selectedCustomer: next.selectedCustomer?.name });
-
-        onChange?.(next);
-
-        return next;
-
-      });
-
-    }, 0);
+    });
 
   };
 
@@ -484,27 +414,7 @@ export default function InvoiceForm({ initialData, onSave, onCancel, onChange })
 
   const handleBranchSelect = (branch) => {
 
-    // Use setTimeout to avoid setState during render
-
-    setTimeout(() => {
-
-      setFormData((prev) => {
-
-        const next = {
-
-          ...prev,
-
-          selectedBranch: branch || ''
-
-        };
-
-        onChange?.(next);
-
-        return next;
-
-      });
-
-    }, 0);
+    setFormData((prev) => { const next = { ...prev, selectedBranch: branch || '' }; setTimeout(() => onChange?.(next), 0); return next; });
 
   };
 
@@ -522,63 +432,11 @@ export default function InvoiceForm({ initialData, onSave, onCancel, onChange })
 
       setSelectedBank(null);
 
-      // Use setTimeout to avoid setState during render
+      setFormData((prev) => { const next = { ...prev, selectedBankName: '', selectedBranch: '', billedToName: '', billedToAddress: '' }; setTimeout(() => onChange?.(next), 0); return next; });
 
-      setTimeout(() => {
+    } else if (!selectedBank) {
 
-        setFormData((prev) => {
-
-          const next = {
-
-            ...prev,
-
-            selectedBankName: '',
-
-            selectedBranch: '',
-
-            billedToName: '',
-
-            billedToAddress: ''
-
-          };
-
-          onChange?.(next);
-
-          return next;
-
-        });
-
-      }, 0);
-
-    }
-
-
-
-    if (!selectedBank) {
-
-      // Use setTimeout to avoid setState during render
-
-      setTimeout(() => {
-
-        setFormData((prev) => {
-
-          const next = {
-
-            ...prev,
-
-            selectedBankName: value,
-
-            billedToName: value
-
-          };
-
-          onChange?.(next);
-
-          return next;
-
-        });
-
-      }, 0);
+      setFormData((prev) => { const next = { ...prev, selectedBankName: value, billedToName: value }; setTimeout(() => onChange?.(next), 0); return next; });
 
     }
 
@@ -634,7 +492,7 @@ export default function InvoiceForm({ initialData, onSave, onCancel, onChange })
 
           };
 
-          onChange?.(next);
+          setTimeout(() => onChange?.(next), 0);
 
           return next;
 
@@ -644,7 +502,7 @@ export default function InvoiceForm({ initialData, onSave, onCancel, onChange })
 
     } catch (error) {
 
-      console.error('Failed to fetch client products:', error);
+      console.warn('Failed to fetch client products:', error);
 
     } finally {
 

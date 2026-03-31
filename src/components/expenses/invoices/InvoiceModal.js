@@ -4,8 +4,7 @@ import { useState, useEffect } from 'react';
 import { X, Save, Download, Eye, Plus, Edit, Trash2, Search, Package, DollarSign, Tag, Calendar, User, Building, CreditCard, FileText } from 'lucide-react';
 import { invoiceService } from '@/services/invoiceService';
 import InvoiceForm from './InvoiceForm';
-import InvoicePreview from './InvoicePreview';
-import { generateInvoicePdf } from '@/utils/pdfGenerator';
+import InvoicePreview from './InvoicePreview.jsx';
 import { useToast } from '@/components/common/ToastProvider';
 
 export default function InvoiceModal({ isOpen, onClose, initialData, onSave }) {
@@ -105,33 +104,6 @@ export default function InvoiceModal({ isOpen, onClose, initialData, onSave }) {
               </div>
             ) : (
               <div className="p-6">
-                <div className="mb-4 flex justify-end gap-3">
-                  <button
-                    onClick={async () => {
-                      if (currentInvoiceData) {
-                        try {
-                          const pdfBlob = await generateInvoicePdf(currentInvoiceData);
-                          const url = window.URL.createObjectURL(pdfBlob);
-                          const link = document.createElement('a');
-                          link.href = url;
-                          link.setAttribute('download', `Invoice_${currentInvoiceData.invoiceNo || 'Draft'}.pdf`);
-                          document.body.appendChild(link);
-                          link.click();
-                          link.remove();
-                          window.URL.revokeObjectURL(url);
-                          addToast('PDF downloaded successfully!', 'success');
-                        } catch (error) {
-                          console.error('Failed to generate PDF:', error);
-                          addToast('Failed to generate PDF. Please try again.', 'error');
-                        }
-                      }
-                    }}
-                    className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all duration-200"
-                  >
-                    <Download className="h-4 w-4" />
-                    Download PDF
-                  </button>
-                </div>
                 <InvoicePreview 
                   data={currentInvoiceData || {
                     invoiceNo: '',

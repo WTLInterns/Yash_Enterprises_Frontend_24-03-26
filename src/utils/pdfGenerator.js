@@ -6,865 +6,556 @@ export class InvoicePdfGenerator {
     this.invoice = invoice || {};
     this.doc = new jsPDF({ unit: 'mm', format: 'a4' });
 
-    this.pageWidth = this.doc.internal.pageSize.getWidth();
-    this.pageHeight = this.doc.internal.pageSize.getHeight();
+    this.W  = this.doc.internal.pageSize.getWidth();   // 210
+    this.H  = this.doc.internal.pageSize.getHeight();  // 297
+    this.m  = 12;                                       // margin
+    this.cW = this.W - this.m * 2;                     // content width
 
-    this.margin = 16;
-    this.contentWidth = this.pageWidth - this.margin * 2;
-
-    this.colors = {
-      black: [0, 0, 0],
-      gray: [92, 92, 92],
-      lightGray: [220, 220, 220],
-      border: [180, 180, 180],
-      indigo: [99, 102, 241],
-      indigoDark: [67, 56, 202],
-      yellow: [255, 235, 120],
-      yellowDark: [255, 204, 0],
-      paleYellow: [255, 250, 205],
-      white: [255, 255, 255],
-      green: [22, 163, 74],
+    // ── Palette ──────────────────────────────────────────────
+    this.c = {
+      black:      [15,  15,  15],
+      gray:       [100, 100, 100],
+      lightGray:  [210, 210, 210],
+      border:     [200, 200, 200],
+      // Light premium header (soft indigo-blue)
+      hdrBg:      [235, 240, 255],
+      hdrAccent:  [99,  102, 241],
+      hdrText:    [30,  30,  80],
+      // Title bar
+      titleBg:    [99,  102, 241],
+      // Sections
+      sectionLbl: [67,  56,  202],
+      paleYellow: [255, 251, 210],
+      yellow:     [255, 204,   0],
+      green:      [22,  163,  74],
+      white:      [255, 255, 255],
     };
   }
 
-  toNumber(value) {
-    const n = Number(value);
-    return Number.isFinite(n) ? n : 0;
-  }
+  // ── Utilities ────────────────────────────────────────────────
 
-  safeString(value, fallback = '') {
-    if (value === null || value === undefined) return fallback;
-    const text = String(value).trim();
-    return text.length ? text : fallback;
-  }
+  n(v)  { const x = Number(v); return Number.isFinite(x) ? x : 0; }
+  s(v, fb = '') { if (v == null) return fb; const t = String(v).trim(); return t || fb; }
 
-  formatCurrency(amount) {
-    const value = this.toNumber(amount);
-    return `Rs. ${value.toFixed(2)}`;
-  }
+  fc(amount) { return `Rs.${this.n(amount).toFixed(2)}`; }
 
-  formatDate(date) {
+  fd(date) {
     if (!date) return '';
     const d = new Date(date);
-    if (Number.isNaN(d.getTime())) return '';
-
-    return new Intl.DateTimeFormat('en-IN', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-    }).format(d);
+    if (isNaN(d.getTime())) return '';
+    return new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }).format(d);
   }
 
-  formatDateTime(date) {
-    if (!date) return '';
-    const d = new Date(date);
-    if (Number.isNaN(d.getTime())) return '';
-    return new Intl.DateTimeFormat('en-IN', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    }).format(d);
-  }
+  txt(text, x, y, opts = {}) { this.doc.text(String(text ?? ''), x, y, opts); }
 
-  convertTwoDigits(num) {
-    const units = [
-      '',
-      'One',
-      'Two',
-      'Three',
-      'Four',
-      'Five',
-      'Six',
-      'Seven',
-      'Eight',
-      'Nine',
-      'Ten',
-      'Eleven',
-      'Twelve',
-      'Thirteen',
-      'Fourteen',
-      'Fifteen',
-      'Sixteen',
-      'Seventeen',
-      'Eighteen',
-      'Nineteen',
-    ];
-
-    const tens = [
-      '',
-      '',
-      'Twenty',
-      'Thirty',
-      'Forty',
-      'Fifty',
-      'Sixty',
-      'Seventy',
-      'Eighty',
-      'Ninety',
-    ];
-
-    if (num < 20) return units[num];
-    const t = Math.floor(num / 10);
-    const u = num % 10;
-    return u ? `${tens[t]} ${units[u]}` : tens[t];
-  }
-
-  convertThreeDigits(num) {
-    const hundreds = Math.floor(num / 100);
-    const rest = num % 100;
-    let result = '';
-
-    if (hundreds) result += `${this.convertTwoDigits(hundreds)} Hundred`;
-    if (hundreds && rest) result += ' ';
-    if (rest) result += this.convertTwoDigits(rest);
-
-    return result.trim();
-  }
-
-  numberToWords(value) {
-    let num = Math.floor(this.toNumber(value));
-    if (num === 0) return 'Zero Rupees Only';
-
-    const parts = [];
-
-    const crore = Math.floor(num / 10000000);
-    num %= 10000000;
-
-    const lakh = Math.floor(num / 100000);
-    num %= 100000;
-
-    const thousand = Math.floor(num / 1000);
-    num %= 1000;
-
-    const belowThousand = num;
-
-    if (crore) parts.push(`${this.convertTwoDigits(crore)} Crore`);
-    if (lakh) parts.push(`${this.convertTwoDigits(lakh)} Lakh`);
-    if (thousand) parts.push(`${this.convertTwoDigits(thousand)} Thousand`);
-    if (belowThousand) parts.push(this.convertThreeDigits(belowThousand));
-
-    return `${parts.filter(Boolean).join(' ').replace(/\s+/g, ' ').trim()} Rupees Only`;
-  }
-
-  addText(text, x, y, options = {}) {
-    this.doc.text(String(text ?? ''), x, y, options);
-  }
-
-  drawLine(x1, y1, x2, y2, color = this.colors.border, width = 0.3) {
+  line(x1, y1, x2, y2, color = this.c.border, w = 0.25) {
     this.doc.setDrawColor(...color);
-    this.doc.setLineWidth(width);
+    this.doc.setLineWidth(w);
     this.doc.line(x1, y1, x2, y2);
   }
 
-  ensureSpace(currentY, requiredHeight) {
-    if (currentY + requiredHeight > this.pageHeight - this.margin - 8) {
-      this.doc.addPage();
-      return this.margin;
-    }
-    return currentY;
+  // ── Number to words ──────────────────────────────────────────
+
+  n2w(value) {
+    let num = Math.floor(this.n(value));
+    if (num === 0) return 'Zero Rupees Only';
+    const u = ['','One','Two','Three','Four','Five','Six','Seven','Eight','Nine','Ten',
+               'Eleven','Twelve','Thirteen','Fourteen','Fifteen','Sixteen','Seventeen','Eighteen','Nineteen'];
+    const t = ['','','Twenty','Thirty','Forty','Fifty','Sixty','Seventy','Eighty','Ninety'];
+    const two   = (n) => n < 20 ? u[n] : (t[Math.floor(n/10)] + (n%10 ? ' '+u[n%10] : ''));
+    const three = (n) => n >= 100 ? u[Math.floor(n/100)]+' Hundred'+(n%100?' '+two(n%100):'') : two(n);
+    const parts = [];
+    const cr = Math.floor(num/10000000); num %= 10000000;
+    const lk = Math.floor(num/100000);   num %= 100000;
+    const th = Math.floor(num/1000);     num %= 1000;
+    if (cr) parts.push(two(cr)+' Crore');
+    if (lk) parts.push(two(lk)+' Lakh');
+    if (th) parts.push(two(th)+' Thousand');
+    if (num) parts.push(three(num));
+    return parts.join(' ') + ' Rupees Only';
   }
 
-  getCompanyName() {
-    return (
-      this.safeString(this.invoice.billedByName) ||
-      this.safeString(this.invoice.companyName) ||
-      'YASH ENTERPRISES'
-    );
-  }
+  // ── Data helpers ─────────────────────────────────────────────
 
-  getCustomerName() {
-    return (
-      this.safeString(this.invoice.selectedCustomer?.name) ||
-      this.safeString(this.invoice.billedToName) ||
-      this.safeString(this.invoice.customerName)
-    );
-  }
+  getItems()    { return Array.isArray(this.invoice.items) ? this.invoice.items : []; }
+  companyName() { return this.s(this.invoice.billedByName) || 'Company'; }
+  bankName()    { return this.s(this.invoice.selectedBankName) || this.s(this.invoice.billedToName); }
+  branchName()  { return this.s(this.invoice.selectedBranch)   || this.s(this.invoice.billedToBranch); }
+  customerName(){ return this.s(this.invoice.selectedCustomer?.name) || this.s(this.invoice.billedToName); }
 
-  getBankName() {
-    return (
-      this.safeString(this.invoice.selectedBankName) ||
-      this.safeString(this.invoice.bank) ||
-      this.safeString(this.invoice.billedToName)
-    );
-  }
-
-  getBranchName() {
-    return this.safeString(this.invoice.selectedBranch) || this.safeString(this.invoice.billedToBranch);
-  }
-
-  getItems() {
-    return Array.isArray(this.invoice.items) ? this.invoice.items : [];
-  }
-
-  shouldUsePercentMode() {
+  grandTotal() {
+    const gt = this.n(this.invoice.grandTotal);
+    if (gt > 0) return gt;
     const items = this.getItems();
-    if (!items.length) return false;
-
-    return items.some((item) => {
-      const percent =
-        this.toNumber(item?.percent) ||
-        this.toNumber(item?.percentage) ||
-        this.toNumber(item?.billPercent);
-      return percent > 0;
-    });
+    const sub = items.reduce((s, i) => s + this.n(i.qty) * this.n(i.rate), 0);
+    const cgst = this.n(this.invoice.cgst);
+    const sgst = this.n(this.invoice.sgst);
+    return sub + cgst + sgst;
   }
 
-  calculatePercentRow(item) {
-    const amount =
-      this.toNumber(item?.amount) ||
-      (this.toNumber(item?.qty) * this.toNumber(item?.rate)) ||
-      this.toNumber(item?.auctionAmount) ||
-      0;
-
-    const percent =
-      this.toNumber(item?.percent) ||
-      this.toNumber(item?.percentage) ||
-      this.toNumber(item?.billPercent) ||
-      1.5;
-
-    const billAmount = amount * (percent / 100);
-
-    return { amount, percent, billAmount };
-  }
-
-  calculateStandardRow(item) {
-    const qty = this.toNumber(item?.qty) || 1;
-    const rate = this.toNumber(item?.rate) || this.toNumber(item?.amount);
-    const amount = this.toNumber(item?.amount) || qty * rate;
-    const tax = this.toNumber(item?.tax) || 0;
-    const total = this.toNumber(item?.total) || amount + tax;
-
-    return { qty, rate, amount, total };
-  }
-
-  calculateGrandTotal() {
-    const items = this.getItems();
-    if (!items.length) {
-      const invoiceTotal = this.toNumber(this.invoice.grandTotal);
-      return invoiceTotal > 0 ? invoiceTotal : 0;
-    }
-
-    if (this.shouldUsePercentMode()) {
-      const total = items.reduce((sum, item) => sum + this.calculatePercentRow(item).billAmount, 0);
-      return this.toNumber(this.invoice.grandTotal) > 0 ? this.toNumber(this.invoice.grandTotal) || total : total;
-    }
-
-    const subtotal = items.reduce((sum, item) => {
-      const row = this.calculateStandardRow(item);
-      return sum + row.amount;
-    }, 0);
-
-    const cgst = this.toNumber(this.invoice.cgst);
-    const sgst = this.toNumber(this.invoice.sgst);
-    const grandTotal = this.toNumber(this.invoice.grandTotal);
-
-    if (grandTotal > 0) return grandTotal;
-    if (cgst > 0 || sgst > 0) return subtotal + cgst + sgst;
-    return items.reduce((sum, item) => sum + this.calculateStandardRow(item).total, 0);
-  }
-
-  addWatermark() {
-    const company = this.getCompanyName();
-
-    this.doc.setTextColor(235, 235, 235);
-    this.doc.setFont('helvetica', 'bold');
-    this.doc.setFontSize(32);
-
-    const textWidth = this.doc.getTextWidth(company);
-    const x = (this.pageWidth - textWidth) / 2;
-    const y = this.pageHeight / 2 + 8;
-
-    this.addText(company, x, y, { angle: 35 });
-    this.doc.setTextColor(...this.colors.black);
-  }
+  // ── 1. HEADER — light premium, single-line owner info ────────
 
   addHeader(y) {
-    const companyName = this.getCompanyName();
-    const companyAddress =
-      this.safeString(this.invoice.billedByAddress) ||
-      this.safeString(this.invoice.address) ||
-      'Pune';
+    const hH = 22; // compact header height
 
-    const gst =
-      this.safeString(this.invoice.gstin) ||
-      this.safeString(this.invoice.billedByGstin) ||
-      '';
+    // Light background rect
+    this.doc.setFillColor(...this.c.hdrBg);
+    this.doc.rect(0, 0, this.W, hH, 'F');
 
-    const phone =
-      this.safeString(this.invoice.billedByMobile) ||
-      this.safeString(this.invoice.phone) ||
-      '';
+    // Left accent bar
+    this.doc.setFillColor(...this.c.hdrAccent);
+    this.doc.rect(0, 0, 3, hH, 'F');
 
-    const email = this.safeString(this.invoice.billedByEmail) || '';
-
-    const logo = this.invoice.companyLogo;
-
-    if (logo) {
+    // Logo (if present)
+    let logoEndX = this.m + 3;
+    if (this.invoice.companyLogo) {
       try {
-        this.doc.addImage(logo, 'PNG', this.margin, y, 24, 24);
-      } catch (error) {
-        console.warn('Failed to add company logo:', error);
-      }
+        this.doc.addImage(this.invoice.companyLogo, 'PNG', this.m + 3, 3, 14, 14);
+        logoEndX = this.m + 20;
+      } catch (_) { /* skip */ }
     }
 
-    const leftX = logo ? this.margin + 30 : this.margin;
-    const centerX = 78;
-    const boxX = this.pageWidth - this.margin - 66;
-    const boxY = y - 1;
-    const boxW = 66;
-    const boxH = 34;
-
+    // Company name — bold, dark
     this.doc.setFont('helvetica', 'bold');
-    this.doc.setFontSize(18);
-    this.doc.setTextColor(...this.colors.black);
-    this.addText(companyName, leftX, y + 8);
+    this.doc.setFontSize(13);
+    this.doc.setTextColor(...this.c.hdrText);
+    this.txt(this.companyName(), logoEndX, 10);
 
-    this.doc.setFont('helvetica', 'normal');
-    this.doc.setFontSize(9);
-    this.doc.setTextColor(...this.colors.gray);
-    this.addText('Property & Legal Services', leftX, y + 14);
+    // Single-line owner info below name
+    const addr  = this.s(this.invoice.billedByAddress);
+    const email = this.s(this.invoice.billedByEmail);
+    const gstin = this.s(this.invoice.gstin);
+    const pan   = this.s(this.invoice.pan);
+    const phone = this.s(this.invoice.billedByMobile) || this.s(this.invoice.phone);
 
-    const centerBlockX = centerX;
+    const parts = [];
+    if (addr)  parts.push(addr);
+    if (email) parts.push(email);
+    if (gstin) parts.push(`GST: ${gstin}`);
+    if (pan)   parts.push(`PAN: ${pan}`);
+    if (phone) parts.push(`Ph: ${phone}`);
+
+    if (parts.length) {
+      this.doc.setFont('helvetica', 'normal');
+      this.doc.setFontSize(7.5);
+      this.doc.setTextColor(...this.c.gray);
+      // Truncate to fit page width
+      const infoLine = parts.join('  |  ');
+      const maxW = this.W - logoEndX - 60;
+      const fitted = this.doc.splitTextToSize(infoLine, maxW)[0] || infoLine;
+      this.txt(fitted, logoEndX, 17);
+    }
+
+    // Right side: invoice type badge
+    const badgeW = 52;
+    const badgeX = this.W - this.m - badgeW;
+    this.doc.setFillColor(...this.c.hdrAccent);
+    this.doc.roundedRect(badgeX, 5, badgeW, 12, 2, 2, 'F');
     this.doc.setFont('helvetica', 'bold');
-    this.doc.setFontSize(10);
-    this.doc.setTextColor(...this.colors.indigoDark);
-    this.addText('Professional Invoice & Recovery Services', centerBlockX, y + 8);
-
-    this.doc.setFont('helvetica', 'normal');
     this.doc.setFontSize(8.5);
-    this.doc.setTextColor(...this.colors.gray);
-    const centerLines = this.doc.splitTextToSize(companyAddress, 65);
-    centerLines.slice(0, 2).forEach((line, index) => {
-      this.addText(line, centerBlockX, y + 13 + index * 4.2);
-    });
+    this.doc.setTextColor(...this.c.white);
+    const label = this.invoice.isProForma ? 'PRO FORMA INVOICE' : 'TAX INVOICE';
+    this.txt(label, badgeX + badgeW / 2, 12.5, { align: 'center' });
 
-    this.doc.setDrawColor(...this.colors.border);
-    this.doc.setLineWidth(0.3);
-    this.doc.rect(boxX, boxY, boxW, boxH);
-
-    let contactY = boxY + 6;
-    this.doc.setFont('helvetica', 'bold');
-    this.doc.setFontSize(8.5);
-    this.doc.setTextColor(...this.colors.black);
-    this.addText('Contact Details', boxX + 3, contactY);
-
-    contactY += 5;
-    this.doc.setFont('helvetica', 'normal');
-    this.doc.setFontSize(8);
-    if (gst) {
-      this.addText(`GST: ${gst}`, boxX + 3, contactY);
-      contactY += 4.3;
-    }
-    if (phone) {
-      this.addText(`Phone: ${phone}`, boxX + 3, contactY);
-      contactY += 4.3;
-    }
-    if (email) {
-      const emailText = this.doc.splitTextToSize(`Email: ${email}`, boxW - 6);
-      this.addText(emailText[0] || `Email: ${email}`, boxX + 3, contactY);
-    }
-
-    y += 28;
-    this.drawLine(this.margin, y, this.pageWidth - this.margin, y);
-    return y + 7;
+    this.doc.setTextColor(...this.c.black);
+    return hH + 2;
   }
 
-  addTitleBar(y) {
-    const barH = 11;
-
-    this.doc.setFillColor(...this.colors.indigo);
-    this.doc.rect(this.margin, y, this.contentWidth, barH, 'F');
-
-    this.doc.setFont('helvetica', 'bold');
-    this.doc.setFontSize(12);
-    this.doc.setTextColor(255, 255, 255);
-    this.addText(
-      this.invoice.isProForma ? 'PRO FORMA INVOICE' : 'TAX INVOICE',
-      this.pageWidth / 2,
-      y + 7.5,
-      { align: 'center' }
-    );
-
-    this.doc.setTextColor(...this.colors.black);
-    return y + barH + 5;
-  }
+  // ── 2. INVOICE META — invoice no / date / due date ───────────
 
   addInvoiceMeta(y) {
-    y = this.ensureSpace(y, 18);
+    const invoiceNo  = this.s(this.invoice.invoiceNo, 'INV-001');
+    const invoiceDate = this.fd(this.invoice.invoiceDate);
+    const dueDate    = this.fd(this.invoice.dueDate);
 
-    const rightX = this.pageWidth - this.margin - 56;
-    const invoiceNo = this.safeString(this.invoice.invoiceNo, 'INV-001');
-    const invoiceDate = this.formatDate(this.invoice.invoiceDate);
-    const dueDate = this.formatDate(this.invoice.dueDate);
-
-    this.doc.setFont('helvetica', 'bold');
-    this.doc.setFontSize(10);
-    this.addText('Invoice No:', rightX, y);
-    this.doc.setFont('helvetica', 'normal');
-    this.addText(invoiceNo, rightX + 20, y);
-
-    y += 6;
+    // Light background strip
+    this.doc.setFillColor(248, 249, 255);
+    this.doc.rect(this.m, y, this.cW, 10, 'F');
 
     this.doc.setFont('helvetica', 'bold');
-    this.addText('Date:', rightX, y);
+    this.doc.setFontSize(8);
+    this.doc.setTextColor(...this.c.sectionLbl);
+
+    const col1 = this.m + 2;
+    const col2 = this.m + 60;
+    const col3 = this.m + 120;
+
+    this.txt('Invoice No:', col1, y + 4);
+    this.txt('Date:', col2, y + 4);
+    if (dueDate) this.txt('Due Date:', col3, y + 4);
+
     this.doc.setFont('helvetica', 'normal');
-    this.addText(invoiceDate, rightX + 20, y);
+    this.doc.setTextColor(...this.c.black);
+    this.doc.setFontSize(8);
 
-    y += 6;
+    this.txt(invoiceNo, col1 + 20, y + 4);
+    this.txt(invoiceDate, col2 + 12, y + 4);
+    if (dueDate) this.txt(dueDate, col3 + 18, y + 4);
 
-    if (dueDate) {
-      this.doc.setFont('helvetica', 'bold');
-      this.addText('Due Date:', rightX, y);
-      this.doc.setFont('helvetica', 'normal');
-      this.addText(dueDate, rightX + 20, y);
-      y += 6;
-    }
-
-    this.drawLine(this.margin, y, this.pageWidth - this.margin, y);
-    return y + 6;
+    this.line(this.m, y + 10, this.m + this.cW, y + 10, this.c.border);
+    return y + 13;
   }
 
-  addClientBankSection(y) {
-    y = this.ensureSpace(y, 28);
+  // ── 3. BILLED TO (no duplicate — owner already in header) ────
 
+  addBilledToSection(y) {
+    const halfW    = (this.cW - 6) / 2;
+    const rightColX = this.m + halfW + 6;
+
+    // Section labels
     this.doc.setFont('helvetica', 'bold');
-    this.doc.setFontSize(12);
-    this.doc.setTextColor(...this.colors.black);
-    this.addText('To,', this.margin, y);
+    this.doc.setFontSize(7);
+    this.doc.setTextColor(...this.c.sectionLbl);
+    this.txt('BILLED BY', this.m, y);
+    this.txt('BILLED TO', rightColX, y);
+    y += 4;
 
-    y += 5.5;
+    // ── LEFT: only GSTIN / PAN (name already in header) ──
     this.doc.setFont('helvetica', 'normal');
-    this.doc.setFontSize(10.5);
-    this.addText('The Branch Manager,', this.margin, y);
-    y += 5.2;
+    this.doc.setFontSize(8);
+    this.doc.setTextColor(...this.c.gray);
 
-    const bankName = this.getBankName();
-    const branchName = this.getBranchName();
+    let leftY = y;
+    const gstin = this.s(this.invoice.gstin);
+    const pan   = this.s(this.invoice.pan);
+    const byAddr = this.s(this.invoice.billedByAddress);
 
-    if (bankName) {
+    if (byAddr) {
+      const lines = this.doc.splitTextToSize(byAddr, halfW);
+      lines.slice(0, 2).forEach(l => { this.txt(l, this.m, leftY); leftY += 4; });
+    }
+    if (gstin) { this.txt(`GSTIN: ${gstin}`, this.m, leftY); leftY += 4; }
+    if (pan)   { this.txt(`PAN: ${pan}`,     this.m, leftY); leftY += 4; }
+
+    // ── RIGHT: Billed To ──
+    let rightY = y;
+    this.doc.setFont('helvetica', 'normal');
+    this.doc.setFontSize(7.5);
+    this.doc.setTextColor(...this.c.gray);
+    this.txt('The Branch Manager,', rightColX, rightY);
+    rightY += 4;
+
+    const bank   = this.bankName();
+    const branch = this.branchName();
+    const toAddr = this.s(this.invoice.billedToAddress);
+    const toGst  = this.s(this.invoice.billedToGstin);
+    const mobile = this.s(this.invoice.billedToMobile) || this.s(this.invoice.selectedCustomer?.contactPhone);
+    const toEmail = this.s(this.invoice.billedToEmail) || this.s(this.invoice.selectedCustomer?.email);
+
+    if (bank) {
       this.doc.setFont('helvetica', 'bold');
-      this.addText(bankName, this.margin, y);
-      y += 5.2;
+      this.doc.setFontSize(8.5);
+      this.doc.setTextColor(...this.c.black);
+      this.txt(bank, rightColX, rightY);
+      rightY += 4.5;
     }
-
-    if (branchName) {
-      this.doc.setFont('helvetica', 'normal');
-      this.addText(branchName, this.margin, y);
-      y += 5.2;
+    this.doc.setFont('helvetica', 'normal');
+    this.doc.setFontSize(7.5);
+    this.doc.setTextColor(...this.c.gray);
+    if (branch) { this.txt(branch, rightColX, rightY); rightY += 4; }
+    if (toAddr) {
+      const lines = this.doc.splitTextToSize(toAddr, halfW);
+      lines.slice(0, 2).forEach(l => { this.txt(l, rightColX, rightY); rightY += 4; });
     }
+    if (toGst)   { this.txt(`GSTIN: ${toGst}`, rightColX, rightY); rightY += 4; }
+    if (!bank && mobile) { this.txt(`Mobile: ${mobile}`, rightColX, rightY); rightY += 4; }
+    if (!bank && toEmail){ this.txt(`Email: ${toEmail}`, rightColX, rightY); rightY += 4; }
 
-    const address =
-      this.safeString(this.invoice.billedToAddress) ||
-      this.safeString(this.invoice.selectedCustomer?.address) ||
-      '';
+    this.doc.setTextColor(...this.c.black);
+    y = Math.max(leftY, rightY) + 2;
 
-    if (address && !bankName) {
-      const lines = this.doc.splitTextToSize(address, this.contentWidth);
-      this.doc.setFont('helvetica', 'normal');
-      lines.slice(0, 2).forEach((line) => {
-        this.addText(line, this.margin, y);
-        y += 4.8;
-      });
-    }
-
-    const customerName = this.getCustomerName();
-    if (customerName) {
-      y += 1.5;
-      this.doc.setFillColor(...this.colors.paleYellow);
-      this.doc.rect(this.margin, y, this.contentWidth, 9, 'F');
-
+    // Customer banner (compact)
+    const cust = this.customerName();
+    if (cust) {
+      this.doc.setFillColor(...this.c.paleYellow);
+      this.doc.rect(this.m, y, this.cW, 7, 'F');
       this.doc.setFont('helvetica', 'bold');
-      this.doc.setFontSize(10.5);
-      this.addText(`Customer Name: ${customerName}`, this.margin + 3, y + 6.1);
-      y += 11;
+      this.doc.setFontSize(8);
+      this.doc.setTextColor(120, 80, 0);
+      let banner = `Customer: ${cust}`;
+      if (mobile) banner += `  |  ${mobile}`;
+      this.txt(banner, this.m + 2, y + 4.8);
+      y += 9;
     }
 
-    const mobile =
-      this.safeString(this.invoice.billedToMobile) ||
-      this.safeString(this.invoice.selectedCustomer?.contactPhone) ||
-      this.safeString(this.invoice.selectedCustomer?.contactNumber) ||
-      '';
-
-    const email =
-      this.safeString(this.invoice.billedToEmail) ||
-      this.safeString(this.invoice.selectedCustomer?.email) ||
-      '';
-
-    const gstin =
-      this.safeString(this.invoice.billedToGstin) ||
-      this.safeString(this.invoice.selectedCustomer?.gstin) ||
-      '';
-
-    if (!bankName && (mobile || email || gstin)) {
-      this.doc.setFont('helvetica', 'normal');
-      this.doc.setFontSize(9.5);
-
-      if (mobile) {
-        this.addText(`Mobile: ${mobile}`, this.margin, y);
-        y += 4.8;
-      }
-      if (email) {
-        this.addText(`Email: ${email}`, this.margin, y);
-        y += 4.8;
-      }
-      if (gstin) {
-        this.addText(`GSTIN: ${gstin}`, this.margin, y);
-        y += 4.8;
-      }
-    }
-
-    return y + 2;
+    this.line(this.m, y, this.m + this.cW, y, this.c.border);
+    return y + 3;
   }
 
-  addSubjectSection(y) {
-    const subject = this.safeString(
-      this.invoice.subject ||
-        this.invoice.invoiceSubject ||
-        'Bill For Property Sale'
-    );
-
-    const auctionDate =
-      this.invoice.auctionDate ||
-      this.invoice.subjectDate ||
-      this.invoice.dealDate ||
-      this.invoice.invoiceDate ||
-      null;
-
-    const auctionAmount =
-      this.toNumber(this.invoice.auctionAmount) ||
-      this.toNumber(this.invoice.subjectAmount) ||
-      this.toNumber(this.invoice.amount) ||
-      0;
-
-    const hasContent = subject || auctionAmount > 0 || auctionDate;
-
-    if (!hasContent) return y;
-
-    y = this.ensureSpace(y, 22);
-
-    this.drawLine(this.margin, y, this.pageWidth - this.margin, y);
-    y += 5;
-
-    this.doc.setFont('helvetica', 'bold');
-    this.doc.setFontSize(10.5);
-    this.addText(`Sub: ${subject}`, this.margin, y);
-    y += 5.2;
-
-    if (auctionDate) {
-      this.doc.setFont('helvetica', 'normal');
-      this.addText(`Auction Date: ${this.formatDate(auctionDate)}`, this.margin, y);
-      y += 4.8;
-    }
-
-    if (auctionAmount > 0) {
-      this.doc.setFont('helvetica', 'bold');
-      this.addText(`Auction Amount: ${this.formatCurrency(auctionAmount)}`, this.margin, y);
-      y += 4.8;
-    }
-
-    return y + 2;
-  }
+  // ── 4. ITEMS TABLE — compact ──────────────────────────────────
 
   addItemsTable(y) {
     const items = this.getItems();
-    if (!items.length) return y + 5;
+    if (!items.length) return y + 4;
 
-    y = this.ensureSpace(y, 30);
+    const includeGst = this.invoice.includeGst !== false;
 
-    const percentMode = this.shouldUsePercentMode();
+    const body = items.map((item, i) => {
+      const qty  = this.n(item.qty) || 1;
+      const rate = this.n(item.rate);
+      const amt  = qty * rate;
+      const cg   = includeGst ? amt * 0.09 : 0;
+      const sg   = includeGst ? amt * 0.09 : 0;
+      const tot  = amt + cg + sg;
+      const name = this.s(item.name || item.productName || item.title || 'Item');
 
-    if (percentMode) {
-      const body = items.map((item, index) => {
-        const row = this.calculatePercentRow(item);
-        const particular = this.safeString(
-          item?.name ||
-            item?.productName ||
-            item?.title ||
-            'Professional Fees'
-        );
-
-        return [
-          String(index + 1),
-          particular,
-          this.formatCurrency(row.amount),
-          `${Number(row.percent).toFixed(1)}%`,
-          this.formatCurrency(row.billAmount),
-        ];
-      });
-
-      autoTable(this.doc, {
-        startY: y,
-        head: [['Sr No', 'Particular', 'Amount', '%', 'Bill Amt']],
-        body,
-        theme: 'grid',
-        styles: {
-          fontSize: 9,
-          cellPadding: 3.2,
-          valign: 'middle',
-          lineColor: [180, 180, 180],
-          lineWidth: 0.2,
-        },
-        headStyles: {
-          fillColor: [255, 204, 0],
-          textColor: 0,
-          fontStyle: 'bold',
-        },
-        columnStyles: {
-          0: { halign: 'center', cellWidth: 16 },
-          1: { halign: 'left', cellWidth: 86 },
-          2: { halign: 'right', cellWidth: 30 },
-          3: { halign: 'center', cellWidth: 20 },
-          4: { halign: 'right', cellWidth: 30 },
-        },
-        margin: { left: this.margin, right: this.margin },
-      });
-
-      return this.doc.lastAutoTable.finalY + 8;
-    }
-
-    const body = items.map((item, index) => {
-      const row = this.calculateStandardRow(item);
-      const particular = this.safeString(
-        item?.name ||
-          item?.productName ||
-          item?.title ||
-          item?.description ||
-          'Item'
-      );
-
-      return [
-        String(index + 1),
-        particular,
-        String(row.qty),
-        this.formatCurrency(row.rate),
-        this.formatCurrency(row.amount),
-        this.formatCurrency(row.total),
-      ];
+      if (includeGst) {
+        return [String(i+1), name, '18%', String(qty), this.fc(rate), this.fc(amt), this.fc(cg), this.fc(sg), this.fc(tot)];
+      }
+      return [String(i+1), name, String(qty), this.fc(rate), this.fc(amt), this.fc(tot)];
     });
+
+    const head = includeGst
+      ? [['#', 'Particular', 'GST%', 'Qty', 'Rate', 'Amount', 'CGST', 'SGST', 'Total']]
+      : [['#', 'Particular', 'Qty', 'Rate', 'Amount', 'Total']];
+
+    const colStyles = includeGst ? {
+      0: { halign: 'center', cellWidth: 8  },
+      1: { halign: 'left',   cellWidth: 52 },
+      2: { halign: 'center', cellWidth: 12 },
+      3: { halign: 'center', cellWidth: 10 },
+      4: { halign: 'right',  cellWidth: 22 },
+      5: { halign: 'right',  cellWidth: 22 },
+      6: { halign: 'right',  cellWidth: 20 },
+      7: { halign: 'right',  cellWidth: 20 },
+      8: { halign: 'right',  cellWidth: 20 },
+    } : {
+      0: { halign: 'center', cellWidth: 10 },
+      1: { halign: 'left',   cellWidth: 80 },
+      2: { halign: 'center', cellWidth: 14 },
+      3: { halign: 'right',  cellWidth: 26 },
+      4: { halign: 'right',  cellWidth: 26 },
+      5: { halign: 'right',  cellWidth: 30 },
+    };
 
     autoTable(this.doc, {
       startY: y,
-      head: [['Sr No', 'Particular', 'Qty', 'Rate', 'Amount', 'Total']],
+      head,
       body,
       theme: 'grid',
+      pageBreak: 'avoid',          // ← prevent auto page break
+      rowPageBreak: 'avoid',
       styles: {
-        fontSize: 9,
-        cellPadding: 3.2,
+        fontSize: 7.5,
+        cellPadding: 1.8,
         valign: 'middle',
-        lineColor: [180, 180, 180],
+        lineColor: [200, 200, 200],
         lineWidth: 0.2,
+        overflow: 'linebreak',
       },
       headStyles: {
-        fillColor: [255, 204, 0],
-        textColor: 0,
+        fillColor: this.c.yellow,
+        textColor: [20, 20, 20],
         fontStyle: 'bold',
+        fontSize: 7.5,
+        cellPadding: 2,
       },
-      columnStyles: {
-        0: { halign: 'center', cellWidth: 14 },
-        1: { halign: 'left', cellWidth: 72 },
-        2: { halign: 'center', cellWidth: 16 },
-        3: { halign: 'right', cellWidth: 28 },
-        4: { halign: 'right', cellWidth: 30 },
-        5: { halign: 'right', cellWidth: 30 },
-      },
-      margin: { left: this.margin, right: this.margin },
+      alternateRowStyles: { fillColor: [250, 250, 255] },
+      columnStyles: colStyles,
+      margin: { left: this.m, right: this.m },
     });
 
-    return this.doc.lastAutoTable.finalY + 8;
+    return this.doc.lastAutoTable.finalY + 3;
   }
+
+  // ── 5. TOTALS — compact right-aligned box ────────────────────
 
   addTotalSection(y) {
-    const items = this.getItems();
-    const total = this.calculateGrandTotal();
+    const total   = this.grandTotal();
+    const sub     = this.n(this.invoice.subtotal) || total / (this.invoice.includeGst !== false ? 1.18 : 1);
+    const cgst    = this.n(this.invoice.cgst);
+    const sgst    = this.n(this.invoice.sgst);
+    const inclGst = this.invoice.includeGst !== false;
 
-    y = this.ensureSpace(y, 28);
+    const boxW = 80;
+    const boxX = this.W - this.m - boxW;
+    const rowH = 5.5;
+    const rows = inclGst ? 4 : 2; // subtotal + cgst + sgst + grand  OR  subtotal + grand
+    const boxH = rows * rowH + 2;
 
-    const boxW = 92;
-    const boxH = 19;
-    const boxX = this.pageWidth - this.margin - boxW;
-    const boxY = y;
+    // Grand total highlight box
+    this.doc.setFillColor(...this.c.paleYellow);
+    this.doc.setDrawColor(...this.c.border);
+    this.doc.setLineWidth(0.3);
+    this.doc.rect(boxX, y, boxW, boxH);
+    this.doc.rect(boxX, y, boxW, boxH, 'F');
 
-    this.doc.setDrawColor(...this.colors.black);
-    this.doc.setLineWidth(0.5);
-    this.doc.rect(boxX, boxY, boxW, boxH);
+    let ry = y + rowH;
+    const drawRow = (label, value, bold = false) => {
+      this.doc.setFont('helvetica', bold ? 'bold' : 'normal');
+      this.doc.setFontSize(bold ? 8.5 : 7.5);
+      this.doc.setTextColor(...this.c.black);
+      this.txt(label, boxX + 3, ry);
+      this.txt(value, boxX + boxW - 3, ry, { align: 'right' });
+      ry += rowH;
+    };
 
-    this.doc.setFillColor(...this.colors.paleYellow);
-    this.doc.rect(boxX, boxY, boxW, boxH, 'F');
+    if (inclGst) {
+      drawRow('Subtotal',   this.fc(sub));
+      drawRow('CGST @ 9%', this.fc(cgst));
+      drawRow('SGST @ 9%', this.fc(sgst));
+    }
+    drawRow('Grand Total', this.fc(total), true);
 
-    this.doc.setFont('helvetica', 'bold');
-    this.doc.setFontSize(10);
-    this.doc.setTextColor(...this.colors.black);
-    this.addText('TOTAL INVOICE AMOUNT', boxX + 3, boxY + 6.8);
-
-    this.doc.setFontSize(11);
-    this.addText(this.formatCurrency(total), boxX + boxW - 3, boxY + 6.8, {
-      align: 'right',
+    // Amount in words — left side, same row band
+    const words = this.n2w(total);
+    const wordsLines = this.doc.splitTextToSize(`In Words: ${words}`, this.cW - boxW - 6);
+    this.doc.setFont('helvetica', 'italic');
+    this.doc.setFontSize(7);
+    this.doc.setTextColor(...this.c.green);
+    wordsLines.slice(0, 3).forEach((l, i) => {
+      this.txt(l, this.m, y + rowH + i * 4);
     });
 
-    y += 22;
-
-    const subtotal = this.toNumber(this.invoice.subtotal);
-    const cgst = this.toNumber(this.invoice.cgst);
-    const sgst = this.toNumber(this.invoice.sgst);
-
-    if (subtotal > 0 || cgst > 0 || sgst > 0 || items.length > 0) {
-      this.doc.setFont('helvetica', 'bold');
-      this.doc.setFontSize(9.5);
-      this.addText('TOTAL AMOUNT IN WORDS:', this.margin, y);
-      y += 5;
-
-      this.doc.setFont('helvetica', 'normal');
-      this.doc.setFontSize(9);
-      const words = this.numberToWords(total);
-      const wordLines = this.doc.splitTextToSize(words, this.contentWidth);
-      wordLines.forEach((line) => {
-        this.addText(line, this.margin, y);
-        y += 4.6;
-      });
-    }
-
-    return y + 2;
+    this.doc.setTextColor(...this.c.black);
+    return y + boxH + 3;
   }
+
+  // ── 6. BANK DETAILS — compact two-column ─────────────────────
 
   addBankDetailsSection(y) {
-    const hasBankDetails =
-      this.invoice.accountName ||
-      this.invoice.accountNumber ||
-      this.invoice.ifsc ||
-      this.invoice.bank ||
-      this.invoice.accountType ||
-      this.invoice.upiId;
+    const has = this.invoice.accountName || this.invoice.accountNumber ||
+                this.invoice.ifsc || this.invoice.bank || this.invoice.upiId;
+    if (!has) return y;
 
-    if (!hasBankDetails) return y;
+    this.line(this.m, y, this.m + this.cW, y, this.c.border);
+    y += 3;
 
-    y = this.ensureSpace(y, 34);
-    y = this.addSectionHeader('Bank Details', y);
+    this.doc.setFont('helvetica', 'bold');
+    this.doc.setFontSize(7);
+    this.doc.setTextColor(...this.c.sectionLbl);
+    this.txt('BANK DETAILS', this.m, y);
+    y += 4;
+
+    const halfW    = (this.cW - 6) / 2;
+    const rightColX = this.m + halfW + 6;
+    let leftY = y, rightY = y;
 
     this.doc.setFont('helvetica', 'normal');
-    this.doc.setFontSize(9.5);
+    this.doc.setFontSize(7.5);
+    this.doc.setTextColor(...this.c.black);
 
-    if (this.invoice.accountName) {
-      y = this.addKeyValue('Account Name', this.invoice.accountName, this.margin, y, 34, this.contentWidth - 34);
-    }
-    if (this.invoice.accountNumber) {
-      y = this.addKeyValue('Account Number', this.invoice.accountNumber, this.margin, y, 34, this.contentWidth - 34);
-    }
-    if (this.invoice.ifsc) {
-      y = this.addKeyValue('IFSC Code', this.invoice.ifsc, this.margin, y, 34, this.contentWidth - 34);
-    }
-    if (this.invoice.bank) {
-      y = this.addKeyValue('Bank Name', this.invoice.bank, this.margin, y, 34, this.contentWidth - 34);
-    }
-    if (this.invoice.accountType) {
-      y = this.addKeyValue('Account Type', this.invoice.accountType, this.margin, y, 34, this.contentWidth - 34);
-    }
+    const kv = (label, val, x, cy) => {
+      this.doc.setFont('helvetica', 'bold');
+      this.txt(`${label}:`, x, cy);
+      this.doc.setFont('helvetica', 'normal');
+      this.txt(val, x + 22, cy);
+      return cy + 4;
+    };
+
+    if (this.invoice.accountName)   leftY = kv('Acc Name', this.invoice.accountName,   this.m, leftY);
+    if (this.invoice.accountNumber) leftY = kv('A/C No',   this.invoice.accountNumber,  this.m, leftY);
+    if (this.invoice.ifsc)          leftY = kv('IFSC',     this.invoice.ifsc,            this.m, leftY);
+    if (this.invoice.bank)          leftY = kv('Bank',     this.invoice.bank,            this.m, leftY);
+    if (this.invoice.accountType)   leftY = kv('Type',     this.invoice.accountType,     this.m, leftY);
+
     if (this.invoice.upiId) {
-      y = this.addKeyValue('UPI ID', this.invoice.upiId, this.margin, y, 34, this.contentWidth - 34);
+      this.doc.setFont('helvetica', 'bold');
+      this.doc.setFontSize(7);
+      this.doc.setTextColor(...this.c.sectionLbl);
+      this.txt('UPI PAYMENT', rightColX, rightY);
+      rightY += 4;
+      this.doc.setFont('helvetica', 'normal');
+      this.doc.setFontSize(7.5);
+      this.doc.setTextColor(...this.c.black);
+      rightY = kv('UPI ID', this.invoice.upiId, rightColX, rightY);
     }
 
-    return y + 2;
+    return Math.max(leftY, rightY) + 2;
   }
+
+  // ── 7. TERMS — compact ───────────────────────────────────────
 
   addTermsSection(y) {
-    const customTerms = this.safeString(this.invoice.terms);
-    const defaultTerms = [
-      'GST on reverse charge basis as applicable',
-      'This is computer generated invoice',
-      'Subject to jurisdiction of courts in [City]',
+    const custom = this.s(this.invoice.terms);
+    const defaults = [
+      'GST on reverse charge basis as applicable.',
+      'This is a computer generated invoice.',
     ];
-
-    const lines = customTerms
-      ? customTerms
-          .split('\n')
-          .map((line) => line.trim())
-          .filter(Boolean)
-      : defaultTerms;
-
+    const lines = custom
+      ? custom.split('\n').map(l => l.trim()).filter(Boolean)
+      : defaults;
     if (!lines.length) return y;
 
-    y = this.ensureSpace(y, 24);
-    y = this.addSectionHeader('Terms & Conditions', y);
+    this.line(this.m, y, this.m + this.cW, y, this.c.border);
+    y += 3;
+
+    this.doc.setFont('helvetica', 'bold');
+    this.doc.setFontSize(7);
+    this.doc.setTextColor(...this.c.sectionLbl);
+    this.txt('TERMS & CONDITIONS', this.m, y);
+    y += 4;
 
     this.doc.setFont('helvetica', 'normal');
-    this.doc.setFontSize(9);
+    this.doc.setFontSize(7);
+    this.doc.setTextColor(...this.c.gray);
+    lines.forEach(l => { this.txt(`• ${l}`, this.m, y); y += 3.8; });
 
-    lines.forEach((line) => {
-      y = this.ensureSpace(y, 5);
-      this.addText(`• ${line}`, this.margin, y);
-      y += 4.6;
-    });
-
-    return y + 2;
+    return y + 1;
   }
 
-  addSignatureSection(y) {
-    const signature = this.invoice.signature;
-    if (!signature) return y;
+  // ── 8. SIGNATURE — FIXED at bottom of page ───────────────────
 
-    y = this.ensureSpace(y, 24);
-    y = this.addSectionHeader('Authorized Signatory', y);
+  addSignature() {
+    // Always pinned to bottom — never overflows
+    const sigY = this.H - 28;
+    const sigX = this.W - this.m - 45;
 
-    try {
-      const sigW = 42;
-      const sigH = 16;
-      const sigX = this.pageWidth - this.margin - sigW;
+    // Line above signature
+    this.line(sigX - 2, sigY, sigX + 45, sigY, this.c.black, 0.4);
 
-      this.doc.addImage(signature, 'PNG', sigX, y, sigW, sigH);
-
-      this.doc.setFont('helvetica', 'normal');
-      this.doc.setFontSize(8.5);
-      this.doc.setTextColor(80, 80, 80);
-      this.addText('Authorized Signatory', sigX, y + sigH + 4.5, {
-        align: 'left',
-      });
-
-      this.doc.setTextColor(...this.colors.black);
-      return y + sigH + 8;
-    } catch (error) {
-      console.warn('Failed to add signature to PDF:', error);
-      this.doc.setFont('helvetica', 'italic');
-      this.doc.setFontSize(9);
-      this.doc.setTextColor(120, 120, 120);
-      this.addText('[Signature]', this.pageWidth - this.margin - 25, y + 6, {
-        align: 'left',
-      });
-      this.doc.setTextColor(...this.colors.black);
-      return y + 12;
+    if (this.invoice.signature) {
+      try {
+        this.doc.addImage(this.invoice.signature, 'PNG', sigX, sigY - 14, 45, 12);
+      } catch (_) { /* skip */ }
     }
+
+    this.doc.setFont('helvetica', 'normal');
+    this.doc.setFontSize(7.5);
+    this.doc.setTextColor(...this.c.gray);
+    this.txt('Authorized Signatory', sigX + 22, sigY + 5, { align: 'center' });
+    this.txt(this.companyName(), sigX + 22, sigY + 9, { align: 'center' });
   }
+
+  // ── 9. FOOTER ─────────────────────────────────────────────────
 
   addFooter() {
-    const footerY = this.pageHeight - 8;
+    const fy = this.H - 6;
+    this.line(this.m, fy - 3, this.m + this.cW, fy - 3, this.c.lightGray);
     this.doc.setFont('helvetica', 'italic');
-    this.doc.setFontSize(8);
-    this.doc.setTextColor(140, 140, 140);
-    this.addText(
-      'This is a computer generated invoice and does not require signature',
-      this.pageWidth / 2,
-      footerY,
-      { align: 'center' }
-    );
-    this.doc.setTextColor(...this.colors.black);
+    this.doc.setFontSize(6.5);
+    this.doc.setTextColor(160, 160, 160);
+    this.txt('This is a computer generated invoice and does not require a physical signature.', this.W / 2, fy, { align: 'center' });
+    this.doc.setTextColor(...this.c.black);
   }
+
+  // ── 10. WATERMARK ─────────────────────────────────────────────
+
+  addWatermark() {
+    this.doc.setTextColor(240, 240, 240);
+    this.doc.setFont('helvetica', 'bold');
+    this.doc.setFontSize(38);
+    const name = this.companyName();
+    this.txt(name, this.W / 2, this.H / 2, { align: 'center', angle: 35 });
+    this.doc.setTextColor(...this.c.black);
+  }
+
+  // ── GENERATE ──────────────────────────────────────────────────
 
   async generatePdf() {
     this.addWatermark();
 
-    let y = this.margin;
-
+    let y = 0;
     y = this.addHeader(y);
-    y = this.addTitleBar(y);
     y = this.addInvoiceMeta(y);
-    y = this.addClientBankSection(y);
-    y = this.addSubjectSection(y);
+    y = this.addBilledToSection(y);
     y = this.addItemsTable(y);
     y = this.addTotalSection(y);
     y = this.addBankDetailsSection(y);
     y = this.addTermsSection(y);
-    y = this.addSignatureSection(y);
 
+    // Signature always at fixed bottom position
+    this.addSignature();
     this.addFooter();
 
     return this.doc.output('blob');
@@ -872,8 +563,8 @@ export class InvoicePdfGenerator {
 }
 
 export async function generateInvoicePdf(invoice) {
-  const generator = new InvoicePdfGenerator(invoice);
-  return await generator.generatePdf();
+  const gen = new InvoicePdfGenerator(invoice);
+  return gen.generatePdf();
 }
 
 export default generateInvoicePdf;

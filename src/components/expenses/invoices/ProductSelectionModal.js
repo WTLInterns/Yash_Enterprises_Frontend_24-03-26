@@ -49,9 +49,7 @@ export default function ProductSelectionModal({ isOpen, onClose, onAddItem, onEd
     }
   }
 
-  async function handleAddProduct(e) {
-    e.preventDefault();
-    
+  async function handleAddProduct() {
     if (!formData.name.trim() || !formData.price) {
       alert('Please fill in product name and price');
       return;
@@ -202,7 +200,7 @@ export default function ProductSelectionModal({ isOpen, onClose, onAddItem, onEd
                 <h3 className="text-lg font-semibold mb-4">
                   {editingProduct ? 'Edit Product' : 'Add New Product'}
                 </h3>
-                <form onSubmit={handleAddProduct} className="space-y-4">
+                <div className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -274,7 +272,8 @@ export default function ProductSelectionModal({ isOpen, onClose, onAddItem, onEd
                   </div>
                   <div className="flex gap-3">
                     <button
-                      type="submit"
+                      type="button"
+                      onClick={handleAddProduct}
                       className="flex items-center gap-2 px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
                     >
                       <Save className="h-4 w-4" />
@@ -300,7 +299,7 @@ export default function ProductSelectionModal({ isOpen, onClose, onAddItem, onEd
                       Cancel
                     </button>
                   </div>
-                </form>
+                </div>
               </div>
             ) : (
               /* Product List */

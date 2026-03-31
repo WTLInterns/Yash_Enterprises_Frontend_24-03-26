@@ -374,7 +374,7 @@ export default function CustomersPage() {
   const [allDepartments, setAllDepartments] = useState([]);
 
   useEffect(() => {
-    fetch("http://localhost:8080/api/stages/departments")
+    fetch("https://api.yashrajent.com/api/stages/departments")
       .then(r => r.ok ? r.json() : [])
       .then(data => setAllDepartments(data || []))
       .catch(() => {});
@@ -857,7 +857,7 @@ export default function CustomersPage() {
       if (!silent) setLoading(false); // ← table visible NOW
 
       // Phase 2: Load addresses in background (non-blocking)
-      fetch('http://localhost:8080/api/clients/addresses/all')
+      fetch('https://api.yashrajent.com/api/clients/addresses/all')
         .then(r => r.ok ? r.json() : [])
         .catch(() => [])
         .then(allAddresses => {
@@ -1407,7 +1407,7 @@ export default function CustomersPage() {
 
 
 
-      const response = await fetch('http://localhost:8080/api/clients/geocode', {
+      const response = await fetch('https://api.yashrajent.com/api/clients/geocode', {
 
 
 
@@ -1635,7 +1635,7 @@ export default function CustomersPage() {
 
 
 
-      const response = await fetch('http://localhost:8080/api/clients/reverse-geocode', {
+      const response = await fetch('https://api.yashrajent.com/api/clients/reverse-geocode', {
 
 
 
@@ -2168,7 +2168,7 @@ export default function CustomersPage() {
       // but backendApi.get("/api/clients/...") becomes /api/api/clients/... → 500!
       const authUser = getTabSafeAuthUser();
       const addrResponse = await fetch(
-        `http://localhost:8080/api/clients/${customer.id}/addresses`,
+        `https://api.yashrajent.com/api/clients/${customer.id}/addresses`,
         {
           headers: {
             "X-User-Id": authUser?.id ?? "",
@@ -2708,7 +2708,7 @@ export default function CustomersPage() {
 
 
 
-        await fetch(`http://localhost:8080/api/clients/${savedCustomer.id}/addresses`, {
+        await fetch(`https://api.yashrajent.com/api/clients/${savedCustomer.id}/addresses`, {
 
 
 
@@ -2762,7 +2762,7 @@ export default function CustomersPage() {
 
 
 
-        await fetch(`http://localhost:8080/api/clients/${savedCustomer.id}/addresses`, {
+        await fetch(`https://api.yashrajent.com/api/clients/${savedCustomer.id}/addresses`, {
 
 
 
@@ -3333,7 +3333,7 @@ export default function CustomersPage() {
     setBulkDeleting(true);
     try {
       const authUser = getTabSafeAuthUser();
-      const res = await fetch('http://localhost:8080/api/clients/bulk', {
+      const res = await fetch('https://api.yashrajent.com/api/clients/bulk', {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
@@ -6555,7 +6555,7 @@ export default function CustomersPage() {
 
 
 
-                                  const response = await fetch(`http://localhost:8080/api/banks/${bankId}`);
+                                  const response = await fetch(`https://api.yashrajent.com/api/banks/${bankId}`);
 
 
 

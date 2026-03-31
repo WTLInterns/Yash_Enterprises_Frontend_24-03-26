@@ -73,7 +73,7 @@ export default function EmployeeDetailPage() {
       const formData = new FormData();
       formData.append("name", docName.trim());
       formData.append("file", docFile);
-      const res = await fetch(`http://localhost:8080/api/employees/${id}/documents`, {
+      const res = await fetch(`https://api.yashrajent.com/api/employees/${id}/documents`, {
         method: "POST",
         headers: { "X-User-Id": userId || "" },
         body: formData,
@@ -282,7 +282,7 @@ export default function EmployeeDetailPage() {
                                   )}
                                 </div>
                                 <div className="flex items-center gap-2">
-                                  <a href={`http://localhost:8080${doc.fileUrl}`} target="_blank" rel="noopener noreferrer"
+                                  <a href={`https://api.yashrajent.com${doc.fileUrl}`} target="_blank" rel="noopener noreferrer"
                                     className="text-slate-500 hover:text-indigo-600" title="View">
                                     <Eye className="h-4 w-4" />
                                   </a>

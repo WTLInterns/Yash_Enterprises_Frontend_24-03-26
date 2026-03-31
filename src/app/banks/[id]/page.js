@@ -85,7 +85,7 @@ export default function BankDetailPage() {
       const formData = new FormData();
       formData.append("name", docName.trim());
       formData.append("file", docFile);
-      const res = await fetch(`https://api.yashrajent.com/api/banks/${id}/documents`, {
+      const res = await fetch(`http://localhost:8080/api/banks/${id}/documents`, {
         method: "POST",
         headers: { "X-User-Id": userId || "" },
         body: formData,
@@ -126,7 +126,7 @@ export default function BankDetailPage() {
       formData.append("subject", emailForm.subject);
       formData.append("body", emailForm.body);
       if (emailFile) formData.append("file", emailFile);
-      const res = await fetch(`https://api.yashrajent.com/api/banks/${id}/emails`, {
+      const res = await fetch(`http://localhost:8080/api/banks/${id}/emails`, {
         method: "POST",
         headers: { "X-User-Id": userId || "" },
         body: formData,
@@ -299,7 +299,7 @@ export default function BankDetailPage() {
                                   )}
                                 </div>
                                 <div className="flex items-center gap-2">
-                                  <a href={`https://api.yashrajent.com${doc.fileUrl}`} target="_blank" rel="noopener noreferrer"
+                                  <a href={`http://localhost:8080${doc.fileUrl}`} target="_blank" rel="noopener noreferrer"
                                     className="text-slate-500 hover:text-indigo-600" title="View">
                                     <Eye className="h-4 w-4" />
                                   </a>

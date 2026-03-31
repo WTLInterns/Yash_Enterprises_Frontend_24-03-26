@@ -159,105 +159,34 @@ export default function TLDepartmentDashboard({ userName, userRole }) {
   
   const { getStagesForDepartment, fetchStagesForDepartment } = useStages();
   
-  // ✅ DYNAMIC FUNNEL COUNTS - O(n) performance with useMemo
   const funnelCounts = useMemo(() => {
-    console.log('🔥 [TL DASHBOARD] Computing funnel counts for department:', currentUser?.department);
-    
-    if (!currentUser?.department) return [];
-    
-    // Get stages for selected department
-    let stages = getStagesForDepartment(currentUser?.department);
-    
-    // Comprehensive fallback stages for all departments
-    if (!stages || stages.length === 0) {
-      if (currentUser?.department === 'ACCOUNT') {
-        console.log('🔥 [TL DASHBOARD] Using fallback stages for ACCOUNT department');
-        stages = [
-          { stageCode: 'INVENTORY', stageName: 'Inventory', stageOrder: 1 },
-          { stageCode: 'MAKE_BILL', stageName: 'Make Bill', stageOrder: 2 },
-          { stageCode: 'BILL_SUBMIT', stageName: 'Bill Submit', stageOrder: 3 },
-          { stageCode: 'BILL_FOLLOWUP', stageName: 'Bill Followup', stageOrder: 4 },
-          { stageCode: 'BILL_PASS', stageName: 'Bill Pass', stageOrder: 5 },
-          { stageCode: 'CLOSE_WIN', stageName: 'Close Win', stageOrder: 6 },
-          { stageCode: 'CLOSE_LOST', stageName: 'Close Lost', stageOrder: 7 }
-        ];
-      } else if (currentUser?.department === 'PPE') {
-        console.log('🔥 [TL DASHBOARD] Using fallback stages for PPE department');
-        stages = [
-          { stageCode: 'NEW_LEAD', stageName: 'New Lead', stageOrder: 1 },
-          { stageCode: 'REVIEW', stageName: 'Review', stageOrder: 2 },
-          { stageCode: 'LOAN_APPLICATION', stageName: 'Loan Application', stageOrder: 3 },
-          { stageCode: 'DOCUMENTATION', stageName: 'Documentation', stageOrder: 4 },
-          { stageCode: 'APPROVAL', stageName: 'Approval', stageOrder: 5 },
-          { stageCode: 'CLOSE_WIN', stageName: 'Close Win', stageOrder: 6 },
-          { stageCode: 'CLOSE_LOST', stageName: 'Close Lost', stageOrder: 7 }
-        ];
-      } else if (currentUser?.department === 'HLC') {
-        console.log('🔥 [TL DASHBOARD] Using fallback stages for HLC department');
-        stages = [
-          { stageCode: 'NEW_LEAD', stageName: 'New Lead', stageOrder: 1 },
-          { stageCode: 'REVIEW', stageName: 'Review', stageOrder: 2 },
-          { stageCode: 'LOAN_APPLICATION', stageName: 'Loan Application', stageOrder: 3 },
-          { stageCode: 'DOCUMENTATION', stageName: 'Documentation', stageOrder: 4 },
-          { stageCode: 'APPROVAL', stageName: 'Approval', stageOrder: 5 },
-          { stageCode: 'CLOSE_WIN', stageName: 'Close Win', stageOrder: 6 },
-          { stageCode: 'CLOSE_LOST', stageName: 'Close Lost', stageOrder: 7 }
-        ];
-      } else {
-        console.log('🔥 [TL DASHBOARD] Using default fallback stages for department:', currentUser?.department);
-        stages = [
-          { stageCode: 'NEW_LEAD', stageName: 'New Lead', stageOrder: 1 },
-          { stageCode: 'REVIEW', stageName: 'Review', stageOrder: 2 },
-          { stageCode: 'LOAN_APPLICATION', stageName: 'Loan Application', stageOrder: 3 },
-          { stageCode: 'DOCUMENTATION', stageName: 'Documentation', stageOrder: 4 },
-          { stageCode: 'APPROVAL', stageName: 'Approval', stageOrder: 5 },
-          { stageCode: 'CLOSE_WIN', stageName: 'Close Win', stageOrder: 6 },
-          { stageCode: 'CLOSE_LOST', stageName: 'Close Lost', stageOrder: 7 }
-        ];
-      }
+    if (!currentUser?.department || !deals.length) return [];
+
+    const dept = currentUser.department;
+    // API already returns only this dept's deals, but filter just in case
+    const deptDeals = deals.filter(d => !d.department || d.department === dept);
+
+    const stages = getStagesForDepartment(dept) || [];
+
+    if (!stages.length) {
+      // No stage config — derive from actual deal data
+      const stageMap = {};
+      deptDeals.forEach(d => {
+        const code = d.stageCode || d.stage || '';
+        if (code) stageMap[code] = (stageMap[code] || 0) + 1;
+      });
+      return Object.entries(stageMap).map(([stage, count]) => ({ stage, count }));
     }
 
-    console.log('🔥 [TL DASHBOARD] Stages being used for funnel:', stages.map(s => s.stageCode));
-
-    // Filter deals by department
-    const filteredDeals = deals.filter(d => {
-      // TL should see deals assigned to them OR deals in their department
-      const assignedToTL = d.ownerName === currentUser?.name || 
-                          d.ownerName === currentUser?.fullName ||
-                          d.assignedTo === currentUser?.name ||
-                          d.assignedTo === currentUser?.fullName;
-      
-      const deptMatch = d.department === currentUser?.department || 
-                       d.ownerName === currentUser?.department || 
-                       d.departmentName === currentUser?.department || 
-                       d.tlDepartmentName === currentUser?.department;
-      
-      return assignedToTL || deptMatch;
-    });
-
-    console.log('🔥 [TL DASHBOARD] Filtered deals:', filteredDeals.length, 'for department:', currentUser?.department);
-
-    // O(n) stage counting using stageMap
+    // Match stageCode as-is (same as customers page — no uppercase transform)
     const stageMap = {};
-    stages.forEach(stage => {
-      stageMap[stage.stageCode] = 0;
+    stages.forEach(s => { stageMap[s.stageCode] = 0; });
+    deptDeals.forEach(deal => {
+      const code = deal.stageCode || deal.stage || '';
+      if (stageMap.hasOwnProperty(code)) stageMap[code]++;
+      else if (stageMap.hasOwnProperty(code.toUpperCase())) stageMap[code.toUpperCase()]++;
     });
-
-    filteredDeals.forEach(deal => {
-      const stageCode = deal.stageCode || deal.stage;
-      if (stageMap.hasOwnProperty(stageCode)) {
-        stageMap[stageCode]++;
-      }
-    });
-
-    // Convert to array format
-    const result = stages.map(stage => ({
-      stage: stage.stageCode,
-      count: stageMap[stage.stageCode] || 0
-    }));
-
-    console.log('🔥 [TL DASHBOARD] Funnel counts computed:', result);
-    return result;
+    return stages.map(s => ({ stage: s.stageCode, count: stageMap[s.stageCode] || 0 }));
   }, [currentUser?.department, deals, getStagesForDepartment]);
 
   // ✅ Fetch real customers data
@@ -273,57 +202,35 @@ export default function TLDepartmentDashboard({ userName, userRole }) {
     }
   };
 
-  // ✅ Fetch real deals data
+  // ✅ Fetch deals exactly like customers page
   const fetchDeals = async () => {
     try {
-      console.log('🔥 [TL DASHBOARD] Fetching deals...');
-      const dealsData = await backendApi.get("/deals").catch(() => []);
-      console.log('🔥 [TL DASHBOARD] Raw deals data:', dealsData);
-      console.log('🔥 [TL DASHBOARD] Deals data type:', typeof dealsData);
-      console.log('🔥 [TL DASHBOARD] Is dealsData an array?', Array.isArray(dealsData));
-      
-      // Normalize deals data (same logic as AdminManagerCRMDashboard)
-      const normalizeList = (res) => {
-        if (!res) return [];
-        if (Array.isArray(res)) return res;
-        if (res.content && Array.isArray(res.content)) return res.content;
-        return [];
-      };
-      
-      const dealsArray = normalizeList(dealsData);
-      console.log('🔥 [TL DASHBOARD] Processed deals array:', dealsArray.length);
-      
-      // Normalize deals data
-      const normalizedDeals = dealsArray.map(deal => ({
-        ...deal,
-        stageCode: deal.stage || deal.stageCode || "",
-        department: deal.department || currentUser?.department,
-        valueAmount: deal.valueAmount || deal.amount || 0
+      let authUser = null;
+      try {
+        const tabId = typeof window !== 'undefined' ? sessionStorage.getItem('tab_id') : null;
+        let raw = tabId ? sessionStorage.getItem(`user_data_${tabId}`) : null;
+        if (!raw) raw = localStorage.getItem('user_data');
+        authUser = raw ? JSON.parse(raw) : null;
+      } catch {}
+
+      const res = await backendApi.get("/deals/filtered", {
+        headers: {
+          "X-User-Role":       authUser?.role ?? "",
+          "X-User-Department": authUser?.department ?? "",
+        }
+      });
+      const list = Array.isArray(res) ? res : (res?.content || []);
+      const normalizedDeals = list.map(d => ({
+        ...d,
+        clientId: d.clientId ?? d.client_id ?? (typeof d.client === 'object' ? d.client?.id : d.client) ?? null,
+        stageCode: d.stage || d.stageCode || "",
+        department: d.department || "",
+        valueAmount: d.calculatedValue ?? d.valueAmount ?? d.value_amount ?? 0,
       }));
-      
-      console.log('🔥 [TL DASHBOARD] Normalized deals:', normalizedDeals.length);
       setDeals(normalizedDeals);
     } catch (error) {
-      console.error('🔥 [TL DASHBOARD] Failed to fetch deals:', error);
-      
-      // Fallback: Use customers as deals if deals API fails
-      console.log('🔥 [TL DASHBOARD] Using customers as fallback deals data');
-      try {
-        const customersData = await departmentApiService.getCustomers();
-        const customerDeals = (customersData || []).map(customer => ({
-          id: customer.id,
-          stageCode: customer.stage || customer.stageCode || "",
-          department: customer.department || currentUser?.department,
-          valueAmount: customer.valueAmount || customer.amount || 0,
-          customerName: customer.customerName || customer.name,
-          // Add other necessary fields
-        }));
-        console.log('🔥 [TL DASHBOARD] Created fallback deals from customers:', customerDeals.length);
-        setDeals(customerDeals);
-      } catch (fallbackError) {
-        console.error('🔥 [TL DASHBOARD] Fallback also failed:', fallbackError);
-        setDeals([]);
-      }
+      console.error('[TL DASHBOARD] Failed to fetch deals:', error);
+      setDeals([]);
     }
   };
 
@@ -1027,56 +934,9 @@ export default function TLDepartmentDashboard({ userName, userRole }) {
                 data={funnelCounts} 
                 department={currentUser?.department} 
                 stages={(() => {
-                  let stages = getStagesForDepartment(currentUser?.department) || [];
-                  
-                  // Comprehensive fallback stages for all departments
-                  if (!stages || stages.length === 0) {
-                    if (currentUser?.department === 'ACCOUNT') {
-                      stages = [
-                        { stageCode: 'INVENTORY', stageName: 'Inventory', stageOrder: 1 },
-                        { stageCode: 'MAKE_BILL', stageName: 'Make Bill', stageOrder: 2 },
-                        { stageCode: 'BILL_SUBMIT', stageName: 'Bill Submit', stageOrder: 3 },
-                        { stageCode: 'BILL_FOLLOWUP', stageName: 'Bill Followup', stageOrder: 4 },
-                        { stageCode: 'BILL_PASS', stageName: 'Bill Pass', stageOrder: 5 },
-                        { stageCode: 'CLOSE_WIN', stageName: 'Close Win', stageOrder: 6 },
-                        { stageCode: 'CLOSE_LOST', stageName: 'Close Lost', stageOrder: 7 }
-                      ];
-                    } else if (currentUser?.department === 'PPE') {
-                      stages = [
-                        { stageCode: 'NEW_LEAD', stageName: 'New Lead', stageOrder: 1 },
-                        { stageCode: 'REVIEW', stageName: 'Review', stageOrder: 2 },
-                        { stageCode: 'LOAN_APPLICATION', stageName: 'Loan Application', stageOrder: 3 },
-                        { stageCode: 'DOCUMENTATION', stageName: 'Documentation', stageOrder: 4 },
-                        { stageCode: 'APPROVAL', stageName: 'Approval', stageOrder: 5 },
-                        { stageCode: 'CLOSE_WIN', stageName: 'Close Win', stageOrder: 6 },
-                        { stageCode: 'CLOSE_LOST', stageName: 'Close Lost', stageOrder: 7 }
-                      ];
-                    } else if (currentUser?.department === 'HLC') {
-                      stages = [
-                        { stageCode: 'NEW_LEAD', stageName: 'New Lead', stageOrder: 1 },
-                        { stageCode: 'REVIEW', stageName: 'Review', stageOrder: 2 },
-                        { stageCode: 'LOAN_APPLICATION', stageName: 'Loan Application', stageOrder: 3 },
-                        { stageCode: 'DOCUMENTATION', stageName: 'Documentation', stageOrder: 4 },
-                        { stageCode: 'APPROVAL', stageName: 'Approval', stageOrder: 5 },
-                        { stageCode: 'CLOSE_WIN', stageName: 'Close Win', stageOrder: 6 },
-                        { stageCode: 'CLOSE_LOST', stageName: 'Close Lost', stageOrder: 7 }
-                      ];
-                    } else {
-                      // Default fallback stages
-                      stages = [
-                        { stageCode: 'NEW_LEAD', stageName: 'New Lead', stageOrder: 1 },
-                        { stageCode: 'REVIEW', stageName: 'Review', stageOrder: 2 },
-                        { stageCode: 'LOAN_APPLICATION', stageName: 'Loan Application', stageOrder: 3 },
-                        { stageCode: 'DOCUMENTATION', stageName: 'Documentation', stageOrder: 4 },
-                        { stageCode: 'APPROVAL', stageName: 'Approval', stageOrder: 5 },
-                        { stageCode: 'CLOSE_WIN', stageName: 'Close Win', stageOrder: 6 },
-                        { stageCode: 'CLOSE_LOST', stageName: 'Close Lost', stageOrder: 7 }
-                      ];
-                    }
-                  }
-                  
-                  console.log('🔥 [TL DASHBOARD] Stages for funnel:', stages);
-                  return stages;
+                  const s = getStagesForDepartment(currentUser?.department) || [];
+                  if (s.length > 0) return s;
+                  return funnelCounts.map((fc, i) => ({ stageCode: fc.stage, stageName: fc.stage, stageOrder: i + 1 }));
                 })()}
               />
             </div>

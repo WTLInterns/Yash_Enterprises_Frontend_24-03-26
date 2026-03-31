@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { departmentApiService } from "@/services/departmentApi.service";
-import { Plus, Search, Filter, Calendar, Download, Edit2, Trash2, User, Clock, MapPin, AlertCircle } from "lucide-react";
+import { Plus, Search, Edit2, Trash2, User, MapPin, AlertCircle } from "lucide-react";
 import { toast } from 'react-toastify';
 import { useCustomerAddressSync } from "@/context/CustomerAddressContext";
 
@@ -72,7 +72,6 @@ export default function TasksManagementContent() {
   const [dateRange, setDateRange] = useState({ start: "", end: "" });
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
-  const [viewMode, setViewMode] = useState("table");
   const [deleteTaskId, setDeleteTaskId] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const recordsPerPage = 5;
@@ -112,7 +111,7 @@ export default function TasksManagementContent() {
 
   const loadDepartments = async () => {
     try {
-      const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api.yashrajent.com';
+      const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080';
       console.log('🔍 Loading departments from:', `${API_BASE_URL}/api/stages/departments`);
       const response = await fetch(`${API_BASE_URL}/api/stages/departments`);
       const data = await response.json();
@@ -297,20 +296,6 @@ export default function TasksManagementContent() {
           </div>
         </div>
 
-        {/* View Toggle */}
-        <div className="mb-4 flex justify-end gap-2">
-          <button
-            onClick={() => setViewMode(viewMode === "table" ? "card" : "table")}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              viewMode === "table" 
-                ? "bg-indigo-600 text-white" 
-                : "bg-slate-200 text-slate-700"
-            }`}
-          >
-            {viewMode === "table" ? "Card View" : "Table View"}
-          </button>
-        </div>
-
         {/* Loading */}
         {loading && (
           <div className="flex justify-center items-center py-12 mx-6">
@@ -321,132 +306,57 @@ export default function TasksManagementContent() {
 
         {/* Content */}
         {!loading && (
-          <>
-            {viewMode === "table" ? (
-              /* Table View */
-              <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mx-6">
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-slate-200">
-                    <thead className="bg-slate-50 border-b border-slate-200">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                          <input type="checkbox" className="rounded border-slate-300" />
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Task Name</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Department</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Client</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Customer Location</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Start Time</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">End Time</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Assigned To</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Status</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-slate-200">
-                      {paginatedTasks.map((task) => (
-                        <tr key={task.id} className="hover:bg-slate-50">
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <input type="checkbox" className="rounded border-slate-300" />
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">{task.taskName || '-'}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
-                            <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-indigo-100 text-indigo-800">
-                              {task.department || '-'}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{task.clientName || '-'}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600 max-w-xs truncate">
-                            {task.address || '-'}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
-                            {formatDate(task.scheduledStartTime)}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
-                            {formatDate(task.scheduledEndTime)}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{task.assignedToEmployeeName || 'Unassigned'}</td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(task.status)}`}>
-                              {task.status}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => openEditModal(task)}
-                                className="text-indigo-600 hover:text-indigo-800"
-                              >
-                                <Edit2 className="h-4 w-4" />
-                              </button>
-                              <button
-                                onClick={() => setDeleteTaskId(task.id)}
-                                className="text-rose-600 hover:text-rose-800"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            ) : (
-              /* Card View */
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mx-6">
-                {filteredTasks.map((task) => (
-                  <div key={task.id} className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition-shadow">
-                    <div className="flex justify-between items-start mb-4">
-                      <h3 className="text-lg font-semibold text-slate-900">{task.taskName}</h3>
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                        task.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-800' :
-                        task.status === 'DELAYED' ? 'bg-rose-100 text-rose-800' :
-                        'bg-amber-100 text-amber-800'
-                      }`}>
-                        {task.status}
-                      </span>
-                    </div>
-                    
-                    <div className="space-y-2 text-sm text-slate-600">
-                      <div className="flex items-center gap-2">
-                        <Calendar className="h-4 w-4" />
-                        {formatDate(task.scheduledStartTime)}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <User className="h-4 w-4" />
-                        {task.assignedToEmployeeName || 'Unassigned'}
-                      </div>
-                      {task.address && (
-                        <div className="flex items-center gap-2">
-                          <MapPin className="h-4 w-4" />
-                          {task.address}
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mx-6">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-slate-200">
+                <thead className="bg-slate-50 border-b border-slate-200" style={{ position: 'sticky', top: 0, zIndex: 10 }}>
+                  <tr>
+                    {/* Sticky: Task Name */}
+                    <th style={{ position: 'sticky', left: 0, zIndex: 20, background: 'rgb(248 250 252)', minWidth: 180 }} className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider border-r border-slate-200">Task Name</th>
+                    {/* Sticky: Department */}
+                    <th style={{ position: 'sticky', left: 180, zIndex: 20, background: 'rgb(248 250 252)', minWidth: 130 }} className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider border-r border-slate-200">Department</th>
+                    {/* Sticky: Client */}
+                    <th style={{ position: 'sticky', left: 310, zIndex: 20, background: 'rgb(248 250 252)', minWidth: 150 }} className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider border-r border-slate-200">Client</th>
+                    {/* Scrollable columns */}
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">Customer Location</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">Start Time</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">End Time</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">Assigned To</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">Status</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-slate-200">
+                  {paginatedTasks.map((task) => (
+                    <tr key={task.id} className="hover:bg-slate-50">
+                      {/* Sticky: Task Name */}
+                      <td style={{ position: 'sticky', left: 0, zIndex: 5, background: 'white', minWidth: 180 }} className="px-6 py-4 text-sm font-medium text-slate-900 border-r border-slate-200 whitespace-nowrap">{task.taskName || '-'}</td>
+                      {/* Sticky: Department */}
+                      <td style={{ position: 'sticky', left: 180, zIndex: 5, background: 'white', minWidth: 130 }} className="px-6 py-4 text-sm text-slate-600 border-r border-slate-200 whitespace-nowrap">
+                        <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-indigo-100 text-indigo-800">{task.department || '-'}</span>
+                      </td>
+                      {/* Sticky: Client */}
+                      <td style={{ position: 'sticky', left: 310, zIndex: 5, background: 'white', minWidth: 150 }} className="px-6 py-4 text-sm text-slate-600 border-r border-slate-200 whitespace-nowrap">{task.clientName || '-'}</td>
+                      {/* Scrollable */}
+                      <td className="px-6 py-4 text-sm text-slate-600 max-w-xs truncate whitespace-nowrap">{task.address || '-'}</td>
+                      <td className="px-6 py-4 text-sm text-slate-600 whitespace-nowrap">{formatDate(task.scheduledStartTime)}</td>
+                      <td className="px-6 py-4 text-sm text-slate-600 whitespace-nowrap">{formatDate(task.scheduledEndTime)}</td>
+                      <td className="px-6 py-4 text-sm text-slate-600 whitespace-nowrap">{task.assignedToEmployeeName || 'Unassigned'}</td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(task.status)}`}>{task.status}</span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
+                        <div className="flex gap-2">
+                          <button onClick={() => openEditModal(task)} className="text-indigo-600 hover:text-indigo-800"><Edit2 className="h-4 w-4" /></button>
+                          <button onClick={() => setDeleteTaskId(task.id)} className="text-rose-600 hover:text-rose-800"><Trash2 className="h-4 w-4" /></button>
                         </div>
-                      )}
-                    </div>
-                    
-                    <div className="mt-4 flex gap-2">
-                      <button
-                        onClick={() => openEditModal(task)}
-                        className="p-2 rounded-lg hover:bg-indigo-50 text-indigo-600 transition"
-                        title="Edit"
-                      >
-                        <Edit2 className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => setDeleteTaskId(task.id)}
-                        className="p-2 rounded-lg hover:bg-rose-50 text-rose-600 transition"
-                        title="Delete"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
         )}
 
         {/* Pagination */}
@@ -544,7 +454,6 @@ function TaskModal({ task, employees, customFields, departments, currentUser, on
   const [formData, setFormData] = useState({
     taskName: "",
     taskDescription: "",
-    customTaskType: "Default Task",
     department: "",
     assignedToEmployeeId: "",
     startDate: "",
@@ -556,7 +465,6 @@ function TaskModal({ task, employees, customFields, departments, currentUser, on
     clientId: "",
     customerAddressId: "",
     address: "",
-    internalTaskId: "",
     customFields: {},
   });
 
@@ -641,7 +549,6 @@ function TaskModal({ task, employees, customFields, departments, currentUser, on
     setFormData({
       taskName: task.taskName || "",
       taskDescription: task.taskDescription || "",
-      customTaskType: task.customTaskType || "Default Task",
       department: task.department || "",
       assignedToEmployeeId: task.assignedToEmployeeId ? String(task.assignedToEmployeeId) : "",
       startDate: task.startDate || "",
@@ -652,23 +559,16 @@ function TaskModal({ task, employees, customFields, departments, currentUser, on
       status: task.status || "INQUIRY",
       clientId: task.clientId ? String(task.clientId) : "",
       customerAddressId: task.customerAddressId ? String(task.customerAddressId) : "",
-      internalTaskId: task.internalTaskId || "",
       customFields: valuesMap,
     });
 
     fetchCustomFields(task.customTaskType || "Default Task");
   }, [task, currentUser]); // ✅ Only depend on task, not modalCustomFields
 
-  useEffect(() => {
-    // ✅ Fetch custom fields when task type changes
-    if (formData.customTaskType) {
-      fetchCustomFields(formData.customTaskType);
-    }
-  }, [formData.customTaskType]); // ✅ Only depend on task type
 
   const loadClients = async () => {
     try {
-      const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api.yashrajent.com';
+      const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080';
       const response = await fetch(`${API_BASE_URL}/api/clients`);
       const data = await response.json();
       setClients(data || []);
@@ -679,7 +579,7 @@ function TaskModal({ task, employees, customFields, departments, currentUser, on
 
   const fetchCustomerAddresses = async (clientId) => {
     try {
-      const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api.yashrajent.com';
+      const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080';
       const response = await fetch(`${API_BASE_URL}/api/clients/${clientId}/addresses`);
       const data = await response.json();
       
@@ -716,7 +616,7 @@ function TaskModal({ task, employees, customFields, departments, currentUser, on
 
   const fetchCustomFields = async (taskType) => {
     try {
-      const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api.yashrajent.com';
+      const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080';
       const response = await fetch(`${API_BASE_URL}/api/task-custom-fields?customTaskType=${encodeURIComponent(taskType)}`);
       const data = await response.json();
       setModalCustomFields(data || []);
@@ -748,7 +648,7 @@ function TaskModal({ task, employees, customFields, departments, currentUser, on
 
   const handleCreateCustomField = async () => {
     try {
-      const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "https://api.yashrajent.com";
+      const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080";
 
       const payload = {
         customTaskType: formData.customTaskType,
@@ -785,10 +685,10 @@ function TaskModal({ task, employees, customFields, departments, currentUser, on
     setLoading(true);
 
     try {
-      const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api.yashrajent.com';
+      const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080';
 
-      if (!formData.customerAddressId) {
-        toast.error("Customer location is required. Please select a customer address with coordinates.");
+      if (!formData.customerAddressId && !formData.clientId) {
+        toast.error("Please select a client and customer location.");
         return;
       }
       
@@ -800,7 +700,7 @@ function TaskModal({ task, employees, customFields, departments, currentUser, on
         id: task?.id,
         taskName: formData.taskName,
         taskDescription: formData.taskDescription,
-        customTaskType: formData.customTaskType,
+        customTaskType: "Default Task",
         department: formData.department,
         assignedToEmployeeId: formData.assignedToEmployeeId ? Number(formData.assignedToEmployeeId) : null,
         startDate: formData.startDate || null,
@@ -812,7 +712,6 @@ function TaskModal({ task, employees, customFields, departments, currentUser, on
         clientId: formData.clientId ? Number(formData.clientId) : null,
         customerAddressId: Number(formData.customerAddressId),
         address: formData.address,
-        internalTaskId: formData.internalTaskId,
 
         // ✅ IMPORTANT: send LIST, not OBJECT with correct key name
         customFieldValues: modalCustomFields.map((field) => ({
@@ -829,10 +728,20 @@ function TaskModal({ task, employees, customFields, departments, currentUser, on
         : `${API_BASE_URL}/api/tasks`;
       const method = task ? "PUT" : "POST";
 
+      const authUser = (() => {
+        try {
+          const raw = localStorage.getItem("user_data") || localStorage.getItem("user");
+          return raw ? JSON.parse(raw) : null;
+        } catch { return null; }
+      })();
+
       const response = await fetch(url, {
         method,
         headers: {
           'Content-Type': 'application/json',
+          'X-User-Id': String(authUser?.id ?? ""),
+          'X-User-Role': authUser?.role || authUser?.roleName || "",
+          'X-User-Department': authUser?.department || authUser?.departmentName || "",
         },
         body: JSON.stringify(task ? { ...payload, id: task.id } : payload)
       });
@@ -946,47 +855,17 @@ function TaskModal({ task, employees, customFields, departments, currentUser, on
               >
                 <option value="">Select employee</option>
                 {filteredEmployees.map(emp => {
-                  // Debug employee data
-                  console.log('🔍 Processing employee:', {
-                    id: emp.id,
-                    name: `${emp.firstName} ${emp.lastName}`,
-                    roleName: emp.roleName,
-                    departmentName: emp.departmentName,
-                    tlId: emp.tlId,
-                    tlFullName: emp.tlFullName,
-                    tlFirstName: emp.tlFirstName,
-                    tlLastName: emp.tlLastName
-                  });
-                  
-                  // Format like Organization page: Role + Department + TL mapping
                   let displayText = `${emp.firstName} ${emp.lastName}`;
-                  
-                  // Add role
-                  if (emp.roleName) {
-                    displayText += ` (${emp.roleName}`;
-                  } else {
-                    displayText += ` (Employee`;
+                  if (emp.roleName) displayText += ` (${emp.roleName}`;
+                  else displayText += ` (Employee`;
+                  if (emp.departmentName) displayText += ` - ${emp.departmentName}`;
+                  if (emp.roleName === 'EMPLOYEE' && emp.tlId) {
+                    const tlName = emp.tlFullName || `${emp.tlFirstName || ''} ${emp.tlLastName || ''}`.trim();
+                    if (tlName) displayText += `, TL: ${tlName}`;
                   }
-                  
-                  // Add department
-                  if (emp.departmentName) {
-                    displayText += ` - ${emp.departmentName}`;
-                  }
-                  
-                  // Add TL mapping for employees
-                  if (emp.roleName === 'EMPLOYEE' && emp.tlId && emp.tlFullName) {
-                    displayText += `, TL: ${emp.tlFullName}`;
-                  } else if (emp.roleName === 'EMPLOYEE' && emp.tlId && (emp.tlFirstName || emp.tlLastName)) {
-                    const tlName = `${emp.tlFirstName || ''} ${emp.tlLastName || ''}`.trim();
-                    if (tlName) {
-                      displayText += `, TL: ${tlName}`;
-                    }
-                  }
-                  
                   displayText += ')';
-                  
                   return (
-                    <option key={emp.id} value={emp.id}>
+                    <option key={emp.id} value={String(emp.id)}>
                       {displayText}
                     </option>
                   );
@@ -1000,52 +879,8 @@ function TaskModal({ task, employees, customFields, departments, currentUser, on
             </div>
           </div>
 
-          {/* Task Description */}
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">
-              Task Description
-            </label>
-            <textarea
-              name="taskDescription"
-              value={formData.taskDescription}
-              onChange={handleInputChange}
-              rows={4}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 focus:border-indigo-500 focus:ring-indigo-500"
-              placeholder="Enter task description"
-            />
-          </div>
-
-          {/* Task Type and Related Fields */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
-                Custom Task Type
-              </label>
-              <select
-                name="customTaskType"
-                value={formData.customTaskType}
-                onChange={handleInputChange}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 focus:border-indigo-500 focus:ring-indigo-500"
-              >
-                <option value="Default Task">Default Task</option>
-                <option value="Collect Payment">Collect Payment</option>
-                <option value="Site Visit">Site Visit</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
-                Internal Task ID
-              </label>
-              <input
-                name="internalTaskId"
-                value={formData.internalTaskId}
-                onChange={handleInputChange}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 focus:border-indigo-500 focus:ring-indigo-500"
-                placeholder="Enter internal task ID"
-              />
-            </div>
-
+          {/* Client + Location */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
                 Client
@@ -1189,10 +1024,25 @@ function TaskModal({ task, employees, customFields, departments, currentUser, on
             </label>
           </div>
 
-          {/* Dynamic Custom Fields */}
+          {/* Task Description — at end */}
+          <div className="border-t border-slate-200 pt-6">
+            <label className="block text-sm font-medium text-slate-700 mb-2">Task Description</label>
+            <textarea
+              name="taskDescription"
+              value={formData.taskDescription}
+              onChange={handleInputChange}
+              rows={4}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 focus:border-indigo-500 focus:ring-indigo-500"
+              placeholder="Enter task description"
+            />
+          </div>
+
+          {/* Dynamic Custom Fields — below description, hidden for TL */}
+          {currentUser?.role !== 'TL' && (
           <div className="border-t border-slate-200 pt-6">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-semibold text-slate-900">Custom Fields</h3>
+              {currentUser?.role !== 'TL' && (
               <button
                 type="button"
                 onClick={() => setShowAddCustomField((p) => !p)}
@@ -1200,6 +1050,7 @@ function TaskModal({ task, employees, customFields, departments, currentUser, on
               >
                 + Add Custom Field
               </button>
+              )}
             </div>
 
             {showAddCustomField && (
@@ -1325,6 +1176,7 @@ function TaskModal({ task, employees, customFields, departments, currentUser, on
               </div>
             )}
           </div>
+          )}
 
           {/* Form Actions */}
           <div className="flex justify-end gap-3 pt-6 border-t border-slate-200">

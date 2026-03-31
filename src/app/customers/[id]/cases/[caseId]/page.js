@@ -84,7 +84,7 @@ export default function CaseDetailModalPage() {
       formData.append("documentName", docType || file.name);
       formData.append("description", "");
 
-      const res = await fetch("https://api.yashrajent.com/api/case-documents/upload", {
+      const res = await fetch("http://localhost:8080/api/case-documents/upload", {
         method: "POST",
         body: formData,
       });
@@ -131,7 +131,7 @@ export default function CaseDetailModalPage() {
 
   function downloadDoc(doc) {
     if (!doc) return;
-    window.open(`https://api.yashrajent.com/api/case-documents/download/${doc.id}`, '_blank');
+    window.open(`http://localhost:8080/api/case-documents/download/${doc.id}`, '_blank');
   }
 
   const caseTitle = caseData?.title || caseData?.caseNumber || `Case #${caseId}`;
@@ -338,14 +338,14 @@ export default function CaseDetailModalPage() {
               </div>
               <div className="flex-1 bg-gray-100 p-1">
                 <iframe
-                  src={`https://api.yashrajent.com/api/case-documents/view/${viewingDoc.id}`}
+                  src={`http://localhost:8080/api/case-documents/view/${viewingDoc.id}`}
                   className="w-full h-full border-0 rounded-lg"
                   title="PDF Viewer"
                   style={{ minHeight: 'calc(90vh - 80px)' }}
                   onError={(e) => {
                     console.error('PDF load error:', e);
                     // Fallback: try opening in new tab if iframe fails
-                    window.open(`https://api.yashrajent.com/api/case-documents/view/${viewingDoc.id}`, '_blank');
+                    window.open(`http://localhost:8080/api/case-documents/view/${viewingDoc.id}`, '_blank');
                     e.target.style.display = 'none';
                     const errorDiv = document.createElement('div');
                     errorDiv.className = 'flex items-center justify-center h-full text-red-600';

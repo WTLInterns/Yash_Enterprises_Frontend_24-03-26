@@ -202,6 +202,12 @@ export default function EmployeeTrackingMap() {
     }
   }, [selectedEmployeeId, selectedDate]);
 
+  // ✅ FIX #7: 30s polling fallback in case WebSocket disconnects
+  useEffect(() => {
+    const interval = setInterval(fetchLive, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
   function focusEmployee(e) {
     if (!map || !maps) {
       console.warn("Map not ready yet");

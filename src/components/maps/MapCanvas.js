@@ -2,97 +2,75 @@
 
 import { useEffect, useRef } from "react";
 
-const DEFAULT_CENTER = { lat: 28.6139, lng: 77.2090 };
-const DEFAULT_ZOOM = 12;
-
-// Global flags to prevent multiple loads
-let isGoogleMapsLoaded = false;
-let isMapInitialized = false;
+const DEFAULT_CENTER = { lat: 20.5937, lng: 78.9629 }; // India center
+const DEFAULT_ZOOM = 5;
 
 export default function MapCanvas({ apiKey, onMapReady }) {
   const mapDivRef = useRef(null);
-  const mapRef = useRef(null);
+  const mapRef    = useRef(null);
+  const readyRef  = useRef(false); // per-instance flag — resets on unmount
 
   useEffect(() => {
-    // Strict prevention of multiple initializations
-    if (!apiKey || isMapInitialized) {
-      console.log("MapCanvas: Skipping - apiKey:", !!apiKey, "isMapInitialized:", isMapInitialized);
-      return;
-    }
-
-    // Check if Google Maps already loaded
-    if (window.google?.maps) {
-      console.log("MapCanvas: Google Maps already loaded, initializing map");
-      initializeMap();
-      return;
-    }
-
-    // Check if script already exists in DOM
-    const existingScript = document.getElementById("google-maps-script");
-    if (existingScript) {
-      console.log("MapCanvas: Script exists, waiting for load");
-      if (isGoogleMapsLoaded) {
-        initializeMap();
-      } else {
-        // Wait for script to load
-        existingScript.addEventListener('load', initializeMap, { once: true });
-      }
-      return;
-    }
-
-    // Load Google Maps script
-    console.log("MapCanvas: Loading Google Maps script");
-    const script = document.createElement("script");
-    script.id = "google-maps-script";
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&v=weekly&libraries=marker,visualization&callback=initMap&loading=async`;
-    script.async = true;
-    script.defer = true;
-    
-    window.initMap = () => {
-      console.log("MapCanvas: Google Maps callback triggered");
-      isGoogleMapsLoaded = true;
-      initializeMap();
-    };
-
-    script.onerror = (error) => {
-      console.error("MapCanvas: Failed to load Google Maps script", error);
-    };
-
-    document.head.appendChild(script);
+    if (!apiKey) return;
 
     function initializeMap() {
-      if (isMapInitialized || !mapDivRef.current) {
-        console.log("MapCanvas: initializeMap skipped - already initialized or no ref");
-        return;
-      }
+      if (readyRef.current || !mapDivRef.current) return;
+      if (!window.google?.maps) return;
 
       try {
-        const { Map, InfoWindow, visualization } = window.google.maps;
-        mapRef.current = new Map(mapDivRef.current, {
+        // ✅ FIX #2: Use window.google.maps.Map directly — avoids collision with JS built-in Map
+        const mapInstance = new window.google.maps.Map(mapDivRef.current, {
           center: DEFAULT_CENTER,
           zoom: DEFAULT_ZOOM,
           mapId: "employee_tracking_map",
         });
 
-        const info = new InfoWindow();
-        isMapInitialized = true;
+        const infoInstance = new window.google.maps.InfoWindow();
+        readyRef.current = true;
         console.log("MapCanvas: Map initialized successfully");
-        
+
         if (onMapReady) {
-          onMapReady(mapRef.current, window.google.maps, visualization);
+          onMapReady(mapInstance, window.google.maps, infoInstance);
         }
       } catch (error) {
         console.error("MapCanvas: Failed to initialize map", error);
       }
     }
 
-    return () => {
-      // Cleanup only the callback, not the script
-      if (window.initMap) {
-        delete window.initMap;
-      }
+    // Already loaded
+    if (window.google?.maps) {
+      initializeMap();
+      return;
+    }
+
+    // Script already in DOM — wait for it
+    const existingScript = document.getElementById("google-maps-script");
+    if (existingScript) {
+      console.log("MapCanvas: Script exists, waiting for load");
+      existingScript.addEventListener("load", initializeMap, { once: true });
+      return;
+    }
+
+    // ✅ FIX #3: Set window.initMap BEFORE appending the script
+    window.initMap = () => {
+      console.log("MapCanvas: Google Maps callback triggered");
+      initializeMap();
     };
-  }, [apiKey, onMapReady]);
+
+    const script = document.createElement("script");
+    script.id  = "google-maps-script";
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&v=weekly&libraries=marker,visualization&callback=initMap&loading=async`;
+    script.async = true;
+    script.defer = true;
+    script.onerror = () => console.error("MapCanvas: Failed to load Google Maps script");
+    document.head.appendChild(script);
+
+    return () => {
+      // ✅ FIX #4: Clean up per-instance flag on unmount so map re-inits on navigation
+      readyRef.current = false;
+      if (window.initMap) delete window.initMap;
+    };
+  }, [apiKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div

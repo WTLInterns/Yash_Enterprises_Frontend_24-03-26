@@ -18,7 +18,7 @@ export default function CustomerExcelUploadModal({ isOpen, onClose, onUploadSucc
 
   const handleDownloadTemplate = async () => {
     try {
-      const res = await fetch("https://api.yashrajent.com/api/deals/download-template");
+      const res = await fetch("http://localhost:8080/api/deals/download-template");
       if (!res.ok) throw new Error("Template download failed");
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
@@ -42,7 +42,7 @@ export default function CustomerExcelUploadModal({ isOpen, onClose, onUploadSucc
       const authUser = getAuthUser();
       const formData = new FormData();
       formData.append("file", file);
-      const res = await fetch("https://api.yashrajent.com/api/deals/upload-excel", {
+      const res = await fetch("http://localhost:8080/api/deals/upload-excel", {
         method: "POST",
         headers: {
           "X-User-Id": authUser?.id || "",

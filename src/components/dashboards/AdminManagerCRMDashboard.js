@@ -192,88 +192,110 @@ export default function AdminManagerCRMDashboard({ userName, userRole }) {
   });
 
   const funnelCounts = useMemo(() => {
-    let stages = getStagesForDepartment(selectedDepartment === 'ALL' ? departments[0] : selectedDepartment);
-    
-    if (!stages || stages.length === 0) {
-      if (selectedDepartment === 'ACCOUNT' || (selectedDepartment === 'ALL' && departments[0] === 'ACCOUNT')) {
-        stages = [
-          { stageCode: 'INVENTORY', stageName: 'Inventory', stageOrder: 1 },
-          { stageCode: 'MAKE_BILL', stageName: 'Make Bill', stageOrder: 2 },
-          { stageCode: 'BILL_SUBMIT', stageName: 'Bill Submit', stageOrder: 3 },
-          { stageCode: 'BILL_FOLLOWUP', stageName: 'Bill Followup', stageOrder: 4 },
-          { stageCode: 'BILL_PASS', stageName: 'Bill Pass', stageOrder: 5 },
-          { stageCode: 'CLOSE_WIN', stageName: 'Close Win', stageOrder: 6 },
-          { stageCode: 'CLOSE_LOST', stageName: 'Close Lost', stageOrder: 7 }
-        ];
-      } else {
-        stages = [
-          { stageCode: 'LEAD', stageName: 'Lead', stageOrder: 1 },
-          { stageCode: 'CONTACTED', stageName: 'Contacted', stageOrder: 2 },
-          { stageCode: 'QUALIFIED', stageName: 'Qualified', stageOrder: 3 },
-          { stageCode: 'PROPOSAL', stageName: 'Proposal', stageOrder: 4 },
-          { stageCode: 'NEGOTIATION', stageName: 'Negotiation', stageOrder: 5 },
-          { stageCode: 'CLOSE_WIN', stageName: 'Close Win', stageOrder: 6 },
-          { stageCode: 'CLOSE_LOST', stageName: 'Close Lost', stageOrder: 7 }
-        ];
-      }
+    if (!deals.length) return [];
+
+    if (selectedDepartment === 'ALL') {
+      // Aggregate all deals by stageCode
+      const stageMap = {};
+      deals.forEach(deal => {
+        const code = deal.stageCode || deal.stage || '';
+        if (code) stageMap[code] = (stageMap[code] || 0) + 1;
+      });
+      return Object.entries(stageMap)
+        .sort((a, b) => b[1] - a[1])
+        .map(([stage, count]) => ({ stage, count }));
     }
 
-    const filteredDeals = selectedDepartment === 'ALL' 
-      ? deals 
-      : deals.filter(d => d.department === selectedDepartment);
+    // Specific department
+    const deptDeals = deals.filter(d => d.department === selectedDepartment);
+    const stages = getStagesForDepartment(selectedDepartment) || [];
 
+    if (!stages.length) {
+      // No stage config — derive from actual deal data
+      const stageMap = {};
+      deptDeals.forEach(d => {
+        const code = d.stageCode || d.stage || '';
+        if (code) stageMap[code] = (stageMap[code] || 0) + 1;
+      });
+      return Object.entries(stageMap).map(([stage, count]) => ({ stage, count }));
+    }
+
+    // Match stageCode as-is (no uppercase transform — deals page doesn't transform)
     const stageMap = {};
-    stages.forEach(stage => { stageMap[stage.stageCode] = 0; });
-    filteredDeals.forEach(deal => {
-      const stageCode = deal.stageCode || deal.stage;
-      if (stageMap.hasOwnProperty(stageCode)) stageMap[stageCode]++;
+    stages.forEach(s => { stageMap[s.stageCode] = 0; });
+    deptDeals.forEach(deal => {
+      const code = deal.stageCode || deal.stage || '';
+      if (stageMap.hasOwnProperty(code)) stageMap[code]++;
+      // Also try uppercase match as fallback
+      else if (stageMap.hasOwnProperty(code.toUpperCase())) stageMap[code.toUpperCase()]++;
     });
-
-    return Object.entries(stageMap).map(([stage, count]) => ({ stage, count }));
-  }, [deals, selectedDepartment, departments, getStagesForDepartment]);
+    return stages.map(s => ({ stage: s.stageCode, count: stageMap[s.stageCode] || 0 }));
+  }, [deals, selectedDepartment, getStagesForDepartment]);
 
   const bankDepartmentStats = useMemo(() => {
-    if (!deals.length || !bankRecords.length) return [];
+    if (!deals.length) return [];
 
-    const result = bankRecords.map(bank => {
-      const deptCounts = {};
-      departments.forEach(dept => {
-        deptCounts[dept] = deals.filter(
-          d => d.relatedBankName === bank.name && d.department === dept
-        ).length;
-      });
-      const totalDeals = deals.filter(d => d.relatedBankName === bank.name).length;
-      return { bankName: bank.name || bank.bankName, bankId: bank.id, totalDeals, departments: deptCounts };
+    // One row per unique Bank + Branch + Taluka from actual deal data
+    const rowMap = {};
+    deals.forEach(d => {
+      const bankName   = d.bankName || d.relatedBankName || '-';
+      const branchName = d.branchName || d.branch || '-';
+      const taluka     = d.taluka || '-';
+      const district   = d.district || '-';
+      const key = bankName + '||' + branchName + '||' + taluka + '||' + district;
+      if (!rowMap[key]) {
+        rowMap[key] = { bankName, branchName, taluka, district, totalDeals: 0, departments: {} };
+        departments.forEach(dept => { rowMap[key].departments[dept] = 0; });
+      }
+      rowMap[key].totalDeals++;
+      if (d.department && rowMap[key].departments.hasOwnProperty(d.department)) {
+        rowMap[key].departments[d.department]++;
+      }
     });
 
-    result.sort((a, b) => b.totalDeals - a.totalDeals);
-    return result;
-  }, [deals, bankRecords, departments]);
+    return Object.values(rowMap)
+      .sort((a, b) => a.bankName.localeCompare(b.bankName) || a.branchName.localeCompare(b.branchName));
+  }, [deals, departments]);
 
   const dashboardStats = useMemo(() => {
-    if (!deals.length) return null;
-    const stats = {
-      totalDeals: deals.length,
-      totalValue: deals.reduce((sum, deal) => sum + (Number(deal.valueAmount) || 0), 0),
-      departmentStats: {},
-      pipelineCounts: {}
-    };
+    const totalValue = deals.reduce((sum, deal) => sum + (Number(deal.valueAmount) || 0), 0);
+    const departmentStats = {};
     departments.forEach(dept => {
       const deptDeals = deals.filter(d => d.department === dept);
-      stats.departmentStats[dept] = {
+      departmentStats[dept] = {
         count: deptDeals.length,
         value: deptDeals.reduce((sum, deal) => sum + (Number(deal.valueAmount) || 0), 0)
       };
     });
-    return stats;
+    return { totalDeals: deals.length, totalValue, departmentStats };
   }, [deals, departments]);
 
   const fetchDashboardData = async () => {
     setLoading(true);
     try {
+      // Read auth user exactly like customers page does
+      const getAuthUser = () => {
+        try {
+          let raw = null;
+          if (typeof window !== 'undefined') {
+            const tabId = sessionStorage.getItem('tab_id');
+            if (tabId) raw = sessionStorage.getItem(`user_data_${tabId}`);
+            if (!raw) raw = localStorage.getItem('user_data');
+          }
+          return raw ? JSON.parse(raw) : null;
+        } catch { return null; }
+      };
+      const authUser = getAuthUser();
+
       const [customersData, dealsData, tasksData, productsData, bankData] = await Promise.all([
         departmentApiService.getCustomers().catch(() => []),
-        backendApi.get("/deals").catch(() => []),
+        // ✅ Use backendApi exactly like customers page - it auto-adds X-User headers
+        backendApi.get("/deals/filtered", {
+          headers: {
+            "X-User-Role":       authUser?.role ?? "",
+            "X-User-Department": authUser?.department ?? "",
+          }
+        }).catch(() => []),
         backendApi.get("/tasks").catch(() => []),
         backendApi.get("/products").catch(() => []),
         backendApi.get("/banks").catch(() => [])
@@ -292,23 +314,25 @@ export default function AdminManagerCRMDashboard({ userName, userRole }) {
       const normalizedProducts = normalizeList(productsData);
       const normalizedBanks = normalizeList(bankData);
 
-      const normalizedDeals = normalizedDealsList.map((d) => ({
+      // Normalize deals exactly like customers page
+      const allDeals = normalizedDealsList.map((d) => ({
         ...d,
-        clientId: d.clientId ?? d.client_id ?? d.client ?? null,
+        clientId: d.clientId ?? d.client_id ?? (typeof d.client === 'object' ? d.client?.id : d.client) ?? null,
         stageCode: d.stage || d.stageCode || "",
-        department: d.department || userRole || 'ALL',
+        department: d.department || "",
         valueAmount: d.calculatedValue ?? d.valueAmount ?? d.value_amount ?? 0,
       }));
 
+      // Use ALL deals for stats (not deduplicated) so department counts are accurate
       setCustomers(normalizedCustomers);
-      setDeals(normalizedDeals);
-      setTasks(normalizedTasks);
+      setDeals(allDeals);
       setProducts(normalizedProducts);
       setBankRecords(normalizedBanks);
+      setTasks(normalizedTasks);
 
       setChartData({
         departmentByAmount: departments.map(dept => {
-          const deptDeals = normalizedDeals.filter(deal => deal.department === dept);
+          const deptDeals = allDeals.filter(deal => deal.department === dept);
           return {
             department: dept,
             amount: deptDeals.reduce((sum, deal) => sum + (Number(deal.valueAmount) || 0), 0),
@@ -319,19 +343,13 @@ export default function AdminManagerCRMDashboard({ userName, userRole }) {
 
       const dynamicTableData = normalizedCustomers.slice(0, 10).map((customer, index) => ({
         id: customer.id || index + 1,
-        accountNo: customer.accountNo || `ACC${index + 1}`,
-        customerName: customer.customerName || customer.fullName || 'Unknown',
-        department: customer.department || 'Unassigned',
-        stage: normalizedDeals.find(d => d.clientId === customer.id)?.stageCode || 'NEW_LEAD',
-        amount: normalizedDeals.find(d => d.clientId === customer.id)?.valueAmount || 0,
-        status: customer.status || 'Active'
+        customerName: customer.name || customer.customerName || 'Unknown',
+        department: allDeals.find(d => String(d.clientId) === String(customer.id))?.department || 'Unassigned',
+        stage: allDeals.find(d => String(d.clientId) === String(customer.id))?.stageCode || '',
+        amount: allDeals.find(d => String(d.clientId) === String(customer.id))?.valueAmount || 0,
       }));
       setTableData(dynamicTableData);
-      setPagination({
-        page: 1, limit: 10,
-        total: normalizedCustomers.length,
-        totalPages: Math.ceil(normalizedCustomers.length / 10)
-      });
+      setPagination({ page: 1, limit: 10, total: normalizedCustomers.length, totalPages: Math.ceil(normalizedCustomers.length / 10) });
     } catch (error) {
       console.error('[DASHBOARD] Error fetching data:', error);
       setCustomers([]); setDeals([]); setTasks([]); setProducts([]); setBankRecords([]);
@@ -400,36 +418,33 @@ export default function AdminManagerCRMDashboard({ userName, userRole }) {
   };
 
   // ✅ DYNAMIC DASHBOARD CARDS
-  const dashboardCards = useMemo(() => {
-    if (!dashboardStats) return [];
-
-    return [
-      {
-        title: "Total Deals",
-        value: dashboardStats.totalDeals.toLocaleString(),
-        icon: <BarChart3 className="h-6 w-6" />,
-        color: "blue"
-      },
-      {
-        title: "Pipeline Value",
-        value: `₹${(dashboardStats.totalValue / 100000).toFixed(1)}L`,
-        icon: <DollarSign className="h-6 w-6" />,
-        color: "green"
-      },
-      {
-        title: "Active Customers",
-        value: customers.length.toLocaleString(),
-        icon: <Users className="h-6 w-6" />,
-        color: "purple"
-      },
-      {
-        title: "Departments",
-        value: departments.length,
-        icon: <Building2 className="h-6 w-6" />,
-        color: "orange"
-      }
-    ];
-  }, [dashboardStats, customers.length, departments.length]);
+  const dashboardCards = useMemo(() => [
+    {
+      title: "Total Customers",
+      value: customers.length.toLocaleString(),
+      icon: <Users className="h-6 w-6" />,
+      color: "blue"
+    },
+    {
+      title: "Total Deals",
+      value: deals.length.toLocaleString(),
+      subtitle: `across ${customers.length} customers`,
+      icon: <BarChart3 className="h-6 w-6" />,
+      color: "indigo"
+    },
+    {
+      title: "Pipeline Value",
+      value: `₹${(dashboardStats.totalValue / 100000).toFixed(1)}L`,
+      icon: <DollarSign className="h-6 w-6" />,
+      color: "green"
+    },
+    {
+      title: "Departments",
+      value: departments.length,
+      icon: <Building2 className="h-6 w-6" />,
+      color: "orange"
+    }
+  ], [dashboardStats, customers.length, deals.length, departments.length]);
 
   // ✅ HANDLE PAGE CHANGE
   const handlePageChange = (newPage) => {
@@ -441,298 +456,205 @@ export default function AdminManagerCRMDashboard({ userName, userRole }) {
 
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
-      {/* ✅ HEADER */}
-      <div className="mb-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">
-              CRM System - Yashraj
-            </h1>
-            <p className="text-gray-600 mt-1">
-              Welcome back, {userName || 'Admin User'}
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={fetchDashboardData}
-              disabled={loading}
-              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-              Refresh
-            </button>
-          </div>
+      {/* HEADER */}
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">CRM System - Yashraj</h1>
+          <p className="text-gray-600 mt-1">Welcome back, {userName || 'Admin User'}</p>
         </div>
+        <button
+          onClick={fetchDashboardData}
+          disabled={loading}
+          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+        >
+          <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+          Refresh
+        </button>
       </div>
 
-      {/* ✅ DYNAMIC DASHBOARD CARDS */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      {/* SUMMARY CARDS */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {dashboardCards.map((card, index) => (
-          <div key={index} className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
+          <div key={index} className="bg-white rounded-xl shadow-sm p-5 border border-gray-200">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">{card.title}</p>
-                <p className="text-2xl font-bold text-gray-900 mt-2">{card.value}</p>
+                <p className="text-sm font-medium text-gray-500">{card.title}</p>
+                <p className="text-2xl font-bold text-gray-900 mt-1">{card.value}</p>
+                {card.subtitle && <p className="text-xs text-gray-400 mt-0.5">{card.subtitle}</p>}
               </div>
-              <div className={`p-3 rounded-lg bg-${card.color}-100`}>
-                <span className="text-2xl text-${card.color}-600">{card.icon}</span>
+              <div className={`p-3 rounded-lg bg-${card.color}-100 text-${card.color}-600`}>
+                {card.icon}
               </div>
             </div>
           </div>
         ))}
       </div>
 
-      {/* ✅ FILTERS SECTION */}
-      <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200 mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <Filter className="h-5 w-5 text-gray-500" />
-            <h3 className="text-lg font-semibold text-gray-900">Filters</h3>
-          </div>
-          <button
-            onClick={resetFilters}
-            className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-          >
-            Reset
-          </button>
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-          {/* Date Range */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
-            <input
-              type="date"
-              value={filters.dateRange.start}
-              onChange={(e) => handleFilterChange('dateRange', { ...filters.dateRange, start: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
-            <input
-              type="date"
-              value={filters.dateRange.end}
-              onChange={(e) => handleFilterChange('dateRange', { ...filters.dateRange, end: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-          </div>
-
-          {/* Department Filter */}
-          {(userRole === 'ADMIN' || userRole === 'MANAGER') && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Department</label>
-              <select
-                value={filters.department}
-                onChange={(e) => handleFilterChange('department', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              >
-                <option value="">All Departments</option>
-                {departments.map(dept => (
-                  <option key={dept} value={dept}>{dept}</option>
-                ))}
-              </select>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* ✅ ROW 1: FUNNEL CHART + DATA */}
+      {/* ROW 1: FUNNEL (left) + DEPARTMENT STATISTICS (right) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        {/* Left Side - Funnel Chart */}
+
+        {/* Funnel Chart */}
         <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-200">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900">
-              Pipeline Funnel - Dynamic Counts
-            </h3>
-            
-            {/* Department Dropdown for Funnel */}
+            <h3 className="text-lg font-semibold text-gray-900">Pipeline Funnel</h3>
             <div className="flex items-center gap-2">
-              <label className="text-sm font-medium text-gray-700">Department:</label>
+              <label className="text-xs font-medium text-gray-600">Dept:</label>
               <div className="relative">
-                <select
-                  value={selectedDepartment}
-                  onChange={(e) => setSelectedDepartment(e.target.value)}
-                  className="appearance-none px-3 py-1 pr-6 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white text-sm"
-                >
-                  <option value="ALL">All Departments</option>
-                  {departments.map(dept => (
-                    <option key={dept} value={dept}>{dept}</option>
-                  ))}
+                <select value={selectedDepartment} onChange={e => setSelectedDepartment(e.target.value)}
+                  className="appearance-none pl-3 pr-7 py-1.5 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                  <option value="ALL">All</option>
+                  {departments.map(dept => <option key={dept} value={dept}>{dept}</option>)}
                 </select>
-                <ChevronDown className="absolute right-1 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500 pointer-events-none" />
+                <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-500 pointer-events-none" />
               </div>
             </div>
           </div>
-          
-          {/* Dynamic Funnel Chart with Real Counts */}
-          <FunnelChart 
-            data={funnelCounts} 
-            department={selectedDepartment} 
-            stages={(() => {
-              let stages = selectedDepartment === 'ALL' 
-                ? getStagesForDepartment(departments[0]) || []
-                : getStagesForDepartment(selectedDepartment) || [];
-              if (!stages || stages.length === 0) {
-                if (selectedDepartment === 'ACCOUNT' || (selectedDepartment === 'ALL' && departments[0] === 'ACCOUNT')) {
-                  stages = [
-                    { stageCode: 'INVENTORY', stageName: 'Inventory', stageOrder: 1 },
-                    { stageCode: 'MAKE_BILL', stageName: 'Make Bill', stageOrder: 2 },
-                    { stageCode: 'BILL_SUBMIT', stageName: 'Bill Submit', stageOrder: 3 },
-                    { stageCode: 'BILL_FOLLOWUP', stageName: 'Bill Followup', stageOrder: 4 },
-                    { stageCode: 'BILL_PASS', stageName: 'Bill Pass', stageOrder: 5 },
-                    { stageCode: 'CLOSE_WIN', stageName: 'Close Win', stageOrder: 6 },
-                    { stageCode: 'CLOSE_LOST', stageName: 'Close Lost', stageOrder: 7 }
-                  ];
-                } else {
-                  stages = [
-                    { stageCode: 'LEAD', stageName: 'Lead', stageOrder: 1 },
-                    { stageCode: 'CONTACTED', stageName: 'Contacted', stageOrder: 2 },
-                    { stageCode: 'QUALIFIED', stageName: 'Qualified', stageOrder: 3 },
-                    { stageCode: 'PROPOSAL', stageName: 'Proposal', stageOrder: 4 },
-                    { stageCode: 'NEGOTIATION', stageName: 'Negotiation', stageOrder: 5 },
-                    { stageCode: 'CLOSE_WIN', stageName: 'Close Win', stageOrder: 6 },
-                    { stageCode: 'CLOSE_LOST', stageName: 'Close Lost', stageOrder: 7 }
-                  ];
-                }
-              }
-              return stages;
-            })()}
+          <FunnelChart
+            data={funnelCounts}
+            department={selectedDepartment}
+            stages={selectedDepartment === 'ALL'
+              ? funnelCounts.map((fc, i) => ({ stageCode: fc.stage, stageName: fc.stage, stageOrder: i + 1 }))
+              : (() => {
+                  const s = getStagesForDepartment(selectedDepartment) || [];
+                  return s.length > 0 ? s : funnelCounts.map((fc, i) => ({ stageCode: fc.stage, stageName: fc.stage, stageOrder: i + 1 }));
+                })()
+            }
           />
         </div>
 
-        {/* Right Side - Bank Pipeline Summary */}
-        <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900">
-              Bank Pipeline Summary
-            </h3>
-            <div className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
-              {bankDepartmentStats.length} Banks
-            </div>
-          </div>
-          
-          <div className="space-y-4 max-h-96 overflow-y-auto">
-            {bankDepartmentStats.length > 0 ? (
-              bankDepartmentStats.map((bank) => (
-                <div
-                  key={bank.bankId}
-                  className="p-4 bg-gray-50 rounded-lg border border-gray-200"
-                >
-                  <div className="flex justify-between items-center mb-3">
-                    <span className="font-semibold text-gray-900 text-base">
-                      {bank.bankName}
-                    </span>
-                    <span className="text-sm text-gray-600 bg-white px-3 py-1 rounded-full border">
-                      Total: {bank.totalDeals}
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-2 text-xs">
-                    {departments.map((dept) => (
-                      <div
-                        key={dept}
-                        className={`flex justify-between items-center p-2 rounded border ${
-                          bank.departments[dept] > 0 
-                            ? 'bg-white border-indigo-200' 
-                            : 'bg-gray-100 border-gray-200'
-                        }`}
-                      >
-                        <span className="font-medium text-gray-700">{dept}</span>
-                        <span className={`font-bold ${
-                          bank.departments[dept] > 0 
-                            ? 'text-indigo-600' 
-                            : 'text-gray-400'
-                        }`}>
-                          {bank.departments[dept]}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-
-                  {bank.totalDeals === 0 && (
-                    <div className="text-center py-2 text-xs text-gray-500">
-                      No deals in any department
-                    </div>
-                  )}
-                </div>
-              ))
-            ) : (
-              <div className="text-center py-8">
-                <div className="text-gray-500">
-                  <div className="text-lg font-medium mb-2">No bank data available</div>
-                  <div className="text-sm">Please ensure banks and deals are loaded</div>
-                </div>
-              </div>
-            )}
-          </div>
-          
-          {bankDepartmentStats.length > 0 && (
-            <div className="mt-4 pt-4 border-t border-gray-200">
-              <div className="text-xs text-gray-500 text-center">
-                Showing {bankDepartmentStats.length} banks • {departments.length} departments each
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* ✅ ROW 2: GRAPHS + DATA */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        {/* Left Side - Department by Amount Chart */}
-        <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Department by Amount</h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={chartData.departmentByAmount}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="department" />
-              <YAxis />
-              <RechartsTooltip formatter={(value) => `₹${value.toLocaleString()}`} />
-              <Bar dataKey="amount" fill="#8884d8" />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* Right Side - Department Stats Data */}
+        {/* Department Statistics */}
         <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Department Statistics</h3>
-          <div className="space-y-4">
+          <div className="space-y-3">
             {(() => {
-              // 🔥 FIXED: Calculate department stats from deals data
               const deptStats = {};
+              departments.forEach(dept => { deptStats[dept] = { count: 0, amount: 0 }; });
               deals.forEach(deal => {
-                if (deal.department) {
-                  if (!deptStats[deal.department]) {
-                    deptStats[deal.department] = { count: 0, amount: 0 };
-                  }
-                  deptStats[deal.department].count++;
-                  deptStats[deal.department].amount += Number(deal.valueAmount) || 0;
+                const d = deal.department;
+                if (d) {
+                  if (!deptStats[d]) deptStats[d] = { count: 0, amount: 0 };
+                  deptStats[d].count++;
+                  deptStats[d].amount += Number(deal.valueAmount) || 0;
                 }
               });
-
-              // Ensure all departments are shown even with 0 values
-              departments.forEach(dept => {
-                if (!deptStats[dept]) {
-                  deptStats[dept] = { count: 0, amount: 0 };
-                }
-              });
-
               return Object.entries(deptStats).map(([dept, stats]) => (
                 <div key={dept} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-100">
                   <div>
-                    <p className="text-sm font-medium text-gray-900">{dept}</p>
+                    <p className="text-sm font-semibold text-gray-900">{dept}</p>
                     <p className="text-xs text-gray-500">{stats.count} deals</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-semibold text-gray-900">₹{stats.amount.toLocaleString()}</p>
-                    <p className="text-xs text-gray-500">Total Value</p>
+                    <p className="text-sm font-bold text-indigo-700">₹{stats.amount.toLocaleString()}</p>
+                    <p className="text-xs text-gray-400">Total Value</p>
                   </div>
                 </div>
               ));
             })()}
           </div>
         </div>
+      </div>
+
+      {/* ROW 2: BANK-WISE TABLE — banks as rows, departments as columns */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 mb-6">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <h3 className="text-lg font-semibold text-gray-900">Bank-wise Deal Count by Department</h3>
+          <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+            {bankDepartmentStats.length} banks with deals
+          </span>
+        </div>
+
+        {bankDepartmentStats.length === 0 ? (
+          <div className="py-12 text-center text-gray-400 text-sm">
+            {deals.length === 0 ? 'Loading data...' : 'No bank data found. Ensure deals have bankId or bankName set.'}
+          </div>
+        ) : (
+          <div style={{maxHeight:'480px',overflowY:'auto',overflowX:'auto'}}>
+            <table className="min-w-full text-sm">
+              <thead className="bg-slate-50" style={{position:'sticky',top:0,zIndex:30}}>
+                <tr>
+                  <th style={{position:'sticky',left:0,zIndex:20,background:'rgb(248 250 252)',minWidth:'160px'}}
+                    className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider border-r border-gray-200 whitespace-nowrap">
+                    Bank
+                  </th>
+                  <th style={{position:'sticky',left:'160px',zIndex:20,background:'rgb(248 250 252)',minWidth:'130px'}}
+                    className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider border-r border-gray-200 whitespace-nowrap">
+                    Branch
+                  </th>
+                  <th style={{position:'sticky',left:'290px',zIndex:20,background:'rgb(248 250 252)',minWidth:'120px'}}
+                    className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider border-r border-gray-200 whitespace-nowrap">
+                    Taluka
+                  </th>
+                  <th style={{position:'sticky',left:'410px',zIndex:20,background:'rgb(248 250 252)',minWidth:'120px'}}
+                    className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider border-r border-gray-200 whitespace-nowrap">
+                    District
+                  </th>
+                  {departments.map(dept => (
+                    <th key={dept} className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap">{dept}</th>
+                  ))}
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-indigo-700 uppercase tracking-wider bg-indigo-50 whitespace-nowrap">Total</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {bankDepartmentStats.map(bank => (
+                  <tr key={`${bank.bankName}||${bank.branchName}||${bank.taluka}||${bank.district}`} className="hover:bg-gray-50">
+                    <td style={{position:'sticky',left:0,zIndex:10,background:'white',minWidth:'160px'}}
+                      className="px-4 py-3 font-medium text-gray-900 border-r border-gray-100 whitespace-nowrap">
+                      {bank.bankName}
+                    </td>
+                    <td style={{position:'sticky',left:'160px',zIndex:10,background:'white',minWidth:'130px'}}
+                      className="px-4 py-3 text-xs text-gray-500 border-r border-gray-100 whitespace-nowrap">
+                      {bank.branchName}
+                    </td>
+                    <td style={{position:'sticky',left:'290px',zIndex:10,background:'white',minWidth:'120px'}}
+                      className="px-4 py-3 text-xs text-gray-500 border-r border-gray-100 whitespace-nowrap">
+                      {bank.taluka}
+                    </td>
+                    <td style={{position:'sticky',left:'410px',zIndex:10,background:'white',minWidth:'120px'}}
+                      className="px-4 py-3 text-xs text-gray-500 border-r border-gray-100 whitespace-nowrap">
+                      {bank.district}
+                    </td>
+                    {departments.map(dept => (
+                      <td key={dept} className="px-4 py-3 text-center">
+                        {bank.departments[dept] > 0
+                          ? <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 font-bold text-xs">{bank.departments[dept]}</span>
+                          : <span className="text-gray-300 text-xs">—</span>
+                        }
+                      </td>
+                    ))}
+                    <td className="px-4 py-3 text-center">
+                      <span className="inline-flex items-center justify-center px-3 py-1 rounded-full bg-indigo-600 text-white font-bold text-xs">{bank.totalDeals}</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot className="bg-slate-50 border-t-2 border-gray-200">
+                <tr>
+                  <td style={{position:'sticky',left:0,zIndex:10,background:'rgb(248 250 252)',minWidth:'160px'}}
+                    className="px-4 py-3 font-bold text-gray-900 border-r border-gray-200">Total</td>
+                  <td style={{position:'sticky',left:'160px',zIndex:10,background:'rgb(248 250 252)',minWidth:'130px'}}
+                    className="px-4 py-3 border-r border-gray-200"></td>
+                  <td style={{position:'sticky',left:'290px',zIndex:10,background:'rgb(248 250 252)',minWidth:'120px'}}
+                    className="px-4 py-3 border-r border-gray-200"></td>
+                  <td style={{position:'sticky',left:'410px',zIndex:10,background:'rgb(248 250 252)',minWidth:'120px'}}
+                    className="px-4 py-3 border-r border-gray-200"></td>
+                  {departments.map(dept => {
+                    const total = bankDepartmentStats.reduce((s, b) => s + (b.departments[dept] || 0), 0);
+                    return (
+                      <td key={dept} className="px-4 py-3 text-center">
+                        <span className="font-bold text-gray-800">{total || '—'}</span>
+                      </td>
+                    );
+                  })}
+                  <td className="px-4 py-3 text-center">
+                    <span className="font-bold text-indigo-700">
+                      {bankDepartmentStats.reduce((s, b) => s + b.totalDeals, 0)}
+                    </span>
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

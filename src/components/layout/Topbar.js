@@ -377,7 +377,7 @@ export default function Topbar({ tabs, activeTabKey, onTabClick }) {
   // ✅ React toast notifications are working
 
   return (
-    <div className="border-b border-slate-200/70 bg-white/80 px-4 sm:px-6 backdrop-blur relative z-10">
+    <div className="sticky top-0 z-30 border-b border-slate-200/70 bg-white/80 px-4 sm:px-6 backdrop-blur">
       <div className="flex items-center justify-between gap-4">
         <div className="flex gap-4 sm:gap-6 overflow-x-auto scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent max-w-full">
           {tabs.map(tab => {

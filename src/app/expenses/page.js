@@ -241,7 +241,6 @@ export default function ExpenseOverviewPage() {
   };
 
   async function exportExcel() {
-    // filter by export options
     let rows = [...expenses];
 
     if (exportType === 'employee' && exportEmployeeId) {
@@ -276,38 +275,156 @@ export default function ExpenseOverviewPage() {
       cell.alignment = { vertical: 'middle', horizontal: 'center' };
     });
 
-    rows.forEach(expense => {
-      const row = worksheet.addRow({
-        employeeName:    expense.employeeName    || '',
-        clientName:      expense.clientName      || '',
-        departmentName:  expense.departmentName  || '',
-        category:        expense.category        || '',
-        description:     expense.description     || '',
-        amount:          expense.amount          || 0,
-        expenseDate:     expense.expenseDate     || '',
-        status:          expense.status          || '',
-        rejectionReason: expense.rejectionReason || '',
+    // Group by employee name, sort each group by date
+    const grouped = {};
+    rows.forEach(e => {
+      const key = e.employeeName || 'Unknown';
+      if (!grouped[key]) grouped[key] = [];
+      grouped[key].push(e);
+    });
+    const empNames = Object.keys(grouped).sort((a, b) => a.localeCompare(b));
+    const summaryMap = {};
+
+    empNames.forEach(empName => {
+      const empRows = grouped[empName].slice().sort((a, b) =>
+        (a.expenseDate || '').localeCompare(b.expenseDate || '')
+      );
+
+      // Blue employee name banner row
+      const empHeaderRow = worksheet.addRow([`👤  ${empName}`, '', '', '', '', '', '', '', '']);
+      worksheet.mergeCells(`A${empHeaderRow.number}:I${empHeaderRow.number}`);
+      empHeaderRow.getCell(1).font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
+      empHeaderRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1565C0' } };
+      empHeaderRow.getCell(1).alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+      empHeaderRow.height = 20;
+
+      // Data rows sorted by date
+      empRows.forEach(expense => {
+        const row = worksheet.addRow({
+          employeeName:    expense.employeeName    || '',
+          clientName:      expense.clientName      || '',
+          departmentName:  expense.departmentName  || '',
+          category:        expense.category        || '',
+          description:     expense.description     || '',
+          amount:          expense.amount          || 0,
+          expenseDate:     expense.expenseDate     || '',
+          status:          expense.status          || '',
+          rejectionReason: expense.rejectionReason || '',
+        });
+        const fillColor = STATUS_COLORS[expense.status];
+        if (fillColor) {
+          const statusCell = row.getCell(8);
+          statusCell.fill = { type: 'pattern', pattern: 'solid', fgColor: fillColor };
+          statusCell.font = {
+            bold: true,
+            color: {
+              argb: expense.status === 'PENDING'  ? 'FF795548' :
+                    expense.status === 'REJECTED' ? 'FFB71C1C' : 'FF1B5E20'
+            }
+          };
+        }
       });
 
-      // Color only the Status cell (column 8)
-      const fillColor = STATUS_COLORS[expense.status];
-      if (fillColor) {
-        const statusCell = row.getCell(8); // 'status' column
-        statusCell.fill = { type: 'pattern', pattern: 'solid', fgColor: fillColor };
-        statusCell.font = {
-          bold: true,
-          color: {
-            argb: expense.status === 'PENDING'  ? 'FF795548' :
-                  expense.status === 'REJECTED' ? 'FFB71C1C' : 'FF1B5E20'
-          }
-        };
-      }
+      // Per-employee subtotal row
+      const totalAmt    = empRows.reduce((s, e) => s + (Number(e.amount) || 0), 0);
+      const pending     = empRows.filter(e => e.status === 'PENDING').length;
+      const paid        = empRows.filter(e => e.status === 'PAID' || e.status === 'APPROVED').length;
+      const rejected    = empRows.filter(e => e.status === 'REJECTED').length;
+      const pendingAmt  = empRows.filter(e => e.status === 'PENDING').reduce((s, e) => s + (Number(e.amount) || 0), 0);
+      const paidAmt     = empRows.filter(e => e.status === 'PAID' || e.status === 'APPROVED').reduce((s, e) => s + (Number(e.amount) || 0), 0);
+      const rejectedAmt = empRows.filter(e => e.status === 'REJECTED').reduce((s, e) => s + (Number(e.amount) || 0), 0);
+      summaryMap[empName] = { pending, paid, rejected, pendingAmt, paidAmt, rejectedAmt };
+
+      const subtotalRow = worksheet.addRow([
+        `Subtotal — ${empName}`, '', '', '',
+        `${empRows.length} expense(s)`,
+        totalAmt, '',
+        `P:${pending}  ✓:${paid}  ✗:${rejected}`, '',
+      ]);
+      subtotalRow.eachCell(cell => {
+        cell.font = { bold: true, italic: true, color: { argb: 'FF1A237E' } };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8EAF6' } };
+      });
+      subtotalRow.getCell(6).numFmt = '#,##0.00';
+
+      worksheet.addRow([]); // blank separator between employees
     });
+
+    // Employee-wise summary section at the bottom
+    if (empNames.length > 0) {
+      worksheet.addRow([]);
+      worksheet.getColumn(10).width = 22;
+      worksheet.getColumn(11).width = 26;
+
+      const summaryHeaderRow = worksheet.addRow([
+        'EMPLOYEE-WISE SUMMARY', '', '', '', '',
+        'Pending Count', 'Pending Amount (₹)',
+        'Paid/Approved Count', 'Paid/Approved Amount (₹)',
+        'Rejected Count', 'Rejected Amount (₹)',
+      ]);
+      summaryHeaderRow.eachCell(cell => {
+        cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF37474F' } };
+        cell.alignment = { vertical: 'middle', horizontal: 'center' };
+      });
+
+      empNames.forEach(name => {
+        const s = summaryMap[name];
+        const dataRow = worksheet.addRow([
+          name, '', '', '', '',
+          s.pending, s.pendingAmt,
+          s.paid,    s.paidAmt,
+          s.rejected, s.rejectedAmt,
+        ]);
+        dataRow.getCell(1).font = { bold: true };
+        [6, 7].forEach(col => {
+          dataRow.getCell(col).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF9C4' } };
+          dataRow.getCell(col).font = { color: { argb: 'FF795548' }, bold: true };
+          dataRow.getCell(col).alignment = { horizontal: 'center' };
+        });
+        [8, 9].forEach(col => {
+          dataRow.getCell(col).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFC8E6C9' } };
+          dataRow.getCell(col).font = { color: { argb: 'FF1B5E20' }, bold: true };
+          dataRow.getCell(col).alignment = { horizontal: 'center' };
+        });
+        [10, 11].forEach(col => {
+          dataRow.getCell(col).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFCDD2' } };
+          dataRow.getCell(col).font = { color: { argb: 'FFB71C1C' }, bold: true };
+          dataRow.getCell(col).alignment = { horizontal: 'center' };
+        });
+      });
+
+      const totals = empNames.reduce((acc, name) => {
+        const s = summaryMap[name];
+        acc.pending += s.pending; acc.pendingAmt += s.pendingAmt;
+        acc.paid    += s.paid;    acc.paidAmt    += s.paidAmt;
+        acc.rejected += s.rejected; acc.rejectedAmt += s.rejectedAmt;
+        return acc;
+      }, { pending: 0, pendingAmt: 0, paid: 0, paidAmt: 0, rejected: 0, rejectedAmt: 0 });
+
+      const totalRow = worksheet.addRow([
+        'GRAND TOTAL', '', '', '', '',
+        totals.pending, totals.pendingAmt,
+        totals.paid,    totals.paidAmt,
+        totals.rejected, totals.rejectedAmt,
+      ]);
+      totalRow.eachCell(cell => {
+        cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1A237E' } };
+        cell.alignment = { horizontal: 'center' };
+      });
+    }
+
+    // Filename: employee name + date range
+    const empLabel = exportType === 'employee' && exportEmployeeId
+      ? (employees.find(e => String(e.id) === String(exportEmployeeId))?.firstName || 'employee')
+      : 'all';
+    const dateLabel = `${exportFromDate || 'start'}_to_${exportToDate || 'end'}`;
 
     const buffer = await workbook.xlsx.writeBuffer();
     saveAs(
       new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }),
-      `expenses_${exportType === 'employee' ? 'employee' : 'all'}_${exportFromDate || 'start'}_to_${exportToDate || 'end'}.xlsx`
+      `expenses_${empLabel}_${dateLabel}.xlsx`
     );
     setShowExportModal(false);
   }
@@ -505,7 +622,7 @@ export default function ExpenseOverviewPage() {
                         e.receiptUrl.match(/\.(jpg|jpeg|png)$/i) ?
 
                           <img
-                            src={`https://api.yashrajent.com${e.receiptUrl}`}
+                            src={`http://localhost:8080${e.receiptUrl}`}
                             onClick={() => setPreviewImage(e.receiptUrl)}
                             className="w-10 h-10 rounded object-cover border cursor-pointer"
                           />
@@ -513,7 +630,7 @@ export default function ExpenseOverviewPage() {
                           :
 
                           <a
-                            href={`https://api.yashrajent.com${e.receiptUrl}`}
+                            href={`http://localhost:8080${e.receiptUrl}`}
                             target="_blank"
                             className="text-indigo-600 text-xs underline"
                           >
@@ -649,7 +766,7 @@ export default function ExpenseOverviewPage() {
             </button>
 
             <img
-              src={`https://api.yashrajent.com${previewImage}`}
+              src={`http://localhost:8080${previewImage}`}
               className="w-full object-contain"
             />
 
@@ -696,7 +813,7 @@ export default function ExpenseOverviewPage() {
                   <option value="">Select Employee</option>
                   {employees.map(emp => (
                     <option key={emp.id} value={emp.id}>
-                      {emp.firstName} {emp.lastName} — {emp.departmentName || 'No Dept'} ({emp.roleName})
+                      {emp.firstName} {emp.lastName} — {emp.departmentName || emp.tlDepartmentName || emp.department || 'No Dept'} ({emp.roleName})
                     </option>
                   ))}
                 </select>
@@ -823,7 +940,7 @@ export default function ExpenseOverviewPage() {
                   )}
                 </label>
                 {editExpense?.receiptUrl && !filePreview && (
-                  <p className="text-xs text-gray-400 mt-1">Current: <a href={`https://api.yashrajent.com${editExpense.receiptUrl}`} target="_blank" className="text-indigo-500 underline">View existing</a></p>
+                  <p className="text-xs text-gray-400 mt-1">Current: <a href={`http://localhost:8080${editExpense.receiptUrl}`} target="_blank" className="text-indigo-500 underline">View existing</a></p>
                 )}
               </div>
 
@@ -918,7 +1035,7 @@ export default function ExpenseOverviewPage() {
                   <option value="">-- Select Employee --</option>
                   {employees.map(emp => (
                     <option key={emp.id} value={emp.id}>
-                      {emp.firstName} {emp.lastName} {emp.departmentName ? `(${emp.departmentName})` : ''}
+                      {emp.firstName} {emp.lastName} {(emp.departmentName || emp.tlDepartmentName || emp.department) ? `(${emp.departmentName || emp.tlDepartmentName || emp.department})` : ''}
                     </option>
                   ))}
                 </select>

@@ -369,6 +369,17 @@ export default function CustomersPage() {
 
   const [filterAvailableStages, setFilterAvailableStages] = useState([]);
 
+  // ✅ NEW: Top department filter (Admin/Manager only)
+  const [topDepartmentFilter, setTopDepartmentFilter] = useState("");
+  const [allDepartments, setAllDepartments] = useState([]);
+
+  useEffect(() => {
+    fetch("http://localhost:8080/api/stages/departments")
+      .then(r => r.ok ? r.json() : [])
+      .then(data => setAllDepartments(data || []))
+      .catch(() => {});
+  }, []);
+
 
 
 
@@ -846,7 +857,7 @@ export default function CustomersPage() {
       if (!silent) setLoading(false); // ← table visible NOW
 
       // Phase 2: Load addresses in background (non-blocking)
-      fetch('https://api.yashrajent.com/api/clients/addresses/all')
+      fetch('http://localhost:8080/api/clients/addresses/all')
         .then(r => r.ok ? r.json() : [])
         .catch(() => [])
         .then(allAddresses => {
@@ -1396,7 +1407,7 @@ export default function CustomersPage() {
 
 
 
-      const response = await fetch('https://api.yashrajent.com/api/clients/geocode', {
+      const response = await fetch('http://localhost:8080/api/clients/geocode', {
 
 
 
@@ -1624,7 +1635,7 @@ export default function CustomersPage() {
 
 
 
-      const response = await fetch('https://api.yashrajent.com/api/clients/reverse-geocode', {
+      const response = await fetch('http://localhost:8080/api/clients/reverse-geocode', {
 
 
 
@@ -1909,6 +1920,14 @@ export default function CustomersPage() {
       });
     }
 
+    // ── NEW: top department filter (Admin/Manager only) ──────────────
+    if (topDepartmentFilter && (role === "ADMIN" || role === "MANAGER")) {
+      result = result.filter(customer => {
+        const deal = dealByClient[Number(customer.id)];
+        return deal?.department === topDepartmentFilter;
+      });
+    }
+
     // ── NEW: per-column filters ─────────────────────────────────────
     Object.entries(columnFilters).forEach(([colKey, allowedSet]) => {
       if (!allowedSet || allowedSet.size === 0) {
@@ -1988,7 +2007,7 @@ export default function CustomersPage() {
     }
 
     return result;
-  }, [customers, deals, search, filterDepartment, filterStage, columnFilters, sortConfig, userRole]);
+  }, [customers, deals, search, filterDepartment, filterStage, columnFilters, sortConfig, userRole, topDepartmentFilter]);
 
   // Add column filter props for reuse
   const colFilterProps = {
@@ -2149,7 +2168,7 @@ export default function CustomersPage() {
       // but backendApi.get("/api/clients/...") becomes /api/api/clients/... → 500!
       const authUser = getTabSafeAuthUser();
       const addrResponse = await fetch(
-        `https://api.yashrajent.com/api/clients/${customer.id}/addresses`,
+        `http://localhost:8080/api/clients/${customer.id}/addresses`,
         {
           headers: {
             "X-User-Id": authUser?.id ?? "",
@@ -2689,7 +2708,7 @@ export default function CustomersPage() {
 
 
 
-        await fetch(`https://api.yashrajent.com/api/clients/${savedCustomer.id}/addresses`, {
+        await fetch(`http://localhost:8080/api/clients/${savedCustomer.id}/addresses`, {
 
 
 
@@ -2743,7 +2762,7 @@ export default function CustomersPage() {
 
 
 
-        await fetch(`https://api.yashrajent.com/api/clients/${savedCustomer.id}/addresses`, {
+        await fetch(`http://localhost:8080/api/clients/${savedCustomer.id}/addresses`, {
 
 
 
@@ -2999,7 +3018,7 @@ export default function CustomersPage() {
 
       if (typeof window !== 'undefined') {
 
-        const customerId = selectedCustomer?.id || response?.id;
+        const customerId = selectedCustomer?.id || savedCustomer?.id;
 
         if (customerId) {
 
@@ -3314,7 +3333,7 @@ export default function CustomersPage() {
     setBulkDeleting(true);
     try {
       const authUser = getTabSafeAuthUser();
-      const res = await fetch('https://api.yashrajent.com/api/clients/bulk', {
+      const res = await fetch('http://localhost:8080/api/clients/bulk', {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
@@ -3687,6 +3706,30 @@ export default function CustomersPage() {
                 </button>
               )}
             </div>
+
+            {/* Top Department Filter — Admin/Manager only */}
+            {(userRole === "ADMIN" || userRole === "MANAGER") && (
+              <div className="flex items-center gap-2">
+                <select
+                  value={topDepartmentFilter}
+                  onChange={(e) => setTopDepartmentFilter(e.target.value)}
+                  className="border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white shadow-sm"
+                >
+                  <option value="">All Departments</option>
+                  {allDepartments.map((dept) => (
+                    <option key={dept} value={dept}>{dept}</option>
+                  ))}
+                </select>
+                {topDepartmentFilter && (
+                  <button
+                    onClick={() => setTopDepartmentFilter("")}
+                    className="text-xs text-red-500 border border-red-200 px-2 py-1 rounded"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+            )}
 
             {/* Record count badge */}
             <div className="text-sm text-slate-500 shrink-0">
@@ -6512,7 +6555,7 @@ export default function CustomersPage() {
 
 
 
-                                  const response = await fetch(`https://api.yashrajent.com/api/banks/${bankId}`);
+                                  const response = await fetch(`http://localhost:8080/api/banks/${bankId}`);
 
 
 

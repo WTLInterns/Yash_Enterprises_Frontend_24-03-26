@@ -50,6 +50,7 @@ export default function InvoicesPage() {
     try {
       setLoading(true);
       const invoiceDetails = await invoiceService.getInvoiceById(invoiceId);
+      console.log('Loaded invoice details:', invoiceDetails);
       setEditingInvoice(invoiceDetails);
       setShowEditModal(true);
     } catch (error) {
@@ -69,21 +70,6 @@ export default function InvoicesPage() {
     } catch (err) {
       console.error('Failed to delete invoice', err);
       toast.error('Failed to delete invoice. Please try again.');
-    }
-  }
-
-  async function loadInvoiceDetails(invoiceId) {
-    try {
-      setLoading(true);
-      const invoiceDetails = await invoiceService.getInvoiceById(invoiceId);
-      console.log('Loaded invoice details:', invoiceDetails);
-      setEditingInvoice(invoiceDetails);
-      setShowEditModal(true);
-    } catch (error) {
-      console.error('Failed to load invoice details:', error);
-      toast.error('Failed to load invoice details. Please try again.');
-    } finally {
-      setLoading(false);
     }
   }
 
@@ -124,229 +110,16 @@ export default function InvoicesPage() {
     }
   }
   
-  // ── Download: open preview modal (InvoicePreview has its own Download PDF button) ──
+  // ── Download: open preview modal ──
   async function handleDownload(invoice) {
-<<<<<<< HEAD
     setSelectedInvoice(invoice);
     setShowPreviewModal(true);
-=======
-    setIsDownloading(invoice.id);
-    try {
-      // Try server PDF first
-      const response = await fetch(`https://api.yashrajent.com/api/invoices/${invoice.id}/pdf`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
-          'X-User-Id': (() => {
-            if (typeof window === 'undefined') return null;
-            try {
-              const userStr = localStorage.getItem('user');
-              return userStr ? JSON.parse(userStr).id : null;
-            } catch {
-              return null;
-            }
-          })()
-        }
-      });
-
-      if (response.ok) {
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.setAttribute('download', `Invoice_${invoice.invoiceNo}.pdf`);
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        window.URL.revokeObjectURL(url);
-        
-        toast.success(`Invoice ${invoice.invoiceNo} downloaded successfully!`);
-      } else {
-        throw new Error('Server PDF failed');
-      }
-    } catch (serverErr) {
-      console.warn('Server PDF failed, trying client-side render:', serverErr);
-      
-      // Open preview modal and generate client-side PDF
-      setSelectedInvoice(invoice);
-      setShowPreviewModal(true);
-      
-      // Wait for modal to render, then capture
-      await new Promise(resolve => setTimeout(resolve, 600));
-      
-      try {
-        // Dynamically import html2canvas and jsPDF
-        const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
-          import('html2canvas'),
-          import('jspdf')
-        ]);
-
-        const element = document.getElementById('invoice-preview-content');
-        if (!element) throw new Error('Preview element not found');
-
-        const canvas = await html2canvas(element, {
-          scale: 2,
-          useCORS: true,
-          backgroundColor: '#ffffff',
-          logging: false,
-        });
-
-        const imgData = canvas.toDataURL('image/jpeg', 0.95);
-        const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-        const pdfW = pdf.internal.pageSize.getWidth();
-        const pdfH = pdf.internal.pageSize.getHeight();
-        const ratio = pdfW / canvas.width;
-        const imgH = canvas.height * ratio;
-
-        if (imgH <= pdfH) {
-          pdf.addImage(imgData, 'JPEG', 0, 0, pdfW, imgH);
-        } else {
-          // Multi-page
-          const pageHeightPx = Math.floor(pdfH / ratio);
-          let y = 0;
-          let page = 0;
-          while (y < canvas.height) {
-            const h = Math.min(pageHeightPx, canvas.height - y);
-            const pc = document.createElement('canvas');
-            pc.width = canvas.width;
-            pc.height = h;
-            pc.getContext('2d').drawImage(canvas, 0, y, canvas.width, h, 0, 0, canvas.width, h);
-            if (page > 0) pdf.addPage();
-            pdf.addImage(pc.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, pdfW, h * ratio);
-            y += h;
-            page++;
-          }
-        }
-
-        const blob = pdf.output('blob');
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `Invoice_${invoice.invoiceNo}.pdf`;
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        URL.revokeObjectURL(url);
-        
-        toast.success(`Invoice ${invoice.invoiceNo} downloaded successfully!`);
-      } catch (clientErr) {
-        console.error('Client-side PDF also failed:', clientErr);
-        toast.error('Failed to download PDF. Make sure html2canvas and jspdf are installed: npm install html2canvas jspdf');
-      }
-    } finally {
-      setIsDownloading(null);
-    }
->>>>>>> 0d46b1cb7afe82b7ac1d784007edc59db1177975
   }
 
-  // ── Download from preview modal: delegate to the preview component's own button ──
-  async function handleDownloadFromPreview() {
-<<<<<<< HEAD
-    // Trigger the Download PDF button inside the InvoicePreview component
-    const btn = document.querySelector('[data-pdf-root]')?.closest('div')?.parentElement?.querySelector('button');
-    // Simpler: just find the green download button rendered by InvoicePreview
+  // ── Download from preview modal: delegate to InvoicePreview's own button ──
+  function handleDownloadFromPreview() {
     const previewBtn = document.querySelector('#preview-modal-content button');
-    if (previewBtn) {
-      previewBtn.click();
-=======
-    if (!selectedInvoice) return;
-    setIsDownloading('preview');
-    try {
-      // Try server first
-      const response = await fetch(`https://api.yashrajent.com/api/invoices/${selectedInvoice.id}/pdf`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
-          'X-User-Id': (() => {
-            if (typeof window === 'undefined') return null;
-            try {
-              const userStr = localStorage.getItem('user');
-              return userStr ? JSON.parse(userStr).id : null;
-            } catch {
-              return null;
-            }
-          })()
-        }
-      });
-
-      if (response.ok) {
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.setAttribute('download', `Invoice_${selectedInvoice.invoiceNo}.pdf`);
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        window.URL.revokeObjectURL(url);
-        
-        toast.success(`Invoice ${selectedInvoice.invoiceNo} downloaded successfully!`);
-      } else {
-        throw new Error('Server PDF failed');
-      }
-    } catch {
-      try {
-        // Client-side fallback
-        const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
-          import('html2canvas'),
-          import('jspdf')
-        ]);
-
-        const element = document.getElementById('invoice-preview-content');
-        if (!element) throw new Error('Preview element not found');
-
-        const canvas = await html2canvas(element, {
-          scale: 2,
-          useCORS: true,
-          backgroundColor: '#ffffff',
-          logging: false,
-        });
-
-        const imgData = canvas.toDataURL('image/jpeg', 0.95);
-        const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-        const pdfW = pdf.internal.pageSize.getWidth();
-        const pdfH = pdf.internal.pageSize.getHeight();
-        const ratio = pdfW / canvas.width;
-        const imgH = canvas.height * ratio;
-
-        if (imgH <= pdfH) {
-          pdf.addImage(imgData, 'JPEG', 0, 0, pdfW, imgH);
-        } else {
-          // Multi-page
-          const pageHeightPx = Math.floor(pdfH / ratio);
-          let y = 0;
-          let page = 0;
-          while (y < canvas.height) {
-            const h = Math.min(pageHeightPx, canvas.height - y);
-            const pc = document.createElement('canvas');
-            pc.width = canvas.width;
-            pc.height = h;
-            pc.getContext('2d').drawImage(canvas, 0, y, canvas.width, h, 0, 0, canvas.width, h);
-            if (page > 0) pdf.addPage();
-            pdf.addImage(pc.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, pdfW, h * ratio);
-            y += h;
-            page++;
-          }
-        }
-
-        const blob = pdf.output('blob');
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `Invoice_${selectedInvoice.invoiceNo}.pdf`;
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        URL.revokeObjectURL(url);
-        
-        toast.success(`Invoice ${selectedInvoice.invoiceNo} downloaded successfully!`);
-      } catch (e) {
-        toast.error('PDF download failed. Install: npm install html2canvas jspdf');
-      }
-    } finally {
-      setIsDownloading(null);
->>>>>>> 0d46b1cb7afe82b7ac1d784007edc59db1177975
-    }
+    if (previewBtn) previewBtn.click();
   }
 
   // 📧 Email invoice functions

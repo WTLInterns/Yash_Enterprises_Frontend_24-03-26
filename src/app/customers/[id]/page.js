@@ -1242,29 +1242,6 @@ export default function CustomerDetailPage() {
   const lastSyncedAmountRef = React.useRef(null);
   const dealRef = React.useRef(null);
   useEffect(() => { dealRef.current = deal; }, [deal]);
-  useEffect(() => {
-    if (!dealId || (products.length === 0 && expenses.length === 0)) return;
-    if (lastSyncedAmountRef.current === finalAmount) return;
-    clearTimeout(syncFinalAmountRef.current);
-    syncFinalAmountRef.current = setTimeout(async () => {
-      if (lastSyncedAmountRef.current === finalAmount) return;
-      const d = dealRef.current;
-      try {
-        await backendApi.put(`/deals/${dealId}`, {
-          name: d?.name || '',
-          clientId: d?.clientId ?? customerId,
-          bankId: d?.bankId ?? null,
-          stageCode: d?.stageCode || d?.stage || '',
-          department: d?.department || '',
-          valueAmount: finalAmount,
-          closingDate: d?.closingDate || null,
-          description: d?.description || '',
-        });
-        lastSyncedAmountRef.current = finalAmount;
-      } catch (_e) { /* silent */ }
-    }, 2000);
-    return () => clearTimeout(syncFinalAmountRef.current);
-  }, [finalAmount, dealId]);
 
 
 
@@ -14037,47 +14014,6 @@ async function ensureDealId() {
 
 
 
-                  <DynamicFieldsSection
-
-
-
-                    entity="client"
-
-
-
-                    entityId={safeCustomer?.id}
-
-
-
-                    values={form?.customFields || {}}
-
-
-
-                    onChange={(values) =>
-
-
-
-                      setForm((prev) => ({
-
-
-
-                        ...prev,
-
-
-
-                        customFields: values
-
-
-
-                      }))
-
-
-
-                    }
-
-
-
-                  />
 
 
 

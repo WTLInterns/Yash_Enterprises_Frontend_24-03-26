@@ -115,6 +115,9 @@ export default function LoginPage() {
         setTabSafeItem("user_role", data.role);
         setTabSafeItem("user_data", JSON.stringify(data.user));
         setTabSafeItem("employee_id", data.employeeId);
+
+        sessionStorage.setItem("user_role", data.role);
+        localStorage.setItem("user_role", data.role);
         
         // 🔥 CRITICAL: Store department separately for department API
         // Department might be in data.user.departmentName OR data.user.department OR data.department
@@ -165,6 +168,7 @@ export default function LoginPage() {
         sessionStorage.setItem("user_data", JSON.stringify(userData));
         sessionStorage.setItem("user", JSON.stringify(userData));
         sessionStorage.setItem("token", data.token);
+        sessionStorage.setItem("user_role", data.role);
         
         // Also store in tabSafeStorage for compatibility
         setTabSafeItem("user_data", JSON.stringify(userData));
@@ -174,6 +178,7 @@ export default function LoginPage() {
         localStorage.setItem("user_data", JSON.stringify(userData));
         localStorage.setItem("user", JSON.stringify(userData));
         localStorage.setItem("token", data.token);
+        localStorage.setItem("user_role", data.role);
         
         // 🔥 DEBUG: Log what we're storing
         console.log("🔍 [LOGIN] Storing user data:", {

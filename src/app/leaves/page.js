@@ -4,28 +4,77 @@ import { useState, useEffect } from 'react';
 import { CalendarDays, FileText, ClipboardList, Plus, Check, X, Eye } from 'lucide-react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { backendApi } from '@/services/api';
+import { getTabSafeItem } from '@/utils/tabSafeStorage';
 
 export default function LeaveOverviewPage() {
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState('requests');
   const [leaves, setLeaves] = useState([]);
   const [loading, setLoading] = useState(false);
+
+  function getRoleBasedLeavesPath() {
+    console.log('=== LEAVE DEBUG START ===');
+
+    const roleFromSession = sessionStorage.getItem('user_role');
+    const roleFromLocal = localStorage.getItem('user_role');
+
+    console.log('Role (sessionStorage):', roleFromSession);
+    console.log('Role (localStorage):', roleFromLocal);
+
+    const roleFromTabSafe = typeof getTabSafeItem === 'function' ? getTabSafeItem('user_role') : null;
+    console.log('Role (tab-safe):', roleFromTabSafe);
+
+    const role = (roleFromTabSafe || roleFromSession || roleFromLocal || '').toUpperCase();
+
+    console.log('Final Role Used:', role);
+
+    if (!role) {
+      console.warn('⚠️ Role is EMPTY → defaulting to /leaves/my');
+    }
+
+    let endpoint = '';
+    if (role === 'ADMIN') endpoint = '/leaves/all';
+    else if (role === 'MANAGER') endpoint = '/leaves/manager';
+    else if (role === 'TL') endpoint = '/leaves/tl';
+    else endpoint = '/leaves/my';
+
+    console.log('Calling API:', endpoint);
+    return endpoint;
+  }
+
+  async function loadLeaves() {
+    try {
+      setLoading(true);
+      const path = getRoleBasedLeavesPath();
+      const data = await backendApi.get(path);
+      setLeaves(data || []);
+    } catch (err) {
+      console.error('Failed to load leaves', err);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
     if (activeTab === 'requests') {
       let isMounted = true;
-      async function loadLeaves() {
+
+      (async () => {
         try {
           setLoading(true);
-          const data = await backendApi.get('/leaves');
+          const path = getRoleBasedLeavesPath();
+          const res = await backendApi.get(path);
+          const payload = res && typeof res === 'object' && 'data' in res ? res.data : res;
+          console.log('API RESPONSE:', payload);
           if (!isMounted) return;
-          setLeaves(data || []);
+          setLeaves(payload || []);
+          console.log('=== LEAVE DEBUG END ===');
         } catch (err) {
           console.error('Failed to load leaves', err);
         } finally {
           if (isMounted) setLoading(false);
         }
-      }
-      loadLeaves();
+      })();
+
       return () => { isMounted = false; };
     }
   }, [activeTab]);
@@ -33,7 +82,7 @@ export default function LeaveOverviewPage() {
   async function handleApprove(id) {
     try {
       await backendApi.put(`/leaves/${id}/approve`);
-      setLeaves(prev => prev.map(l => l.id === id ? { ...l, status: 'APPROVED' } : l));
+      await loadLeaves();
     } catch (err) {
       console.error('Failed to approve', err);
     }
@@ -42,7 +91,7 @@ export default function LeaveOverviewPage() {
   async function handleReject(id) {
     try {
       await backendApi.put(`/leaves/${id}/reject`);
-      setLeaves(prev => prev.map(l => l.id === id ? { ...l, status: 'REJECTED' } : l));
+      await loadLeaves();
     } catch (err) {
       console.error('Failed to reject', err);
     }
@@ -52,20 +101,13 @@ export default function LeaveOverviewPage() {
     <DashboardLayout>
       {/* Tabs */}
       <div className="flex gap-6 border-b border-gray-200 px-6 pt-4">
-        <Tab active={activeTab === 'overview'} icon={<ClipboardList size={16} />} label="Overview" onClick={() => setActiveTab('overview')} />
         <Tab active={activeTab === 'requests'} icon={<FileText size={16} />} label="Leaves Requests" onClick={() => setActiveTab('requests')} />
-        <Tab active={activeTab === 'balance'} icon={<CalendarDays size={16} />} label="Leave Balance" onClick={() => setActiveTab('balance')} />
-        <Tab active={activeTab === 'compoff'} icon={<CalendarDays size={16} />} label="Comp Off Credit Request" onClick={() => setActiveTab('compoff')} />
+        
       </div>
 
       {/* Content */}
       <div className="bg-gray-100 min-h-screen p-6">
-        {activeTab === 'overview' && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card title="Approved Leaves by Type" filterLabel="Select Month and Year" filterValue="December 2025" />
-            <Card title="Approved Leaves" filterLabel="Select Year" filterValue="2025" />
-          </div>
-        )}
+        {/* Leave Requests Tab */}
         {activeTab === 'requests' && (
           <div className="bg-white rounded-xl shadow-sm p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Leave Requests</h2>
@@ -91,8 +133,8 @@ export default function LeaveOverviewPage() {
                     <tr key={l.id} className="border-b hover:bg-gray-50">
                       <td className="p-3">{l.employeeName || '-'}</td>
                       <td className="p-3">{l.leaveType || '-'}</td>
-                      <td className="p-3">{l.startDate || '-'}</td>
-                      <td className="p-3">{l.endDate || '-'}</td>
+                      <td className="p-3">{l.fromDate || '-'}</td>
+                      <td className="p-3">{l.toDate || '-'}</td>
                       <td className="p-3">{l.reason || '-'}</td>
                       <td className="p-3">
                         <span className={`text-xs font-medium px-2 py-1 rounded-full ${
@@ -127,8 +169,6 @@ export default function LeaveOverviewPage() {
             )}
           </div>
         )}
-        {activeTab === 'balance' && <Card title="Leave Balance" filterLabel="Select Year" filterValue="2025" />}
-        {activeTab === 'compoff' && <Card title="Comp Off Credit Requests" filterLabel="Select Month" filterValue="December 2025" />}
       </div>
     </DashboardLayout>
   );

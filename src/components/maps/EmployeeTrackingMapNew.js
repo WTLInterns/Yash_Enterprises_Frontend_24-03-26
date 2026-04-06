@@ -145,8 +145,13 @@ export default function EmployeeTrackingMap() {
   // Fetch live employees
   async function fetchLive() {
     try {
-      // Use existing live-employees endpoint for location-based attendance data
-      const res = await fetch(`${baseUrl}/api/employee-locations/live-employees`);
+      const token = (typeof window !== 'undefined')
+        ? (sessionStorage.getItem('token') || localStorage.getItem('token'))
+        : null;
+      const res = await fetch(`${baseUrl}/api/employee-locations/live-employees`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
+      if (!res.ok) { return; }
       const json = await res.json();
       const mapped = (json.employees || []).map((e) => {
         const lat = Number(e.latitude ?? e.lat ?? e.position?.lat ?? NaN);

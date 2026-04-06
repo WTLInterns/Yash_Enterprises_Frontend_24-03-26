@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { CheckCircle, AlertCircle, PlayCircle, Clock, Calendar, Building2 } from "lucide-react";
 
-const API = process.env.NEXT_PUBLIC_BACKEND_URL || "https://api.yashrajent.com";
+const API = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080";
 
 const getCurrentUser = () => {
   if (typeof window === "undefined") return null;
@@ -131,10 +131,14 @@ export default function TasksOverviewPage() {
   const loadData = async (u) => {
     if (!u) return;
     setLoading(true);
+    const token = (typeof window !== 'undefined')
+      ? (sessionStorage.getItem('token') || localStorage.getItem('token'))
+      : null;
+    const authHeader = token ? { Authorization: `Bearer ${token}` } : {};
     try {
-      // Fetch all tasks with auth headers
       const res = await fetch(`${API}/api/tasks`, {
         headers: {
+          ...authHeader,
           "X-User-Id":         String(u.id ?? ""),
           "X-User-Role":       u.role,
           "X-User-Department": u.department ?? "",
@@ -144,9 +148,8 @@ export default function TasksOverviewPage() {
       const list = Array.isArray(data) ? data : (data.content ?? []);
       setTasks(list);
 
-      // Fetch department list for ADMIN/MANAGER
       if (u.role === "ADMIN" || u.role === "MANAGER") {
-        const dr = await fetch(`${API}/api/stages/departments`);
+        const dr = await fetch(`${API}/api/stages/departments`, { headers: authHeader });
         const depts = dr.ok ? await dr.json() : [];
         setDepts(depts || []);
       }

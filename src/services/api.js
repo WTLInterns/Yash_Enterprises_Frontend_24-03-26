@@ -69,19 +69,12 @@ export function createApiClient({ baseUrl = "" } = {}) {
 
 
     // Add role-based headers for admin endpoints
-
     if (path.includes('/tasks') && !path.includes('/employee/')) {
-
-      // 🔥 Allow ADMIN, MANAGER, and TL roles to access tasks
-
-      if (!['ADMIN', 'MANAGER', 'TL'].includes(actualUserRole)) {
-
-        console.log('🔍 API Access check - actualUserRole:', actualUserRole, 'userRole:', userRole, 'parsedUser:', parsedUser, 'path:', path);
-
-        throw new Error('Access denied: Admin, Manager, or TL role required');
-
+      // Allow all authenticated users to access tasks (role check done on backend)
+      // Only block if no token at all
+      if (!token) {
+        throw new Error('Authentication required');
       }
-
     }
 
 
@@ -162,7 +155,7 @@ export function createApiClient({ baseUrl = "" } = {}) {
 
 export const backendApi = createApiClient({
 
-  baseUrl: "https://api.yashrajent.com/api",
+  baseUrl: "http://localhost:8080/api",
 
 });
 

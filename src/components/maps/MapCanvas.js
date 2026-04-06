@@ -47,11 +47,16 @@ export default function MapCanvas({ apiKey, onMapReady }) {
     const existingScript = document.getElementById("google-maps-script");
     if (existingScript) {
       console.log("MapCanvas: Script exists, waiting for load");
-      existingScript.addEventListener("load", initializeMap, { once: true });
+      // If google maps already loaded but initMap was deleted, just init directly
+      if (window.google?.maps) {
+        initializeMap();
+      } else {
+        existingScript.addEventListener("load", initializeMap, { once: true });
+      }
       return;
     }
 
-    // ✅ FIX #3: Set window.initMap BEFORE appending the script
+    // Set window.initMap BEFORE appending the script
     window.initMap = () => {
       console.log("MapCanvas: Google Maps callback triggered");
       initializeMap();
@@ -66,9 +71,8 @@ export default function MapCanvas({ apiKey, onMapReady }) {
     document.head.appendChild(script);
 
     return () => {
-      // ✅ FIX #4: Clean up per-instance flag on unmount so map re-inits on navigation
       readyRef.current = false;
-      if (window.initMap) delete window.initMap;
+      // Don't delete window.initMap — script may still be loading
     };
   }, [apiKey]); // eslint-disable-line react-hooks/exhaustive-deps
 

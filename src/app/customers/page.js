@@ -374,7 +374,10 @@ export default function CustomersPage() {
   const [allDepartments, setAllDepartments] = useState([]);
 
   useEffect(() => {
-    fetch("https://api.yashrajent.com/api/stages/departments")
+    const token = sessionStorage.getItem('token') || localStorage.getItem('token');
+    fetch("http://localhost:8080/api/stages/departments", {
+      headers: token ? { Authorization: `Bearer ${token}` } : {}
+    })
       .then(r => r.ok ? r.json() : [])
       .then(data => setAllDepartments(data || []))
       .catch(() => {});
@@ -857,7 +860,10 @@ export default function CustomersPage() {
       if (!silent) setLoading(false); // ← table visible NOW
 
       // Phase 2: Load addresses in background (non-blocking)
-      fetch('https://api.yashrajent.com/api/clients/addresses/all')
+      const token = sessionStorage.getItem('token') || localStorage.getItem('token');
+      fetch('http://localhost:8080/api/clients/addresses/all', {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      })
         .then(r => r.ok ? r.json() : [])
         .catch(() => [])
         .then(allAddresses => {
@@ -1407,7 +1413,7 @@ export default function CustomersPage() {
 
 
 
-      const response = await fetch('https://api.yashrajent.com/api/clients/geocode', {
+      const response = await fetch('http://localhost:8080/api/clients/geocode', {
 
 
 
@@ -1635,7 +1641,7 @@ export default function CustomersPage() {
 
 
 
-      const response = await fetch('https://api.yashrajent.com/api/clients/reverse-geocode', {
+      const response = await fetch('http://localhost:8080/api/clients/reverse-geocode', {
 
 
 
@@ -1750,15 +1756,11 @@ export default function CustomersPage() {
   // 🔥 STEP 2: BANK DETAILS HELPER FUNCTION
 
   const getBankDetails = (deal) => {
-    // Priority 1: taluka/district embedded directly on deal DTO (from bank relation in mapper)
-    const talukaFromDeal = deal?.taluka || null;
-    const districtFromDeal = deal?.district || null;
-
-    // Priority 2: bank name/branch from deal fields
+    // Bank name/branch from deal fields
     const nameFromDeal = deal?.bankName || deal?.relatedBankName || null;
     const branchFromDeal = deal?.branchName || deal?.branch || null;
 
-    // Priority 3: fall back to banks[] array by bankId
+    // Fall back to banks[] array by bankId
     const bankObj = deal?.bankId
       ? banks.find(b => Number(b.id) === Number(deal.bankId))
       : null;
@@ -1768,8 +1770,16 @@ export default function CustomersPage() {
     return {
       name: nameFromDeal || bankObj?.name || "-",
       branch: branchFromDeal || branchFromBank || "-",
-      taluka: talukaFromDeal || bankObj?.taluka || "-",
-      district: districtFromDeal || bankObj?.district || "-",
+    };
+  };
+
+  // Get taluka/district from customer's PRIMARY address
+  const getCustomerLocation = (customer) => {
+    if (!customer?.addresses?.length) return { taluka: "-", district: "-" };
+    const primary = customer.addresses.find(a => a.addressType === 'PRIMARY') || customer.addresses[0];
+    return {
+      taluka: primary?.city || "-",
+      district: primary?.state || "-",
     };
   };
 
@@ -1793,9 +1803,9 @@ export default function CustomersPage() {
       const valueMap = {
         name: customer.name || null,
         bankName: bankDetails.name !== '-' ? bankDetails.name : null,
-        branchName: bankDetails.branch !== '-' ? bankDetails.branch : null,  // ← uses fixed getBankDetails
-        taluka: bankDetails.taluka !== '-' ? bankDetails.taluka : null,
-        district: bankDetails.district !== '-' ? bankDetails.district : null,
+        branchName: bankDetails.branch !== '-' ? bankDetails.branch : null,
+        taluka: getCustomerLocation(customer).taluka !== '-' ? getCustomerLocation(customer).taluka : null,
+        district: getCustomerLocation(customer).district !== '-' ? getCustomerLocation(customer).district : null,
         stageCode: deal?.stageCode ? deal.stageCode.toUpperCase() : null,
         department: deal?.department ? deal.department.trim() : null,
         ownerName: customer.ownerName || null,
@@ -1951,8 +1961,8 @@ export default function CustomersPage() {
           name: customer.name || '',
           bankName: bankDetails.name !== '-' ? bankDetails.name : '',
           branchName: bankDetails.branch !== '-' ? bankDetails.branch : '',  // ← fixed
-          taluka: bankDetails.taluka !== '-' ? bankDetails.taluka : '',
-          district: bankDetails.district !== '-' ? bankDetails.district : '',
+          taluka: getCustomerLocation(customer).taluka !== '-' ? getCustomerLocation(customer).taluka : '',
+          district: getCustomerLocation(customer).district !== '-' ? getCustomerLocation(customer).district : '',
           stageCode: deal?.stageCode ? deal.stageCode.toUpperCase() : '',
           department: deal?.department ? deal.department.trim() : '',
           ownerName: customer.ownerName || '',
@@ -1990,8 +2000,8 @@ export default function CustomersPage() {
             name: customer.name || '',
             bankName: bd.name !== '-' ? bd.name : '',
             branchName: bd.branch !== '-' ? bd.branch : '',  // ← fixed
-            taluka: bd.taluka !== '-' ? bd.taluka : '',
-            district: bd.district !== '-' ? bd.district : '',
+            taluka: getCustomerLocation(customer).taluka !== '-' ? getCustomerLocation(customer).taluka : '',
+            district: getCustomerLocation(customer).district !== '-' ? getCustomerLocation(customer).district : '',
             stageCode: deal?.stageCode || '',
             department: deal?.department || '',
             ownerName: customer.ownerName || '',
@@ -2168,7 +2178,7 @@ export default function CustomersPage() {
       // but backendApi.get("/api/clients/...") becomes /api/api/clients/... → 500!
       const authUser = getTabSafeAuthUser();
       const addrResponse = await fetch(
-        `https://api.yashrajent.com/api/clients/${customer.id}/addresses`,
+        `http://localhost:8080/api/clients/${customer.id}/addresses`,
         {
           headers: {
             "X-User-Id": authUser?.id ?? "",
@@ -2708,7 +2718,7 @@ export default function CustomersPage() {
 
 
 
-        await fetch(`https://api.yashrajent.com/api/clients/${savedCustomer.id}/addresses`, {
+        await fetch(`http://localhost:8080/api/clients/${savedCustomer.id}/addresses`, {
 
 
 
@@ -2762,7 +2772,7 @@ export default function CustomersPage() {
 
 
 
-        await fetch(`https://api.yashrajent.com/api/clients/${savedCustomer.id}/addresses`, {
+        await fetch(`http://localhost:8080/api/clients/${savedCustomer.id}/addresses`, {
 
 
 
@@ -3333,10 +3343,12 @@ export default function CustomersPage() {
     setBulkDeleting(true);
     try {
       const authUser = getTabSafeAuthUser();
-      const res = await fetch('https://api.yashrajent.com/api/clients/bulk', {
+      const token = sessionStorage.getItem('token') || localStorage.getItem('token');
+      const res = await fetch('http://localhost:8080/api/clients/bulk', {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': token ? `Bearer ${token}` : '',
           'X-User-Id': authUser?.id || '',
           'X-User-Role': authUser?.role || '',
         },
@@ -3989,11 +4001,10 @@ export default function CustomersPage() {
 
 
 
-                          {/* Bank details */}
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700">{bankDetails.name}</td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700">{bankDetails.branch}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700">{bankDetails.taluka}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700">{bankDetails.district}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700">{getCustomerLocation(customer).taluka}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700">{getCustomerLocation(customer).district}</td>
 
                           {/* Deal Stage */}
                           <td className="px-6 py-4 whitespace-nowrap text-sm">
@@ -6555,7 +6566,7 @@ export default function CustomersPage() {
 
 
 
-                                  const response = await fetch(`https://api.yashrajent.com/api/banks/${bankId}`);
+                                  const response = await fetch(`http://localhost:8080/api/banks/${bankId}`);
 
 
 

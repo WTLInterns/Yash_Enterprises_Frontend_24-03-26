@@ -15,13 +15,15 @@ export default function BanksPage() {
   const userRole = getCurrentUserRole();
 
   const [banks, setBanks] = useState([]);
-  const [bankContacts, setBankContacts] = useState({}); // { bankId: [contacts] }
+  const [bankContacts, setBankContacts] = useState({});
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [selectedBank, setSelectedBank] = useState(null);
   const [form, setForm] = useState({ name: "", branch: "", website: "", address: "", district: "", taluka: "", pinCode: "" });
   const [contacts, setContacts] = useState([{ ...EMPTY_CONTACT }]);
+  const [selectedBankIds, setSelectedBankIds] = useState([]);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   // Max contact columns to show in table (dynamic)
   const maxContacts = Math.max(1, ...Object.values(bankContacts).map(c => c.length));
@@ -52,9 +54,7 @@ export default function BanksPage() {
 
   const filtered = banks.filter(b =>
     (b.name || "").toLowerCase().includes(search.toLowerCase()) ||
-    (b.branchName || "").toLowerCase().includes(search.toLowerCase()) ||
-    (b.taluka || "").toLowerCase().includes(search.toLowerCase()) ||
-    (b.district || "").toLowerCase().includes(search.toLowerCase())
+    (b.branchName || "").toLowerCase().includes(search.toLowerCase())
   );
 
   const openCreate = () => {
@@ -102,6 +102,22 @@ export default function BanksPage() {
     } catch (err) { toast.error("Failed to save: " + (err?.message || "Unknown error")); }
   };
 
+  const handleBulkDelete = async () => {
+    if (selectedBankIds.length === 0) return;
+    if (!confirm(`Delete ${selectedBankIds.length} selected bank(s)? This cannot be undone.`)) return;
+    setBulkDeleting(true);
+    try {
+      await Promise.all(selectedBankIds.map(id => backendApi.delete(`/banks/${id}`).catch(() => {})));
+      toast.success(`${selectedBankIds.length} bank(s) deleted`);
+      setSelectedBankIds([]);
+      fetchBanks();
+    } catch (err) {
+      toast.error("Bulk delete failed");
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
+
   const handleDelete = async (id) => {
     if (!confirm("Delete this bank?")) return;
     try {
@@ -128,16 +144,25 @@ export default function BanksPage() {
             <div className="text-lg font-semibold text-slate-900">Banks</div>
             <p className="text-sm text-slate-500">{banks.length} bank branch{banks.length !== 1 ? "es" : ""}</p>
           </div>
-          <button onClick={openCreate} className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 shadow-sm">
-            <Plus className="h-4 w-4" /> Add Bank
-          </button>
+          <div className="flex items-center gap-2">
+            {selectedBankIds.length > 0 && (
+              <button onClick={handleBulkDelete} disabled={bulkDeleting}
+                className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50">
+                <Trash2 className="h-4 w-4" />
+                {bulkDeleting ? "Deleting..." : `Delete ${selectedBankIds.length} Selected`}
+              </button>
+            )}
+            <button onClick={openCreate} className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 shadow-sm">
+              <Plus className="h-4 w-4" /> Add Bank
+            </button>
+          </div>
         </div>
 
         {/* Search */}
         <div className="sticky top-[60px] z-20 bg-white py-2 mb-2">
           <div className="flex items-center gap-2 border border-slate-200 rounded-lg px-3 py-2 w-96 bg-white shadow-sm">
             <Search size={16} className="text-slate-400 shrink-0" />
-            <input type="text" placeholder="Search bank, branch, taluka, district..." value={search} onChange={e => setSearch(e.target.value)} className="flex-1 outline-none text-sm bg-transparent" />
+            <input type="text" placeholder="Search bank or branch..." value={search} onChange={e => setSearch(e.target.value)} className="flex-1 outline-none text-sm bg-transparent" />
             {search && <button onClick={() => setSearch("")}><X className="h-3.5 w-3.5 text-slate-400" /></button>}
           </div>
         </div>
@@ -151,19 +176,28 @@ export default function BanksPage() {
               <table className="min-w-full divide-y divide-slate-200">
                 <thead className="bg-slate-50" style={{ position: "sticky", top: 0, zIndex: 10 }}>
                   <tr>
+                    {/* Checkbox */}
+                    <th className="px-3 py-3" style={{ position: "sticky", left: 0, background: "rgb(248 250 252)", zIndex: 20, width: 40 }}>
+                      <input type="checkbox" className="h-4 w-4 rounded border-gray-300"
+                        checked={filtered.length > 0 && filtered.every(b => selectedBankIds.includes(b.id))}
+                        onChange={e => e.target.checked ? setSelectedBankIds(filtered.map(b => b.id)) : setSelectedBankIds([])}
+                      />
+                    </th>
+                    {/* ID */}
+                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 whitespace-nowrap"
+                      style={{ position: "sticky", left: 40, background: "rgb(248 250 252)", zIndex: 20, minWidth: 80 }}>
+                      ID
+                    </th>
                     {/* Frozen: Branch */}
                     <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 whitespace-nowrap"
-                      style={{ position: "sticky", left: 0, background: "rgb(248 250 252)", zIndex: 20, borderRight: "1px solid #e2e8f0", minWidth: 160 }}>
+                      style={{ position: "sticky", left: 120, background: "rgb(248 250 252)", zIndex: 20, borderRight: "1px solid #e2e8f0", minWidth: 160 }}>
                       Branch Name
                     </th>
                     {/* Frozen: Bank */}
                     <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 whitespace-nowrap"
-                      style={{ position: "sticky", left: 160, background: "rgb(248 250 252)", zIndex: 20, borderRight: "1px solid #e2e8f0", minWidth: 160 }}>
+                      style={{ position: "sticky", left: 280, background: "rgb(248 250 252)", zIndex: 20, borderRight: "1px solid #e2e8f0", minWidth: 160 }}>
                       Bank Name
                     </th>
-                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 whitespace-nowrap">Taluka</th>
-                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 whitespace-nowrap">District</th>
-                    {/* Dynamic contact columns */}
                     {Array.from({ length: contactColCount }, (_, i) => (
                       <th key={i} className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 whitespace-nowrap">
                         Contact Person {i + 1}
@@ -179,9 +213,23 @@ export default function BanksPage() {
                     const bContacts = bankContacts[bank.id] || [];
                     return (
                       <tr key={bank.id} className="hover:bg-slate-50 transition-colors">
+                        {/* Checkbox */}
+                        <td className="px-3 py-3" style={{ position: "sticky", left: 0, background: "white", zIndex: 5, width: 40 }}>
+                          <input type="checkbox" className="h-4 w-4 rounded border-gray-300"
+                            checked={selectedBankIds.includes(bank.id)}
+                            onChange={e => e.target.checked
+                              ? setSelectedBankIds(prev => [...prev, bank.id])
+                              : setSelectedBankIds(prev => prev.filter(id => id !== bank.id))}
+                          />
+                        </td>
+                        {/* ID */}
+                        <td className="px-5 py-3 whitespace-nowrap text-sm text-slate-500"
+                          style={{ position: "sticky", left: 40, background: "white", zIndex: 5, minWidth: 80 }}>
+                          {bank.id}
+                        </td>
                         {/* Frozen Branch */}
                         <td className="px-5 py-3 whitespace-nowrap text-sm font-medium"
-                          style={{ position: "sticky", left: 0, background: "white", zIndex: 10, borderRight: "1px solid #e2e8f0" }}>
+                          style={{ position: "sticky", left: 120, background: "white", zIndex: 5, borderRight: "1px solid #e2e8f0" }}>
                           <Link href={`/banks/${bank.id}`} className="flex items-center gap-1.5 text-indigo-600 hover:text-indigo-800 hover:underline">
                             <Building2 className="h-3.5 w-3.5 shrink-0" />
                             <span>{bank.branchName || "—"}</span>
@@ -189,13 +237,11 @@ export default function BanksPage() {
                         </td>
                         {/* Frozen Bank */}
                         <td className="px-5 py-3 whitespace-nowrap text-sm font-medium"
-                          style={{ position: "sticky", left: 160, background: "white", zIndex: 10, borderRight: "1px solid #e2e8f0" }}>
+                          style={{ position: "sticky", left: 280, background: "white", zIndex: 5, borderRight: "1px solid #e2e8f0" }}>
                           <Link href={`/banks/${bank.id}`} className="text-indigo-600 hover:text-indigo-800 hover:underline">
                             {bank.name || "—"}
                           </Link>
                         </td>
-                        <td className="px-5 py-3 whitespace-nowrap text-sm text-slate-600">{bank.taluka || "—"}</td>
-                        <td className="px-5 py-3 whitespace-nowrap text-sm text-slate-600">{bank.district || "—"}</td>
                         {/* Dynamic contact cells */}
                         {Array.from({ length: contactColCount }, (_, i) => {
                           const c = bContacts[i];

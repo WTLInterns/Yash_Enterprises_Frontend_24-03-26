@@ -145,14 +145,17 @@ export default function EmployeeTrackingMap() {
   // Fetch live employees
   async function fetchLive() {
     try {
-      const token = (typeof window !== 'undefined')
-        ? (sessionStorage.getItem('token') || localStorage.getItem('token'))
-        : null;
+      const user = (() => { try { return JSON.parse(sessionStorage.getItem('user_data') || localStorage.getItem('user_data') || '{}'); } catch { return {}; } })();
       const res = await fetch(`${baseUrl}/api/employee-locations/live-employees`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {}
+        headers: {
+          'X-User-Id':   String(user?.id   ?? ''),
+          'X-User-Role': user?.role ?? '',
+        }
       });
       if (!res.ok) { return; }
-      const json = await res.json();
+      const text = await res.text();
+      if (!text) return;
+      const json = JSON.parse(text);
       const mapped = (json.employees || []).map((e) => {
         const lat = Number(e.latitude ?? e.lat ?? e.position?.lat ?? NaN);
         const lng = Number(e.longitude ?? e.lng ?? e.position?.lng ?? NaN);

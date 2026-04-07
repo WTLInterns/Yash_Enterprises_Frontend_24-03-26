@@ -7,16 +7,20 @@ export default function AuthGuard({ children, allowedRoles = [] }) {
   const router = useRouter();
 
   useEffect(() => {
-    const token = localStorage.getItem("auth_token");
-    const role = localStorage.getItem("user_role");
+    try {
+      const raw = sessionStorage.getItem("user_data") || localStorage.getItem("user_data");
+      const user = raw ? JSON.parse(raw) : null;
 
-    if (!token) {
+      if (!user?.id || !user?.role) {
+        router.replace("/login");
+        return;
+      }
+
+      if (allowedRoles.length && !allowedRoles.includes(user.role)) {
+        router.replace("/login");
+      }
+    } catch {
       router.replace("/login");
-      return;
-    }
-
-    if (allowedRoles.length && !allowedRoles.includes(role)) {
-      router.replace("/unauthorized");
     }
   }, [router, allowedRoles]);
 

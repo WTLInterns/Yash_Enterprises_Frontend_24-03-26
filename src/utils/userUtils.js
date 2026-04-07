@@ -1,81 +1,46 @@
 import { useState, useEffect } from "react";
-import { getTabSafeItem } from "./tabSafeStorage";
 
-// Utility functions for dynamic user data
-export const getCurrentUser = () => {
+function readUserData() {
   if (typeof window === "undefined") return null;
   try {
-    // Priority: sessionStorage -> tabSafeStorage -> localStorage
-    let userDataStr = sessionStorage.getItem('user_data');
-    
-    if (!userDataStr) {
-      userDataStr = getTabSafeItem("user_data");
-    }
-    
-    if (!userDataStr) {
-      userDataStr = localStorage.getItem('user_data');
-    }
-    
-    // Also try other common keys
-    if (!userDataStr) {
-      userDataStr = sessionStorage.getItem('authUser') || localStorage.getItem('authUser');
-    }
-    
-    const userData = JSON.parse(userDataStr || "{}");
-    
-    return userData;
-  } catch (error) {
-    console.error("Error parsing user data:", error);
-    return null;
-  }
-};
+    const raw = sessionStorage.getItem("user_data") || localStorage.getItem("user_data");
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+export const getCurrentUser = () => readUserData();
 
 export const getCurrentUserRole = () => {
-  if (typeof window === "undefined") return "ADMIN";
-  return getTabSafeItem("user_role") || "ADMIN";
+  const u = readUserData();
+  return u?.role || u?.roleName || "ADMIN";
 };
 
 export const getCurrentUserName = () => {
-  const user = getCurrentUser();
-  if (user && user.firstName) {
-    return `${user.firstName} ${user.lastName || ""}`.trim();
-  }
-  return "Admin User";
+  const u = readUserData();
+  if (!u) return "Admin User";
+  return u.fullName || (u.firstName ? `${u.firstName} ${u.lastName || ""}`.trim() : u.name) || "Admin User";
 };
 
 export const getCurrentUserId = () => {
-  const user = getCurrentUser();
-  const userId = user?.id || user?.userId || null;
-  
-  return userId;
+  const u = readUserData();
+  return u?.id || u?.userId || null;
 };
 
-// React hook version for components that need reactivity
+export const getAuthUser = () => readUserData();
+
 export const useCurrentUser = () => {
   const [user, setUser] = useState(null);
   const [role, setRole] = useState("ADMIN");
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const updateUser = () => {
-      const userData = getCurrentUser();
-      const userRole = getCurrentUserRole();
-      setUser(userData);
-      setRole(userRole);
+    const update = () => {
+      const u = readUserData();
+      setUser(u);
+      setRole(u?.role || "ADMIN");
     };
-
-    updateUser();
-
-    // Listen for storage changes
-    const handleStorageChange = (e) => {
-      if (e.key === "user_data" || e.key === "user_role") {
-        updateUser();
-      }
-    };
-
-    window.addEventListener("storage", handleStorageChange);
-    return () => window.removeEventListener("storage", handleStorageChange);
+    update();
+    window.addEventListener("storage", update);
+    return () => window.removeEventListener("storage", update);
   }, []);
 
   return { user, role, userName: getCurrentUserName(), userId: getCurrentUserId() };

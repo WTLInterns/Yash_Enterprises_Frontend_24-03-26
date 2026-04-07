@@ -374,9 +374,9 @@ export default function CustomersPage() {
   const [allDepartments, setAllDepartments] = useState([]);
 
   useEffect(() => {
-    const token = sessionStorage.getItem('token') || localStorage.getItem('token');
-    fetch("http://localhost:8080/api/stages/departments", {
-      headers: token ? { Authorization: `Bearer ${token}` } : {}
+    const _ud = (() => { try { return JSON.parse(sessionStorage.getItem('user_data') || localStorage.getItem('user_data') || '{}'); } catch { return {}; } })();
+    fetch("https://api.yashrajent.com/api/stages/departments", {
+      headers: { 'X-User-Id': String(_ud?.id ?? ''), 'X-User-Role': _ud?.role ?? '' }
     })
       .then(r => r.ok ? r.json() : [])
       .then(data => setAllDepartments(data || []))
@@ -732,36 +732,21 @@ export default function CustomersPage() {
 
 
 
-  const fetchCustomers = async (skipAddresses = false) => {
+  const fetchCustomers = async () => {
     await loadAllData(false);
-  };
-
-  const fetchBanks = async () => {
-    try {
-      const res = await backendApi.get("/banks?size=9999");
-      setBanks(normalizeList(res));
-    } catch (err) {
-      console.error("Failed to fetch banks:", err);
-    }
   };
 
   const fetchDeals = async () => {
     try {
-      const authUser = getTabSafeAuthUser();
-      const res = await backendApi.get("/deals/filtered", {
-        headers: {
-          "X-User-Role": authUser?.role ?? "",
-          "X-User-Department": authUser?.department ?? "",
-        },
-      });
+      const res = await backendApi.get('/deals/all');
       const list = normalizeList(res);
       const normalized = list.map((d) => ({
         ...d,
-        clientId: d.clientId ?? d.client_id ?? (typeof d.client === 'object' ? d.client?.id : d.client) ?? null,
-        stageCode: d.stage || d.stageCode || "",
-        valueAmount: d.calculatedValue ?? d.valueAmount ?? d.value_amount ?? 0,
-        dealCode: d.dealCode ?? d.deal_code ?? null,
-        movedToApproval: d.movedToApproval ?? d.moved_to_approval ?? false,
+        clientId: d.clientId ?? d.client_id ?? null,
+        stageCode: d.stageCode || d.stage || "",
+        valueAmount: d.calculatedValue ?? d.valueAmount ?? 0,
+        dealCode: d.dealCode ?? null,
+        movedToApproval: d.movedToApproval ?? false,
       }));
       setDeals(normalized);
     } catch (err) {
@@ -794,23 +779,8 @@ export default function CustomersPage() {
 
 
   useEffect(() => {
-    // Show cached data instantly (stale-while-revalidate)
-    const cached = sessionStorage.getItem('crm_customers_cache');
-    if (cached) {
-      try {
-        const { customers: cc, deals: cd, banks: cb, ts } = JSON.parse(cached);
-        const age = Date.now() - ts;
-        if (age < 10 * 60 * 1000) { // 10 min cache
-          setCustomers(cc || []);
-          setDeals(cd || []);
-          setBanks(cb || []);
-          setLoading(false);
-          // Refresh in background silently
-          loadAllData(true);
-          return;
-        }
-      } catch {}
-    }
+    // Clear stale cache to ensure clientId/bankId fields are fresh
+    sessionStorage.removeItem('crm_customers_cache');
     loadAllData(false);
   }, []);
 
@@ -819,27 +789,21 @@ export default function CustomersPage() {
     try {
       const authUser = getTabSafeAuthUser();
 
-      // Phase 1: Load customers + deals + banks in parallel (NO addresses — fast!)
       const [customersData, dealsRes, banksRes] = await Promise.all([
         departmentApiService.getCustomers(),
-        backendApi.get("/deals/filtered", {
-          headers: {
-            "X-User-Role": authUser?.role ?? "",
-            "X-User-Department": authUser?.department ?? "",
-          },
-        }).catch(() => []),
-        backendApi.get("/banks?size=9999").catch(() => ({ content: [] })),
+        backendApi.get('/deals/all').catch(() => []),
+        backendApi.get('/banks?size=9999').catch(() => ({ content: [] })),
       ]);
 
       // Process deals
       const dealsList = normalizeList(dealsRes);
       const normalizedDeals = dealsList.map((d) => ({
         ...d,
-        clientId: d.clientId ?? d.client_id ?? (typeof d.client === 'object' ? d.client?.id : d.client) ?? null,
-        stageCode: d.stage || d.stageCode || "",
-        valueAmount: d.calculatedValue ?? d.valueAmount ?? d.value_amount ?? 0,
-        dealCode: d.dealCode ?? d.deal_code ?? null,
-        movedToApproval: d.movedToApproval ?? d.moved_to_approval ?? false,
+        clientId: d.clientId ?? d.client_id ?? null,
+        stageCode: d.stageCode || d.stage || "",
+        valueAmount: d.calculatedValue ?? d.valueAmount ?? 0,
+        dealCode: d.dealCode ?? null,
+        movedToApproval: d.movedToApproval ?? false,
       }));
 
       const banksList = normalizeList(banksRes);
@@ -859,10 +823,14 @@ export default function CustomersPage() {
       setDynamicColumns([...keys]);
       if (!silent) setLoading(false); // ← table visible NOW
 
-      // Phase 2: Load addresses in background (non-blocking)
-      const token = sessionStorage.getItem('token') || localStorage.getItem('token');
-      fetch('http://localhost:8080/api/clients/addresses/all', {
-        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      // Phase 2: Load addresses in background
+      const authUser2 = getTabSafeAuthUser();
+      fetch('https://api.yashrajent.com/api/clients/addresses/all', {
+        headers: {
+          'X-User-Id': String(authUser2?.id ?? ''),
+          'X-User-Role': authUser2?.role ?? '',
+          'X-User-Department': authUser2?.department ?? '',
+        }
       })
         .then(r => r.ok ? r.json() : [])
         .catch(() => [])
@@ -875,16 +843,6 @@ export default function CustomersPage() {
             addrByClient[cid].push(addr);
           });
           setCustomers(prev => prev.map(c => ({ ...c, addresses: addrByClient[c.id] || c.addresses || [] })));
-
-          // Cache with addresses
-          try {
-            sessionStorage.setItem('crm_customers_cache', JSON.stringify({
-              customers: customersData.map(c => ({ ...c, addresses: addrByClient[c.id] || [] })),
-              deals: normalizedDeals,
-              banks: banksList,
-              ts: Date.now(),
-            }));
-          } catch {}
         });
 
     } catch (err) {
@@ -1413,7 +1371,7 @@ export default function CustomersPage() {
 
 
 
-      const response = await fetch('http://localhost:8080/api/clients/geocode', {
+      const response = await fetch('https://api.yashrajent.com/api/clients/geocode', {
 
 
 
@@ -1641,7 +1599,7 @@ export default function CustomersPage() {
 
 
 
-      const response = await fetch('http://localhost:8080/api/clients/reverse-geocode', {
+      const response = await fetch('https://api.yashrajent.com/api/clients/reverse-geocode', {
 
 
 
@@ -1756,31 +1714,35 @@ export default function CustomersPage() {
   // 🔥 STEP 2: BANK DETAILS HELPER FUNCTION
 
   const getBankDetails = (deal) => {
-    // Bank name/branch from deal fields
-    const nameFromDeal = deal?.bankName || deal?.relatedBankName || null;
-    const branchFromDeal = deal?.branchName || deal?.branch || null;
-
-    // Fall back to banks[] array by bankId
+    // Bank name: prefer deal's relatedBankName, fall back to banks[] lookup by bankId
     const bankObj = deal?.bankId
       ? banks.find(b => Number(b.id) === Number(deal.bankId))
       : null;
 
-    const branchFromBank = bankObj?.branchName || bankObj?.branch || null;
-
     return {
-      name: nameFromDeal || bankObj?.name || "-",
-      branch: branchFromDeal || branchFromBank || "-",
+      name: deal?.bankName || deal?.relatedBankName || bankObj?.name || "-",
+      // branchName on the deal is the specific branch for this deal
+      branch: deal?.branchName || bankObj?.branchName || "-",
     };
   };
 
-  // Get taluka/district from customer's PRIMARY address
-  const getCustomerLocation = (customer) => {
-    if (!customer?.addresses?.length) return { taluka: "-", district: "-" };
-    const primary = customer.addresses.find(a => a.addressType === 'PRIMARY') || customer.addresses[0];
+  // Taluka/District from BANK (not customer address)
+  const getCustomerLocation = (customer, deal) => {
+    const bankObj = deal?.bankId
+      ? banks.find(b => Number(b.id) === Number(deal.bankId))
+      : null;
     return {
-      taluka: primary?.city || "-",
-      district: primary?.state || "-",
+      taluka: bankObj?.taluka || "-",
+      district: bankObj?.district || "-",
     };
+  };
+
+  // Full address from customer PRIMARY address
+  const getFullAddress = (customer) => {
+    if (!customer?.addresses?.length) return "-";
+    const primary = customer.addresses.find(a => a.addressType === 'PRIMARY') || customer.addresses[0];
+    const parts = [primary?.addressLine, primary?.city, primary?.state, primary?.pincode].filter(Boolean);
+    return parts.join(", ") || "-";
   };
 
   // Column filter helper functions
@@ -1799,13 +1761,14 @@ export default function CustomersPage() {
         })[0] ?? null;
 
       const bankDetails = getBankDetails(deal);
+      const bankObj = deal?.bankId ? banks.find(b => Number(b.id) === Number(deal.bankId)) : null;
 
       const valueMap = {
         name: customer.name || null,
         bankName: bankDetails.name !== '-' ? bankDetails.name : null,
         branchName: bankDetails.branch !== '-' ? bankDetails.branch : null,
-        taluka: getCustomerLocation(customer).taluka !== '-' ? getCustomerLocation(customer).taluka : null,
-        district: getCustomerLocation(customer).district !== '-' ? getCustomerLocation(customer).district : null,
+        taluka: bankObj?.taluka || null,
+        district: bankObj?.district || null,
         stageCode: deal?.stageCode ? deal.stageCode.toUpperCase() : null,
         department: deal?.department ? deal.department.trim() : null,
         ownerName: customer.ownerName || null,
@@ -1956,13 +1919,14 @@ export default function CustomersPage() {
           })[0] ?? null;
 
         const bankDetails = getBankDetails(deal);
+        const bankObj2 = deal?.bankId ? banks.find(b => Number(b.id) === Number(deal.bankId)) : null;
 
         const valueMap = {
           name: customer.name || '',
           bankName: bankDetails.name !== '-' ? bankDetails.name : '',
-          branchName: bankDetails.branch !== '-' ? bankDetails.branch : '',  // ← fixed
-          taluka: getCustomerLocation(customer).taluka !== '-' ? getCustomerLocation(customer).taluka : '',
-          district: getCustomerLocation(customer).district !== '-' ? getCustomerLocation(customer).district : '',
+          branchName: bankDetails.branch !== '-' ? bankDetails.branch : '',
+          taluka: bankObj2?.taluka || '',
+          district: bankObj2?.district || '',
           stageCode: deal?.stageCode ? deal.stageCode.toUpperCase() : '',
           department: deal?.department ? deal.department.trim() : '',
           ownerName: customer.ownerName || '',
@@ -1996,12 +1960,13 @@ export default function CustomersPage() {
               return td !== 0 ? td : (Number(b.id) || 0) - (Number(a.id) || 0);
             })[0] ?? null;
           const bd = getBankDetails(deal);
+          const bankObj3 = deal?.bankId ? banks.find(b => Number(b.id) === Number(deal.bankId)) : null;
           const vm = {
             name: customer.name || '',
             bankName: bd.name !== '-' ? bd.name : '',
-            branchName: bd.branch !== '-' ? bd.branch : '',  // ← fixed
-            taluka: getCustomerLocation(customer).taluka !== '-' ? getCustomerLocation(customer).taluka : '',
-            district: getCustomerLocation(customer).district !== '-' ? getCustomerLocation(customer).district : '',
+            branchName: bd.branch !== '-' ? bd.branch : '',
+            taluka: bankObj3?.taluka || '',
+            district: bankObj3?.district || '',
             stageCode: deal?.stageCode || '',
             department: deal?.department || '',
             ownerName: customer.ownerName || '',
@@ -2178,10 +2143,10 @@ export default function CustomersPage() {
       // but backendApi.get("/api/clients/...") becomes /api/api/clients/... → 500!
       const authUser = getTabSafeAuthUser();
       const addrResponse = await fetch(
-        `http://localhost:8080/api/clients/${customer.id}/addresses`,
+        `https://api.yashrajent.com/api/clients/${customer.id}/addresses`,
         {
           headers: {
-            "X-User-Id": authUser?.id ?? "",
+            "X-User-Id": String(authUser?.id ?? ""),
             "X-User-Role": authUser?.role ?? "",
             "X-User-Department": authUser?.department ?? "",
           },
@@ -2718,7 +2683,7 @@ export default function CustomersPage() {
 
 
 
-        await fetch(`http://localhost:8080/api/clients/${savedCustomer.id}/addresses`, {
+        await fetch(`https://api.yashrajent.com/api/clients/${savedCustomer.id}/addresses`, {
 
 
 
@@ -2772,7 +2737,7 @@ export default function CustomersPage() {
 
 
 
-        await fetch(`http://localhost:8080/api/clients/${savedCustomer.id}/addresses`, {
+        await fetch(`https://api.yashrajent.com/api/clients/${savedCustomer.id}/addresses`, {
 
 
 
@@ -3343,13 +3308,11 @@ export default function CustomersPage() {
     setBulkDeleting(true);
     try {
       const authUser = getTabSafeAuthUser();
-      const token = sessionStorage.getItem('token') || localStorage.getItem('token');
-      const res = await fetch('http://localhost:8080/api/clients/bulk', {
+      const res = await fetch('https://api.yashrajent.com/api/clients/bulk', {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': token ? `Bearer ${token}` : '',
-          'X-User-Id': authUser?.id || '',
+          'X-User-Id': String(authUser?.id || ''),
           'X-User-Role': authUser?.role || '',
         },
         body: JSON.stringify({ ids: selectedDealIds })
@@ -3905,7 +3868,8 @@ export default function CustomersPage() {
                       const dealDepartment = (customerDeal?.department ?? "").trim();
 
                       // FIX 2 ▸ Resolve bank details from the deal object (not bankId alone)
-                      const bankDetails = getBankDetails(customerDeal); // pass full deal, not just bankId
+                      const bankDetails = getBankDetails(customerDeal);
+                      const customerLocation = getCustomerLocation(customer, customerDeal);
 
 
                       return (
@@ -3933,7 +3897,7 @@ export default function CustomersPage() {
                           </td>
                           {/* Sticky ID column */}
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900 sticky left-[40px] bg-white z-10 border-r border-slate-200" style={{ position: 'sticky', left: '40px', backgroundColor: 'white', zIndex: 10 }}>
-                            {customerDeal?.dealCode ? customerDeal.dealCode.toLowerCase() : "-"}
+                            {customerDeal?.dealCode ? customerDeal.dealCode.toLowerCase() : (customerDeal?.id ? `#${customerDeal.id}` : "-")}
                           </td>
 
 
@@ -3964,18 +3928,9 @@ export default function CustomersPage() {
 
                           {/* Address column */}
                           <td className="px-6 py-4 text-sm text-slate-700" style={{ maxWidth: 220 }}>
-                            {customer.addresses && customer.addresses.length > 0
-                              ? (() => {
-                                  const primary = customer.addresses.find(a => a.addressType === 'PRIMARY');
-                                  const addr = primary || customer.addresses[0];
-                                  const parts = [addr.addressLine, addr.city, addr.pincode].filter(Boolean);
-                                  return (
-                                    <span title={parts.join(', ')} style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                      {parts.join(', ')}
-                                    </span>
-                                  );
-                                })()
-                              : <span className="text-slate-400">-</span>}
+                            <span title={getFullAddress(customer)} style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {getFullAddress(customer)}
+                            </span>
                           </td>
 
                           {/* Phone + Contact Person column */}
@@ -4003,8 +3958,8 @@ export default function CustomersPage() {
 
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700">{bankDetails.name}</td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700">{bankDetails.branch}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700">{getCustomerLocation(customer).taluka}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700">{getCustomerLocation(customer).district}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700">{customerLocation.taluka}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700">{customerLocation.district}</td>
 
                           {/* Deal Stage */}
                           <td className="px-6 py-4 whitespace-nowrap text-sm">
@@ -6566,7 +6521,7 @@ export default function CustomersPage() {
 
 
 
-                                  const response = await fetch(`http://localhost:8080/api/banks/${bankId}`);
+                                  const response = await fetch(`https://api.yashrajent.com/api/banks/${bankId}`);
 
 
 

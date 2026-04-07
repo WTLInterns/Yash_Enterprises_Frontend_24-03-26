@@ -90,7 +90,8 @@ const CustomerExcelUploadModal = ({ isOpen, onClose, onUploadSuccess }) => {
 
   const handleDownloadTemplate = async () => {
     try {
-      const res = await fetch('https://api.yashrajent.com/api/deals/download-template');
+      const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api.yashrajent.com';
+      const res = await fetch(`${BASE_URL}/api/deals/download-template`);
       if (!res.ok) throw new Error(`Server error ${res.status}`);
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);

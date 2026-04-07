@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { backendApi } from '@/services/api';
 import {
@@ -18,6 +18,8 @@ import {
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 
+const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api.yashrajent.com';
+
 export default function ExpenseOverviewPage() {
 
   const [activeTab, setActiveTab] = useState('overview');
@@ -30,6 +32,11 @@ export default function ExpenseOverviewPage() {
   const pageSize = 10;
 
   const [clients, setClients] = useState([]);
+  const [clientProducts, setClientProducts] = useState([]);
+  const [clientDealId, setClientDealId] = useState(null);
+  const [dealStats, setDealStats] = useState({ totalDeals: 0, closeWin: 0, closeLost: 0, pending: 0 });
+  const [productSales, setProductSales] = useState([]);
+  const [productSalesOpen, setProductSalesOpen] = useState(false);
   const [selectedExpense, setSelectedExpense] = useState(null);
   const [previewImage, setPreviewImage] = useState(null);
   const [showFormModal, setShowFormModal] = useState(false);
@@ -75,6 +82,8 @@ export default function ExpenseOverviewPage() {
     loadExpenses();
     loadEmployees();
     loadClients();
+    loadDealStats();
+    loadProductSales();
   }, []);
 
   async function loadExpenses() {
@@ -101,9 +110,51 @@ export default function ExpenseOverviewPage() {
   async function loadClients() {
     try {
       const res = await backendApi.get('/clients');
-      setClients(res || []);
+      setClients(Array.isArray(res) ? res : (res?.content || []));
     } catch (err) {
       console.error("Failed to load clients", err);
+    }
+  }
+
+  async function loadDealStats() {
+    try {
+      const res = await backendApi.get('/deals?size=9999');
+      const list = Array.isArray(res) ? res : (res?.content || []);
+      setDealStats({
+        totalDeals: list.length,
+        closeWin:   list.filter(d => d.stageCode === 'CLOSE_WIN').length,
+        closeLost:  list.filter(d => d.stageCode === 'CLOSE_LOST').length,
+        pending:    list.filter(d => !['CLOSE_WIN','CLOSE_LOST'].includes(d.stageCode)).length,
+      });
+    } catch (err) {
+      console.error('Failed to load deal stats', err);
+    }
+  }
+
+  async function loadProductSales() {
+    try {
+      const res = await backendApi.get('/deals/products/sales-summary');
+      setProductSales(Array.isArray(res) ? res : []);
+    } catch (err) {
+      console.error('Failed to load product sales', err);
+    }
+  }
+
+  async function handleClientChange(clientId) {
+    setSelectedClientId(clientId);
+    setClientProducts([]);
+    setClientDealId(null);
+    if (!clientId) return;
+    try {
+      const deals = await backendApi.get(`/deals?clientId=${clientId}&size=9999`);
+      const list = Array.isArray(deals) ? deals : (deals?.content || []);
+      const deal = list.sort((a, b) => (b.id || 0) - (a.id || 0))[0];
+      if (!deal) return;
+      setClientDealId(deal.id);
+      const products = await backendApi.get(`/deals/${deal.id}/products`).catch(() => []);
+      setClientProducts(Array.isArray(products) ? products : []);
+    } catch (err) {
+      console.error('Failed loading client products', err);
     }
   }
 
@@ -160,6 +211,8 @@ export default function ExpenseOverviewPage() {
       setPreviewImage(null);
       setFilePreview(null);
       setSelectedClientId('');
+      setClientProducts([]);
+      setClientDealId(null);
       e.target.reset();
       loadExpenses();
 
@@ -430,11 +483,26 @@ export default function ExpenseOverviewPage() {
   }
 
   const summary = {
-    pending: expenses.filter(e => e.status === 'PENDING').length,
-    approved: expenses.filter(e => e.status === 'APPROVED').length,
-    rejected: expenses.filter(e => e.status === 'REJECTED').length,
-    paid: expenses.filter(e => e.status === 'PAID').length,
+    pending:  { count: expenses.filter(e => e.status === 'PENDING').length,  amount: expenses.filter(e => e.status === 'PENDING').reduce((s, e) => s + Number(e.amount || 0), 0) },
+    approved: { count: expenses.filter(e => e.status === 'APPROVED').length, amount: expenses.filter(e => e.status === 'APPROVED').reduce((s, e) => s + Number(e.amount || 0), 0) },
+    rejected: { count: expenses.filter(e => e.status === 'REJECTED').length, amount: expenses.filter(e => e.status === 'REJECTED').reduce((s, e) => s + Number(e.amount || 0), 0) },
+    paid:     { count: expenses.filter(e => e.status === 'PAID').length,     amount: expenses.filter(e => e.status === 'PAID').reduce((s, e) => s + Number(e.amount || 0), 0) },
   };
+
+  const totalExpenseAmount = useMemo(() =>
+    expenses.reduce((sum, e) => sum + Number(e.amount || 0), 0)
+  , [expenses]);
+
+  const productSummary = useMemo(() => {
+    let totalQty = 0, totalPrice = 0;
+    clientProducts.forEach(p => {
+      const qty   = Number(p.quantity || p.qty || 1);
+      const price = Number(p.unitPrice || p.price || p.totalPrice || 0);
+      totalQty   += qty;
+      totalPrice += qty * price;
+    });
+    return { totalQty, totalPrice };
+  }, [clientProducts]);
 
   const filtered = expenses.filter(e => {
     const searchMatch = 
@@ -477,6 +545,8 @@ export default function ExpenseOverviewPage() {
               setEditExpense(null);
               setFilePreview(null);
               setSelectedClientId('');
+              setClientProducts([]);
+              setClientDealId(null);
               setShowFormModal(true);
             }}
             className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-md text-sm hover:bg-indigo-700"
@@ -487,11 +557,73 @@ export default function ExpenseOverviewPage() {
         </div>
 
         {/* SUMMARY */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Card title="Pending" value={summary.pending} color="yellow"/>
-          <Card title="Approved" value={summary.approved} color="green"/>
-          <Card title="Rejected" value={summary.rejected} color="red"/>
-          <Card title="Paid" value={summary.paid} color="blue"/>
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <Card title="Pending"  count={summary.pending.count}  amount={summary.pending.amount}  color="yellow"/>
+          <Card title="Approved" count={summary.approved.count} amount={summary.approved.amount} color="green"/>
+          <Card title="Rejected" count={summary.rejected.count} amount={summary.rejected.amount} color="red"/>
+          <Card title="Paid"     count={summary.paid.count}     amount={summary.paid.amount}     color="blue"/>
+          <div className="bg-indigo-600 text-white rounded-lg p-4 flex flex-col justify-between">
+            <div className="text-sm opacity-80">Total Expenses</div>
+            <div className="text-xl font-bold mt-1">₹{totalExpenseAmount.toLocaleString('en-IN')}</div>
+            <div className="text-xs opacity-70 mt-1">{expenses.length} record{expenses.length !== 1 ? 's' : ''}</div>
+          </div>
+        </div>
+
+        {/* PRODUCT SALES STATS - collapsible */}
+        <div className="bg-white border rounded-lg overflow-hidden">
+          <button
+            onClick={() => setProductSalesOpen(o => !o)}
+            className="w-full px-5 py-3 border-b bg-gray-50 flex items-center justify-between hover:bg-gray-100 transition-colors"
+          >
+            <div className="text-left">
+              <h2 className="text-sm font-semibold text-gray-800">Product Sales Summary</h2>
+              <p className="text-xs text-gray-400 mt-0.5">Total products sold across all customer deals</p>
+            </div>
+            <span className="text-gray-400 text-sm">{productSalesOpen ? '▲' : '▼'}</span>
+          </button>
+
+          {productSalesOpen && (
+            productSales.length === 0 ? (
+              <div className="p-8 text-center text-gray-400 text-sm">No product sales data yet.</div>
+            ) : (
+              <div className="overflow-auto max-h-64">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 text-xs uppercase text-gray-500 tracking-wider sticky top-0">
+                    <tr>
+                      <th className="px-5 py-3 text-left">#</th>
+                      <th className="px-5 py-3 text-left">Product Name</th>
+                      <th className="px-5 py-3 text-right">Deals</th>
+                      <th className="px-5 py-3 text-right">Total Qty</th>
+                      <th className="px-5 py-3 text-right">Total Price</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {productSales.map((p, i) => (
+                      <tr key={i} className="border-t hover:bg-gray-50">
+                        <td className="px-5 py-2 text-gray-400">{i + 1}</td>
+                        <td className="px-5 py-2 font-medium text-gray-800">{p.productName || '—'}</td>
+                        <td className="px-5 py-2 text-right">
+                          <span className="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full text-xs font-semibold">
+                            {Number(p.dealCount).toLocaleString()}
+                          </span>
+                        </td>
+                        <td className="px-5 py-2 text-right font-semibold text-gray-700">{Number(p.totalQty).toLocaleString()}</td>
+                        <td className="px-5 py-2 text-right font-semibold text-green-600">
+                          ₹{Number(p.totalPrice || 0).toLocaleString('en-IN')}
+                        </td>
+                      </tr>
+                    ))}
+                    <tr className="border-t bg-indigo-50 font-semibold">
+                      <td className="px-5 py-2" colSpan={2}>Total</td>
+                      <td className="px-5 py-2 text-right text-indigo-700">{productSales.reduce((s, p) => s + Number(p.dealCount || 0), 0).toLocaleString()}</td>
+                      <td className="px-5 py-2 text-right text-gray-700">{productSales.reduce((s, p) => s + Number(p.totalQty || 0), 0).toLocaleString()}</td>
+                      <td className="px-5 py-2 text-right text-green-700">₹{productSales.reduce((s, p) => s + Number(p.totalPrice || 0), 0).toLocaleString('en-IN')}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            )
+          )}
         </div>
 
         {/* SEARCH */}
@@ -541,17 +673,13 @@ export default function ExpenseOverviewPage() {
         </div>
 
         {/* TABLE */}
-        <div className="bg-white border rounded-lg overflow-x-auto">
-
+        <div className="bg-white border rounded-lg overflow-hidden">
           {loading ? (
-            <div className="p-8 text-center text-gray-500">
-              Loading expenses...
-            </div>
+            <div className="p-8 text-center text-gray-500">Loading expenses...</div>
           ) : (
-
-            <table className="w-full text-sm">
-
-              <thead className="bg-gray-50 text-gray-600 text-xs uppercase tracking-wider">
+            <div className="overflow-auto" style={{ maxHeight: 'calc(100vh - 380px)' }}>
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 text-gray-600 text-xs uppercase tracking-wider" style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                 <tr>
                   <th className="p-3 text-left">Employee</th>
                   <th className="p-3 text-left">Client</th>
@@ -622,7 +750,7 @@ export default function ExpenseOverviewPage() {
                         e.receiptUrl.match(/\.(jpg|jpeg|png)$/i) ?
 
                           <img
-                            src={`https://api.yashrajent.com${e.receiptUrl}`}
+                            src={`${BASE_URL}${e.receiptUrl}`}
                             onClick={() => setPreviewImage(e.receiptUrl)}
                             className="w-10 h-10 rounded object-cover border cursor-pointer"
                           />
@@ -630,7 +758,7 @@ export default function ExpenseOverviewPage() {
                           :
 
                           <a
-                            href={`https://api.yashrajent.com${e.receiptUrl}`}
+                            href={`${BASE_URL}${e.receiptUrl}`}
                             target="_blank"
                             className="text-indigo-600 text-xs underline"
                           >
@@ -669,6 +797,8 @@ export default function ExpenseOverviewPage() {
                             setEditExpense(e);
                             setFilePreview(null);
                             setSelectedClientId(e.clientId || '');
+                            setClientProducts([]);
+                            setClientDealId(null);
                             setShowFormModal(true);
                           }}
                           className="p-2 bg-gray-100 rounded"
@@ -710,6 +840,7 @@ export default function ExpenseOverviewPage() {
 
             </table>
 
+            </div>
           )}
 
         </div>
@@ -766,7 +897,7 @@ export default function ExpenseOverviewPage() {
             </button>
 
             <img
-              src={`https://api.yashrajent.com${previewImage}`}
+              src={`${BASE_URL}${previewImage}`}
               className="w-full object-contain"
             />
 
@@ -825,7 +956,7 @@ export default function ExpenseOverviewPage() {
                 <select
                   name="clientId"
                   value={selectedClientId}
-                  onChange={e => setSelectedClientId(e.target.value)}
+                  onChange={e => handleClientChange(e.target.value)}
                   className="w-full border rounded px-3 py-2 text-sm"
                 >
                   <option value="">No Client</option>
@@ -835,10 +966,14 @@ export default function ExpenseOverviewPage() {
                     </option>
                   ))}
                 </select>
-                {selectedClientId && (
-                  <p className="text-xs text-indigo-600 mt-1">
-                    Client: {clients.find(c => String(c.id) === String(selectedClientId))?.name || clients.find(c => String(c.id) === String(selectedClientId))?.clientName || clients.find(c => String(c.id) === String(selectedClientId))?.companyName}
-                  </p>
+                {selectedClientId && clientProducts.length > 0 && (
+                  <div className="mt-2 p-2 bg-indigo-50 rounded text-xs text-indigo-700 flex gap-4">
+                    <span>Products: <b>{productSummary.totalQty}</b></span>
+                    <span>Total Value: <b>₹{productSummary.totalPrice.toLocaleString('en-IN')}</b></span>
+                  </div>
+                )}
+                {selectedClientId && clientProducts.length === 0 && clientDealId && (
+                  <p className="text-xs text-gray-400 mt-1">No products linked to this client's deal.</p>
                 )}
               </div>
 
@@ -940,7 +1075,7 @@ export default function ExpenseOverviewPage() {
                   )}
                 </label>
                 {editExpense?.receiptUrl && !filePreview && (
-                  <p className="text-xs text-gray-400 mt-1">Current: <a href={`https://api.yashrajent.com${editExpense.receiptUrl}`} target="_blank" className="text-indigo-500 underline">View existing</a></p>
+                  <p className="text-xs text-gray-400 mt-1">Current: <a href={`${BASE_URL}${editExpense.receiptUrl}`} target="_blank" className="text-indigo-500 underline">View existing</a></p>
                 )}
               </div>
 
@@ -1169,23 +1304,21 @@ export default function ExpenseOverviewPage() {
 
 /* COMPONENTS */
 
-function Card({title,value,color}){
-
-  const colors={
-    yellow:"text-yellow-600",
-    green:"text-green-600",
-    red:"text-red-600",
-    blue:"text-blue-600"
-  }
-
-  return(
-    <div className="bg-white border rounded-lg p-4">
+function Card({ title, count, amount, color }) {
+  const colors = {
+    yellow: { text: 'text-yellow-600', bg: 'bg-yellow-50' },
+    green:  { text: 'text-green-600',  bg: 'bg-green-50' },
+    red:    { text: 'text-red-600',    bg: 'bg-red-50' },
+    blue:   { text: 'text-blue-600',   bg: 'bg-blue-50' },
+  };
+  const c = colors[color] || colors.blue;
+  return (
+    <div className={`${c.bg} border rounded-lg p-4`}>
       <div className="text-sm text-gray-500">{title}</div>
-      <div className={`text-2xl font-semibold ${colors[color]}`}>
-        {value}
-      </div>
+      <div className={`text-2xl font-semibold ${c.text}`}>{count}</div>
+      <div className={`text-xs font-medium ${c.text} mt-1`}>₹{Number(amount || 0).toLocaleString('en-IN')}</div>
     </div>
-  )
+  );
 }
 
 function StatusBadge({status}){

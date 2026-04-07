@@ -82,9 +82,16 @@ export default function BanksPage() {
 
   const handleSave = async () => {
     if (!form.name?.trim()) { toast.error("Bank name is required"); return; }
+    // Case-insensitive duplicate check
+    const normalizedInput = form.name.trim().toLowerCase();
+    const duplicate = banks.find(b =>
+      b.name?.trim().toLowerCase() === normalizedInput &&
+      (!selectedBank || b.id !== selectedBank.id)
+    );
+    if (duplicate) { toast.error(`Bank "${duplicate.name}" already exists`); return; }
     try {
       const payload = {
-        name: form.name, branchName: form.branch, website: form.website,
+        name: form.name.trim(), branchName: form.branch, website: form.website,
         address: form.address, district: form.district, taluka: form.taluka,
         pinCode: form.pinCode, active: true
       };

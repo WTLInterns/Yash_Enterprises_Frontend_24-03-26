@@ -7,9 +7,6 @@ import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 
 import { getAuthUser, getCurrentUserRole } from "@/utils/userUtils";
-
-import { getTabSafeItem, removeTabSafeItem } from "@/utils/tabSafeStorage";
-
 import { clearAuthUserCache } from "@/utils/authUser";
 
 import { Menu, X } from "lucide-react";
@@ -126,20 +123,16 @@ export default function DashboardLayout({ header, children }) {
 
 
 
-  // ✅ Get user role from tab-safe storage
-
+  // ✅ Get user role AND department from sessionStorage
   const [userRole, setUserRole] = useState(null);
-
+  const [userDept, setUserDept] = useState(null);
   useEffect(() => {
-
-    if (typeof window !== "undefined") {
-
-      const role = getTabSafeItem("user_role");
-
-      setUserRole(role);
-
-    }
-
+    if (typeof window === "undefined") return;
+    // sessionStorage ONLY — getTabSafeItem was causing redirect loop
+    const raw = sessionStorage.getItem("user_data");
+    const u = raw ? JSON.parse(raw) : null;
+    setUserRole(u?.role || sessionStorage.getItem("user_role") || null);
+    setUserDept((u?.department || u?.departmentName || "").toUpperCase());
   }, []);
 
 
@@ -158,25 +151,19 @@ export default function DashboardLayout({ header, children }) {
 
 
 
-  // ✅ Filter sidebar sections: remove Dashboard from Unolo if role is "TL"
-
-  const filteredSections = sidebarSections.map((section) => {
-
-    if (section.key === "unolo" && userRole === "TL") {
-
-      return {
-
-        ...section,
-
-        items: section.items.filter((item) => item.key !== "unolo-dashboard"),
-
-      };
-
-    }
-
-    return section;
-
-  });
+  // Filter sidebar: hide HRM + Address Management for ACCOUNT dept users
+  const isAccountDept = userDept === "ACCOUNT";
+  const filteredSections = sidebarSections
+    .filter(section => {
+      if (isAccountDept && (section.key === "hrm" || section.key === "address-management")) return false;
+      return true;
+    })
+    .map((section) => {
+      if (section.key === "unolo" && userRole === "TL") {
+        return { ...section, items: section.items.filter((item) => item.key !== "unolo-dashboard") };
+      }
+      return section;
+    });
 
 
 
@@ -187,23 +174,17 @@ export default function DashboardLayout({ header, children }) {
 
 
   const handleLogout = () => {
-
     if (typeof window !== "undefined") {
-
-      removeTabSafeItem("auth_token");
-
-      removeTabSafeItem("user_role");
-
-      removeTabSafeItem("user_data");
-
-      // Clear auth user cache on logout
-
+      // Clear sessionStorage completely
+      sessionStorage.removeItem("user_data");
+      sessionStorage.removeItem("user_role");
+      sessionStorage.removeItem("tab_id");
+      // Clear any stale localStorage
+      localStorage.removeItem("user_data");
+      localStorage.removeItem("user_role");
       clearAuthUserCache();
-
     }
-
     router.push("/login");
-
   };
 
 

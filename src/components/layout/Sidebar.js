@@ -108,9 +108,9 @@ const filterSectionsByRoleAndDepartment = (sections, user) => {
 
   const roleRestrictedItems = {
 
-    "hrm-dashboard": ["ADMIN", "MANAGER", "HR", "ACCOUNT"], // HRM Dashboard for Admin, Manager, HR, and Account department
+    "hrm-dashboard": ["ADMIN", "MANAGER", "HR"], // HRM Dashboard for Admin, Manager, HR only — NOT ACCOUNT
 
-    "address-edit-requests": ["ADMIN", "MANAGER", "TL", "ACCOUNT"], // TL & ACCOUNT can access address edit requests
+    "address-edit-requests": ["ADMIN", "MANAGER", "TL"], // TL can access address edit requests — NOT ACCOUNT
 
     "tasks": ["ADMIN", "MANAGER", "TL"], // TL can access tasks
 

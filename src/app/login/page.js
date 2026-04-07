@@ -13,9 +13,9 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    // If already logged in, redirect
+    // If already logged in (sessionStorage only), redirect
     try {
-      const raw = sessionStorage.getItem("user_data") || localStorage.getItem("user_data");
+      const raw = sessionStorage.getItem("user_data");
       if (raw) {
         const u = JSON.parse(raw);
         if (u?.id && u?.role) { router.replace("/dashboard"); return; }
@@ -55,12 +55,13 @@ export default function LoginPage() {
           employeeId:     data.employeeId,
         };
 
-        // Store in both sessionStorage and localStorage
+        // Store ONLY in sessionStorage — localStorage causes cross-tab/loop issues
         const json = JSON.stringify(userData);
         sessionStorage.setItem("user_data", json);
         sessionStorage.setItem("user_role", data.role);
-        localStorage.setItem("user_data", json);
-        localStorage.setItem("user_role", data.role);
+        // Clear any stale localStorage to prevent login loop
+        localStorage.removeItem("user_data");
+        localStorage.removeItem("user_role");
 
         toast.success(`Welcome ${userData.fullName || userData.name}!`);
         router.replace("/dashboard");

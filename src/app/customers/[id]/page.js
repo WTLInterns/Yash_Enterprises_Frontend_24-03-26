@@ -50,8 +50,6 @@ import DynamicFieldsSection from "@/components/dynamic-fields/DynamicFieldsSecti
 
 import { getCurrentUserName, getCurrentUserRole } from "@/utils/userUtils";
 
-import { getTabSafeItem } from "@/utils/tabSafeStorage";
-
 
 
 import {
@@ -299,56 +297,9 @@ export default function CustomerDetailPage() {
 
     try {
 
-      // Priority: sessionStorage -> tabSafeStorage -> localStorage
-
-      let rawUserData = sessionStorage.getItem("user_data");
-
-      
-
-      if (!rawUserData) {
-
-        rawUserData = getTabSafeItem("user_data");
-
-      }
-
-      
-
-      if (!rawUserData) {
-
-        rawUserData = localStorage.getItem("user_data");
-
-      }
-
-      
-
-      let rawUser = sessionStorage.getItem("user");
-
-      
-
-      if (!rawUser) {
-
-        rawUser = getTabSafeItem("user");
-
-      }
-
-      
-
-      if (!rawUser) {
-
-        rawUser = localStorage.getItem("user");
-
-      }
-
-      
-
-      const user = (rawUserData ? JSON.parse(rawUserData) : null) || (rawUser ? JSON.parse(rawUser) : null);
-
-      
-
-
-
-      
-
+      // sessionStorage ONLY — no localStorage fallback (prevents cross-tab logout loop)
+      const rawUserData = sessionStorage.getItem("user_data");
+      const user = rawUserData ? JSON.parse(rawUserData) : null;
       return user;
 
     } catch {
@@ -371,17 +322,12 @@ export default function CustomerDetailPage() {
 
 
 
-    // Listen for storage changes from other tabs
-
+    // Listen for storage changes from other tabs — ONLY reload if auth token changed
     const handleStorageChange = (e) => {
-
-      if (e.key === 'user_data' || e.key === 'user') {
-
-
-        window.location.reload(); // Simple refresh to get latest user context
-
+      // DO NOT reload on user_data changes — causes infinite loop
+      if (e.key === 'auth_token' && !e.newValue) {
+        router.push('/login');
       }
-
     };
 
 
@@ -425,62 +371,23 @@ export default function CustomerDetailPage() {
 
 
     // Listen for BroadcastChannel messages (cross-tab)
-
     let broadcastChannel = null;
-
     if (typeof BroadcastChannel !== 'undefined') {
-
       broadcastChannel = new BroadcastChannel('crm-updates');
-
       broadcastChannel.onmessage = (e) => {
-
-        if (e.data?.type === 'DEAL_STAGE_CHANGED' && e.data?.dealId !== dealId) {
-
-
-          // Update current stage immediately for UI refresh
-
-          if (e.data?.newStage) {
-
-            setCurrentStage(e.data.newStage);
-
-          }
-
-          loadCustomer();
-
+        if (e.data?.type === 'DEAL_STAGE_CHANGED' && e.data?.customerId === customerId) {
+          if (e.data?.newStage) setCurrentStage(e.data.newStage);
           fetchDeal();
-
           fetchTimeline();
-
         }
-
-        
-
         if (e.data?.type === 'DEAL_APPROVAL_COMPLETED') {
-
-
-          // Refresh all data when approval is completed
-
-          loadCustomer();
-
           fetchDeal();
-
           fetchTimeline();
-
-          fetchStagesForDepartment(deal?.department);
-
         }
-
-        
-
-        if (e.data?.type === 'CUSTOMER_UPDATED' && e.data?.customerId !== customerId) {
-
-
+        if (e.data?.type === 'CUSTOMER_UPDATED' && e.data?.customerId === customerId) {
           loadCustomer();
-
         }
-
       };
-
     }
 
 
@@ -4058,6 +3965,8 @@ export default function CustomerDetailPage() {
 
   const safeCustomer = customer || { id: customerId, name: "Customer" };
 
+  const isAccountDept = loggedInUser?.department?.toUpperCase() === "ACCOUNT";
+
 
 
 
@@ -6644,31 +6553,15 @@ async function ensureDealId() {
 
 
 
+              {!isAccountDept && (
               <button 
-
-
-
                 onClick={() => openCustomerEdit()}
-
-
-
                 className="inline-flex items-center gap-2 rounded-full border border-slate-300/80 bg-white/70 px-3 py-2 text-xs font-medium text-slate-800 shadow-sm transition duration-150 hover:border-indigo-400 hover:text-indigo-700"
-
-
-
               >
-
-
-
                 <Edit3 className="h-4 w-4" />
-
-
-
                 Edit
-
-
-
               </button>
+              )}
 
 
 
@@ -6746,15 +6639,8 @@ async function ensureDealId() {
 
                 const currentStageOrder = currentStageData?.stageOrder || 0;
                 const thisStageOrder = stageData?.stageOrder || 0;
-                let canProgress = thisStageOrder <= currentStageOrder + 1;
-                
-                
-                // 🔥 SPECIAL: For ACCOUNT department, allow CLOSE_WON and CLOSE_LOST when current stage is BILL PASS
-                if (isAccountDepartment && isBillPassStage && isCloseStage) {
-                  // Allow both CLOSE_WON and CLOSE_LOST for ACCOUNT department when at BILL PASS stage
-                  canProgress = true;
-                } else {
-                }
+                // Allow direct stage change to ANY stage (no one-by-one restriction)
+                const canProgress = true;
                 
                 // Final comprehensive state
 
@@ -7025,23 +6911,7 @@ async function ensureDealId() {
 
                   <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
 
-                    {/* Customer Name and Email */}
-
-                    <div className="flex items-start gap-3">
-
-                      <User className="h-4 w-4 text-slate-400 mt-0.5" />
-
-                      <div className="flex-1">
-
-                        <div className="text-xs font-medium text-slate-500">Name</div>
-
-                        <div className="text-sm text-slate-900">{customer?.name || "-"}</div>
-
-                      </div>
-
-                    </div>
-
-
+                    {/* Email */}
 
                     <div className="flex items-start gap-3">
 

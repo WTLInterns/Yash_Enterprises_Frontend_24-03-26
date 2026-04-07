@@ -1,29 +1,32 @@
-// Auth service - PROPER AUTHENTICATION ENABLED
+// Auth service - sessionStorage only (no localStorage to prevent cross-tab loop)
 export const authService = {
   getToken() {
     if (typeof window === "undefined") return null;
-    return localStorage.getItem("jwt_token");
+    return sessionStorage.getItem("jwt_token");
   },
 
   getUserRole() {
     if (typeof window === "undefined") return null;
-    return localStorage.getItem("user_role");
+    return sessionStorage.getItem("user_role");
   },
 
   isAuthenticated() {
     if (typeof window === "undefined") return false;
-    return !!localStorage.getItem("jwt_token");
+    return !!sessionStorage.getItem("user_data");
   },
 
   logout() {
     if (typeof window === "undefined") return;
+    sessionStorage.removeItem("jwt_token");
+    sessionStorage.removeItem("user_role");
+    sessionStorage.removeItem("user_data");
+    // Also clear any stale localStorage
     localStorage.removeItem("jwt_token");
     localStorage.removeItem("user_role");
     localStorage.removeItem("user_data");
   },
 
   login() {
-    // Login is handled by login page
     return Promise.resolve({ success: true });
   }
 };

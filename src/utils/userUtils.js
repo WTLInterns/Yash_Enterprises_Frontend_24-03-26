@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 function readUserData() {
   if (typeof window === "undefined") return null;
   try {
-    const raw = sessionStorage.getItem("user_data") || localStorage.getItem("user_data");
+    const raw = sessionStorage.getItem("user_data");
     return raw ? JSON.parse(raw) : null;
   } catch { return null; }
 }

@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { getCurrentUserRole, getCurrentUserName } from "@/utils/userUtils";
-import { getTabSafeItem } from "@/utils/tabSafeStorage";
 
 // ✅ ROLE-BASED DASHBOARD COMPONENTS
 import AdminManagerCRMDashboard from "@/components/dashboards/AdminManagerCRMDashboard";
@@ -17,38 +16,23 @@ export default function UnifiedDashboard() {
   const [userName, setUserName] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // ✅ Get user role and name from tab-safe storage
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const role = getTabSafeItem("user_role");
-      const name = getCurrentUserName();
-      
-      setUserRole(role);
-      setUserName(name);
-      setLoading(false);
-      
-      console.log('Unified Dashboard - Role:', role, 'Name:', name);
-      console.log('📊 Dashboard loaded for tab with role:', role);
-    }
-  }, []);
+    if (typeof window === "undefined") return;
+    // sessionStorage ONLY — getTabSafeItem was returning null causing redirect loop
+    const raw = sessionStorage.getItem("user_data");
+    const user = raw ? JSON.parse(raw) : null;
+    const role = user?.role || sessionStorage.getItem("user_role") || null;
+    const name = user?.fullName || (user?.firstName ? `${user.firstName} ${user.lastName || ""}`.trim() : user?.name) || "User";
 
-  // ✅ Redirect unauthorized roles
-  useEffect(() => {
-    if (!loading && !userRole) {
-      router.push("/login");
-      return;
-    }
-  }, [userRole, loading, router]);
+    setUserRole(role);
+    setUserName(name);
+    setLoading(false);
 
-  // ✅ Redirect unrecognized roles
-  useEffect(() => {
-    if (!loading && userRole && !["ADMIN", "MANAGER", "TL", "EMPLOYEE"].includes(userRole?.toUpperCase())) {
-      router.push("/login");
-      return;
+    if (!role) {
+      router.replace("/login");
     }
-  }, [userRole, loading, router]);
+  }, [router]);
 
-  // ✅ Render appropriate dashboard based on role
   const renderDashboard = () => {
     if (loading) {
       return (
@@ -62,21 +46,15 @@ export default function UnifiedDashboard() {
       case "ADMIN":
       case "MANAGER":
         return <AdminManagerCRMDashboard userName={userName} userRole={userRole} />;
-      
       case "TL":
+      case "ACCOUNT":
         return <TLDepartmentDashboard userName={userName} userRole={userRole} />;
-      
       case "EMPLOYEE":
         return <EmployeeDashboard userName={userName} userRole={userRole} />;
-      
       default:
-        // Unrecognized role - will be handled by useEffect
         return (
           <div className="flex items-center justify-center min-h-screen">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-              <p className="text-gray-600">Redirecting...</p>
-            </div>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
           </div>
         );
     }
@@ -85,15 +63,12 @@ export default function UnifiedDashboard() {
   return (
     <DashboardLayout
       header={{
-        project: userRole?.toUpperCase() === "ADMIN" || userRole?.toUpperCase() === "MANAGER" 
-          ? "CRM System - Yashraj" 
-          : userRole?.toUpperCase() === "TL" 
-          ? "Department Dashboard" 
+        project: ["ADMIN", "MANAGER"].includes(userRole?.toUpperCase())
+          ? "CRM System - Yashraj"
+          : userRole?.toUpperCase() === "TL"
+          ? "Department Dashboard"
           : "Employee Dashboard",
-        user: {
-          name: userName || "User",
-          role: userRole || "Unknown"
-        },
+        user: { name: userName || "User", role: userRole || "Unknown" },
         tabs: [],
         activeTabKey: "dashboard"
       }}

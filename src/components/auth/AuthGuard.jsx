@@ -8,7 +8,8 @@ export default function AuthGuard({ children, allowedRoles = [] }) {
 
   useEffect(() => {
     try {
-      const raw = sessionStorage.getItem("user_data") || localStorage.getItem("user_data");
+      // sessionStorage ONLY — localStorage causes cross-tab loop
+      const raw = sessionStorage.getItem("user_data");
       const user = raw ? JSON.parse(raw) : null;
 
       if (!user?.id || !user?.role) {
@@ -22,7 +23,7 @@ export default function AuthGuard({ children, allowedRoles = [] }) {
     } catch {
       router.replace("/login");
     }
-  }, [router, allowedRoles]);
+  }, [router]);
 
   return <>{children}</>;
 }

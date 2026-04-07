@@ -39,6 +39,26 @@ const CustomerExcelUploadModal = ({ isOpen, onClose, onUploadSuccess }) => {
     setDragActive(false);
   };
 
+  const reactivateBanks = async () => {
+    try {
+      const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api.yashrajent.com';
+      // Fetch inactive banks created by import service
+      const res = await fetch(`${BASE_URL}/api/banks?size=9999&active=false`);
+      if (!res.ok) return;
+      const data = await res.json();
+      const inactive = (data.content || []);
+      if (inactive.length === 0) return;
+      // Reactivate all inactive banks
+      await Promise.all(inactive.map(b =>
+        fetch(`${BASE_URL}/api/banks/${b.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...b, active: true }),
+        }).catch(() => {})
+      ));
+    } catch { /* silent */ }
+  };
+
   const handleUpload = async () => {
     if (!file) {
       alert('Please select a file first');
@@ -57,6 +77,7 @@ const CustomerExcelUploadModal = ({ isOpen, onClose, onUploadSuccess }) => {
       setUploadResult(response);
       
       if (response.success > 0) {
+        reactivateBanks(); // fix banks created with active=false by import service
         onUploadSuccess?.(response);
       }
     } catch (error) {

@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, Search, Edit2, Trash2, Building2, X, UserPlus, Trash, User } from "lucide-react";
+import { Plus, Search, Edit2, Trash2, Building2, X, UserPlus, Trash, User, Upload } from "lucide-react";
 import { backendApi } from "@/services/api";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { getCurrentUserName, getCurrentUserRole } from "@/utils/userUtils";
 import { toast } from "react-toastify";
 import Link from "next/link";
+import BankExcelUploadModal from "@/components/excel/BankExcelUploadModal";
 
 const EMPTY_CONTACT = { fullName: "", email: "", position: "" };
 
@@ -24,22 +25,30 @@ export default function BanksPage() {
   const [contacts, setContacts] = useState([{ ...EMPTY_CONTACT }]);
   const [selectedBankIds, setSelectedBankIds] = useState([]);
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [showExcelModal, setShowExcelModal] = useState(false);
+
+  const normalizeList = (res) => {
+    if (Array.isArray(res)) return res;
+    if (res?.content && Array.isArray(res.content)) return res.content;
+    return [];
+  };
 
   const fetchBanks = async () => {
     setLoading(true);
     try {
       const res = await backendApi.get("/banks?size=9999");
-      const list = Array.isArray(res) ? res : (res?.content || []);
+      const list = normalizeList(res);
       setBanks(list);
       const contactEntries = await Promise.all(
         list.map(async b => {
           const c = await backendApi.get(`/banks/${b.id}/contacts`).catch(() => []);
-          return [b.id, Array.isArray(c) ? c : []];
+          return [b.id, normalizeList(c)];
         })
       );
       setBankContacts(Object.fromEntries(contactEntries));
     } catch (err) {
       console.error("Failed to fetch banks:", err);
+      toast.error("Failed to load banks");
     } finally {
       setLoading(false);
     }
@@ -73,8 +82,9 @@ export default function BanksPage() {
         taluka: fresh.taluka || "",
         pinCode: fresh.pinCode || ""
       });
-      setContacts(existing.length > 0
-        ? existing.map(c => ({ id: c.id, fullName: c.fullName || "", email: c.email || "", position: c.position || "" }))
+      const existingArr = normalizeList(existing);
+      setContacts(existingArr.length > 0
+        ? existingArr.map(c => ({ id: c.id, fullName: c.fullName || "", email: c.email || "", position: c.position || "" }))
         : [{ ...EMPTY_CONTACT }]);
       setShowModal(true);
     } catch { toast.error("Failed to load bank"); }
@@ -93,7 +103,7 @@ export default function BanksPage() {
       const payload = {
         name: form.name.trim(), branchName: form.branch, website: form.website,
         address: form.address, district: form.district, taluka: form.taluka,
-        pinCode: form.pinCode, active: true
+        pinCode: form.pinCode, active: true, isActive: true
       };
       let bankId;
       if (selectedBank) {
@@ -107,7 +117,8 @@ export default function BanksPage() {
       }
       if (selectedBank) {
         const existing = await backendApi.get(`/banks/${bankId}/contacts`).catch(() => []);
-        await Promise.all(existing.map(c => backendApi.delete(`/banks/${bankId}/contacts/${c.id}`).catch(() => {})));
+        const existingContacts = normalizeList(existing);
+        await Promise.all(existingContacts.map(c => backendApi.delete(`/banks/${bankId}/contacts/${c.id}`).catch(() => {})));
       }
       await Promise.all(contacts.filter(c => c.fullName?.trim()).map(c =>
         backendApi.post(`/banks/${bankId}/contacts`, { fullName: c.fullName, email: c.email, position: c.position })
@@ -223,6 +234,10 @@ export default function BanksPage() {
                 {bulkDeleting ? "Deleting..." : `Delete ${selectedBankIds.length} Selected`}
               </button>
             )}
+            <button onClick={() => setShowExcelModal(true)}
+              style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "#16a34a", color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>
+              <Upload size={14} /> Upload Excel
+            </button>
             <button onClick={openCreate}
               style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "#4f46e5", color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>
               <Plus size={14} /> Add Bank
@@ -497,6 +512,15 @@ export default function BanksPage() {
           </>
         )}
       </div>
+
+      <BankExcelUploadModal
+        isOpen={showExcelModal}
+        onClose={() => setShowExcelModal(false)}
+        onUploadSuccess={() => {
+          setShowExcelModal(false);
+          fetchBanks();
+        }}
+      />
     </DashboardLayout>
   );
 }

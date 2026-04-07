@@ -1040,7 +1040,11 @@ export default function CustomerDetailPage() {
 
       console.error("Failed to load customer", err);
 
-      setError("Failed to load customer: " + err.message);
+      if (err?.status === 404 || err?.message?.includes('404')) {
+        setError("Customer not found (ID: " + customerId + "). It may have been deleted.");
+      } else {
+        setError("Failed to load customer: " + err.message);
+      }
 
     } finally {
 
@@ -3907,54 +3911,32 @@ export default function CustomerDetailPage() {
 
 
 
-  if (!customer && (loadingCustomer || loadingCases)) {
-
-
-
+  if (error) {
     return (
-
-
-
-      <DashboardLayout
-
-
-
-        header={{
-
-
-
-          project: "Customer Details",
-
-
-
-          user: { name: userName, role: userRole },
-
-
-
-          notifications: [],
-
-
-
-        }}
-
-
-
-      >
-
-
-
-        <div className="p-4 text-sm text-slate-600">Loading customer...</div>
-
-
-
+      <DashboardLayout header={{ project: 'Customer Details', user: getLoggedInUser(), notifications: [] }}>
+        <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+          <div className="text-red-600 text-lg font-medium">{error}</div>
+          <button
+            onClick={() => router.push('/customers')}
+            className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+          >
+            ← Back to Customers
+          </button>
+        </div>
       </DashboardLayout>
-
-
-
     );
+  }
 
 
 
+  if (!customer && (loadingCustomer || loadingCases)) {
+    return (
+      <DashboardLayout
+        header={{ project: 'Customer Details', user: getLoggedInUser(), notifications: [] }}
+      >
+        <div className="p-4 text-sm text-slate-600">Loading customer...</div>
+      </DashboardLayout>
+    );
   }
 
 

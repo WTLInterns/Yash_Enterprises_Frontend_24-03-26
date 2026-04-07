@@ -6585,7 +6585,7 @@ async function ensureDealId() {
 
               {/* Removed: badges and tracking text per design request */}
 
-              <div className="relative flex items-center gap-4 overflow-x-auto pb-2">
+              <div className="relative flex items-center gap-4 overflow-x-auto pb-2 scrollbar-hide">
 
 
 

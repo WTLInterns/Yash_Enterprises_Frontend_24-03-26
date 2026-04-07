@@ -234,109 +234,14 @@ export default function TLDepartmentDashboard({ userName, userRole }) {
     }
   };
 
-  // 🔥 NEW: Fetch tasks with proper role-based access - CRM/ERP ARCHITECTURE
   const fetchTasks = async () => {
     try {
-      console.log('🔥 [TL DASHBOARD] Fetching tasks for role:', authUserRole, 'department:', currentUser?.department);
-      
-      // ✅ CRM/ERP ROLE LOGIC:
-      // ADMIN: Access ALL departments (department = null means no filtering)
-      // MANAGER: Multi-department access
-      // TL/EMPLOYEE: Only their department
-      
-      if (authUserRole === 'ADMIN') {
-        console.log('🔥 [TL DASHBOARD] ADMIN role - fetching ALL tasks across ALL departments');
-        // Admin gets ALL tasks without department filtering
-        const tasksData = await backendApi.get('/tasks');
-        const tasksArray = Array.isArray(tasksData) ? tasksData : (tasksData?.content || []);
-        console.log('🔥 [TL DASHBOARD] ADMIN - All tasks fetched:', tasksArray.length);
-        setTasks(tasksArray || []);
-        
-      } else if (authUserRole === 'MANAGER') {
-        console.log('🔥 [TL DASHBOARD] MANAGER role - fetching multi-department tasks');
-        // Manager gets tasks from their assigned departments or all if no department restriction
-        const tasksData = await departmentApiService.getTasks();
-        console.log('🔥 [TL DASHBOARD] MANAGER - Tasks fetched:', tasksData.length);
-        setTasks(tasksData || []);
-        
-      } else {
-        // TL/EMPLOYEE: Only their department
-        console.log('🔥 [TL DASHBOARD] TL/EMPLOYEE role - fetching department-specific tasks');
-        const tasksData = await departmentApiService.getTasks();
-        console.log('🔥 [TL DASHBOARD] TL/EMPLOYEE - Tasks fetched:', tasksData.length);
-        setTasks(tasksData || []);
-      }
-      
+      const tasksData = await departmentApiService.getTasks();
+      const tasksArray = Array.isArray(tasksData) ? tasksData : (tasksData?.content || []);
+      setTasks(tasksArray);
     } catch (error) {
       console.error('🔥 [TL DASHBOARD] Failed to fetch tasks:', error);
-      
-      // 🔥 ENHANCED FALLBACK: Try direct API call with proper role headers
-      try {
-        console.log('🔥 [TL DASHBOARD] Trying direct API call fallback...');
-        
-        // Get auth token and user info
-        const token = localStorage.getItem('token');
-        const userData = localStorage.getItem('user') || localStorage.getItem('authUser');
-        const parsedUser = userData ? JSON.parse(userData) : null;
-        
-        const headers = {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        };
-        
-        if (token) {
-          headers['Authorization'] = `Bearer ${token}`;
-        }
-        
-        // ✅ PROPER ROLE-BASED HEADERS
-        if (parsedUser?.id) {
-          headers['X-User-Id'] = parsedUser.id.toString();
-        }
-        if (parsedUser?.role || authUserRole) {
-          headers['X-User-Role'] = parsedUser?.role || authUserRole;
-        }
-        // ✅ KEY FIX: Only add department header for non-ADMIN roles
-        if (authUserRole !== 'ADMIN' && (parsedUser?.department || currentUser?.department)) {
-          headers['X-User-Department'] = parsedUser?.department || currentUser?.department;
-        }
-        
-        console.log('🔥 [TL DASHBOARD] Direct API call with role-based headers:', {
-          role: headers['X-User-Role'],
-          department: headers['X-User-Department'],
-          userId: headers['X-User-Id'],
-          isAdmin: authUserRole === 'ADMIN'
-        });
-        
-        const response = await fetch('/api/tasks', {
-          method: 'GET',
-          headers
-        });
-        
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-        
-        const data = await response.json();
-        const tasksArray = Array.isArray(data) ? data : (data?.content || []);
-        
-        console.log('🔥 [TL DASHBOARD] Direct API call successful:', tasksArray.length);
-        setTasks(tasksArray);
-        
-      } catch (directError) {
-        console.error('🔥 [TL DASHBOARD] Direct API call also failed:', directError);
-        
-        // Final fallback: Try backendApi without restrictions
-        try {
-          console.log('🔥 [TL DASHBOARD] Final backendApi fallback...');
-          const response = await backendApi.get('/tasks');
-          const tasksArray = Array.isArray(response) ? response : (response?.content || []);
-          console.log('🔥 [TL DASHBOARD] BackendApi fallback successful:', tasksArray.length);
-          setTasks(tasksArray);
-        } catch (fallbackError) {
-          console.error('🔥 [TL DASHBOARD] All task fetching methods failed:', fallbackError);
-          setTasks([]);
-        }
-      }
+      setTasks([]);
     }
   };
 
@@ -712,13 +617,7 @@ export default function TLDepartmentDashboard({ userName, userRole }) {
 
   useEffect(() => {
     fetchAllData();
-    
-    // Safety timeout to prevent infinite loading
-    const timeout = setTimeout(() => {
-      console.log('🔥 [TL DASHBOARD] Safety timeout - forcing loading to false');
-      setLoading(false);
-    }, 10000); // 10 seconds timeout
-    
+    const timeout = setTimeout(() => setLoading(false), 10000);
     return () => clearTimeout(timeout);
   }, []);
 

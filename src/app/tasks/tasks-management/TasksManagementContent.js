@@ -9,13 +9,9 @@ import { useCustomerAddressSync } from "@/context/CustomerAddressContext";
 // 🔥 GET CURRENT USER INFO
 const getCurrentUser = () => {
   if (typeof window === "undefined") return null;
-  
   try {
-    const userData = localStorage.getItem("user_data");
-    const user = localStorage.getItem("user");
-    
-    const parsed = userData ? JSON.parse(userData) : (user ? JSON.parse(user) : null);
-    
+    const raw = sessionStorage.getItem("user_data") || localStorage.getItem("user_data") || localStorage.getItem("user");
+    const parsed = raw ? JSON.parse(raw) : null;
     return {
       role: parsed?.roleName || parsed?.role || "USER",
       department: parsed?.departmentName || parsed?.department || null,

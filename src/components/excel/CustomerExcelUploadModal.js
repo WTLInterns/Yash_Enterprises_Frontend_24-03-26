@@ -11,7 +11,9 @@ export default function CustomerExcelUploadModal({ isOpen, onClose, onUploadSucc
 
   const getAuthUser = () => {
     try {
-      const raw = getTabSafeItem("authUser") || localStorage.getItem("authUser");
+      const raw = getTabSafeItem("user_data")
+        || sessionStorage.getItem("user_data")
+        || localStorage.getItem("user_data");
       return raw ? JSON.parse(raw) : null;
     } catch { return null; }
   };
@@ -45,9 +47,9 @@ export default function CustomerExcelUploadModal({ isOpen, onClose, onUploadSucc
       const res = await fetch("https://api.yashrajent.com/api/deals/upload-excel", {
         method: "POST",
         headers: {
-          "X-User-Id": authUser?.id || "",
-          "X-User-Role": authUser?.role || "",
-          "X-User-Department": authUser?.department || "",
+          "X-User-Id":         String(authUser?.id || ""),
+          "X-User-Role":       authUser?.role || authUser?.roleName || "",
+          "X-User-Department": authUser?.department || authUser?.departmentName || "",
         },
         body: formData,
       });

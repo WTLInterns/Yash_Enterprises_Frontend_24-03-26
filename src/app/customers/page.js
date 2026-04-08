@@ -787,73 +787,59 @@ export default function CustomersPage() {
   const loadAllData = async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      const authUser = getTabSafeAuthUser();
-
-      const [customersData, dealsRes, banksRes] = await Promise.all([
-        departmentApiService.getCustomers(),
-        backendApi.get('/deals/all').catch(() => []),
-        backendApi.get('/banks?size=9999').catch(() => ({ content: [] })),
-      ]);
-
-      // Process deals
-      const dealsList = normalizeList(dealsRes);
-      const normalizedDeals = dealsList.map((d) => ({
-        ...d,
-        clientId: d.clientId ?? d.client_id ?? null,
-        stageCode: d.stageCode || d.stage || "",
-        valueAmount: d.calculatedValue ?? d.valueAmount ?? 0,
-        dealCode: d.dealCode ?? null,
-        movedToApproval: d.movedToApproval ?? false,
-      }));
-
-      const banksList = normalizeList(banksRes);
-
-      // Dynamic columns
+      // Phase 1: customers first — show table immediately
+      const customersData = await departmentApiService.getCustomers();
       const keys = new Set();
       customersData.forEach(c => {
         if (c?.customFields && typeof c.customFields === 'object') {
           Object.keys(c.customFields).forEach(k => keys.add(k));
         }
       });
-
-      // Show table immediately without addresses
       setCustomers(customersData.map(c => ({ ...c, addresses: c.addresses || [] })));
-      setDeals(normalizedDeals);
-      setBanks(banksList);
       setDynamicColumns([...keys]);
-      if (!silent) setLoading(false); // ← table visible NOW
+      if (!silent) setLoading(false); // table visible NOW
 
-      // Phase 2: Load addresses in background
+      // Phase 2: deals + banks + addresses in parallel, non-blocking
       const authUser2 = getTabSafeAuthUser();
-      fetch('https://api.yashrajent.com/api/clients/addresses/all', {
-        headers: {
-          'X-User-Id': String(authUser2?.id ?? ''),
-          'X-User-Role': authUser2?.role ?? '',
-          'X-User-Department': authUser2?.department ?? '',
-        }
-      })
-        .then(r => r.ok ? r.json() : [])
-        .catch(() => [])
-        .then(allAddresses => {
-          if (!allAddresses.length) return;
+      Promise.all([
+        backendApi.get('/deals/all').catch(() => []),
+        backendApi.get('/banks?size=9999').catch(() => ({ content: [] })),
+        fetch('https://api.yashrajent.com/api/clients/addresses/all', {
+          headers: {
+            'X-User-Id': String(authUser2?.id ?? ''),
+            'X-User-Role': authUser2?.role ?? '',
+            'X-User-Department': authUser2?.department ?? '',
+          }
+        }).then(r => r.ok ? r.json() : []).catch(() => []),
+      ]).then(([dealsRes, banksRes, allAddresses]) => {
+        const normalizedDeals = normalizeList(dealsRes).map(d => ({
+          ...d,
+          clientId: d.clientId ?? d.client_id ?? null,
+          stageCode: d.stageCode || d.stage || '',
+          valueAmount: d.calculatedValue ?? d.valueAmount ?? 0,
+          dealCode: d.dealCode ?? null,
+          movedToApproval: d.movedToApproval ?? false,
+        }));
+        setDeals(normalizedDeals);
+        setBanks(normalizeList(banksRes));
+        if (allAddresses.length) {
           const addrByClient = {};
           allAddresses.forEach(addr => {
-            const cid = addr.clientId;
-            if (!addrByClient[cid]) addrByClient[cid] = [];
-            addrByClient[cid].push(addr);
+            if (!addrByClient[addr.clientId]) addrByClient[addr.clientId] = [];
+            addrByClient[addr.clientId].push(addr);
           });
           setCustomers(prev => prev.map(c => ({ ...c, addresses: addrByClient[c.id] || c.addresses || [] })));
-        });
-
+        }
+      });
     } catch (err) {
-      console.error("Failed to load data:", err);
-      if (!silent) addToast("Failed to load customers", "error");
+      console.error('Failed to load data:', err);
+      if (!silent) addToast('Failed to load customers', 'error');
     } finally {
       if (!silent) setLoading(false);
     }
   };
 
-  // Detect edit query param and open edit drawer — runs ONCE when customers first load
+    // Detect edit query param and open edit drawer — runs ONCE when customers first load
   const editOpenedRef = useRef(false);
   const customersRef = useRef([]);
   useEffect(() => { customersRef.current = customers; }, [customers]);
@@ -1983,6 +1969,27 @@ export default function CustomersPage() {
 
     return result;
   }, [customers, deals, search, filterDepartment, filterStage, columnFilters, sortConfig, userRole, topDepartmentFilter]);
+
+  // One row per deal (not per client) — so 431 deals = 431 rows
+  const flatRows = useMemo(() => {
+    const rows = [];
+    filtered.forEach(customer => {
+      const clientDeals = deals.filter(
+        d => Number(d?.clientId ?? d?.client_id ?? (typeof d?.client === 'object' ? d?.client?.id : d?.client)) === Number(customer.id)
+      );
+      if (clientDeals.length === 0) {
+        rows.push({ customer, deal: null });
+      } else {
+        // Sort deals: latest first
+        const sorted = clientDeals.slice().sort((a, b) => {
+          const td = new Date(b.createdAt) - new Date(a.createdAt);
+          return td !== 0 ? td : (Number(b.id) || 0) - (Number(a.id) || 0);
+        });
+        sorted.forEach(deal => rows.push({ customer, deal }));
+      }
+    });
+    return rows;
+  }, [filtered, deals]);
 
   // Add column filter props for reuse
   const colFilterProps = {
@@ -3709,7 +3716,7 @@ export default function CustomersPage() {
             {/* Record count badge */}
             <div className="text-sm text-slate-500 shrink-0">
               <span className="font-medium text-slate-700">{filtered.length}</span>
-              {filtered.length !== customers.length && (
+              {flatRows.length !== customers.length && (
                 <span> of {customers.length}</span>
               )} customers
             </div>
@@ -3765,11 +3772,11 @@ export default function CustomersPage() {
         {/* TABLE */}
         {(() => {
           // Compute virtual window
-          const maxStart = Math.max(0, filtered.length - VISIBLE_ROWS);
+          const maxStart = Math.max(0, flatRows.length - VISIBLE_ROWS);
           const clampedStart = Math.min(Math.max(0, visibleStart), maxStart);
-          const visibleEnd = Math.min(filtered.length, clampedStart + VISIBLE_ROWS + OVERSCAN * 2);
+          const visibleEnd = Math.min(flatRows.length, clampedStart + VISIBLE_ROWS + OVERSCAN * 2);
           const paddingTop = clampedStart * ROW_HEIGHT;
-          const paddingBottom = Math.max(0, (filtered.length - visibleEnd) * ROW_HEIGHT);
+          const paddingBottom = Math.max(0, (flatRows.length - visibleEnd) * ROW_HEIGHT);
 
           return loading ? (
             <div className="text-center py-8">Loading...</div>
@@ -3787,9 +3794,9 @@ export default function CustomersPage() {
                       <th className="px-3 py-3 sticky left-0 bg-slate-50 z-20" style={{ position: 'sticky', left: 0, backgroundColor: 'rgb(248 250 252)', zIndex: 20, width: 40 }}>
                         <input
                           type="checkbox"
-                          checked={filtered.length > 0 && filtered.every(c => selectedDealIds.includes(c.id))}
+                          checked={flatRows.length > 0 && flatRows.every(r => selectedDealIds.includes(r.customer.id))}
                           onChange={e => {
-                            const pageIds = filtered.map(c => c.id);
+                            const pageIds = flatRows.map(r => r.customer.id);
                             if (e.target.checked) {
                               setSelectedDealIds(prev => [...new Set([...prev, ...pageIds])]);
                             } else {
@@ -3851,16 +3858,16 @@ export default function CustomersPage() {
                       </tr>
                     )}
 
-                    {filtered.slice(clampedStart, visibleEnd).map((customer) => {
+                    {flatRows.slice(clampedStart, visibleEnd).map(({ customer, deal: rowDeal }, _rowIdx) => {
 
 
 
-                      // FIX 1 ▸ Filter deals for this customer
-                      const customerDeals = deals.filter(
-                        d => Number(d?.clientId ?? d?.client_id ?? (typeof d?.client === 'object' ? d?.client?.id : d?.client)) === Number(customer.id)
-                      );
+                      const customerDeal = rowDeal;
 
-                      const customerDeal = dealByClient[Number(customer.id)] ?? null;
+
+
+
+
 
                       // FIX 3 ▸ Normalise stageCode to UPPERCASE for consistent matching
                       const rawStageCode = customerDeal?.stageCode ?? customerDeal?.stage ?? "";
@@ -3876,7 +3883,7 @@ export default function CustomersPage() {
 
 
 
-                        <tr key={customer.id} className="hover:bg-slate-50" style={{ height: ROW_HEIGHT }}>
+                        <tr key={rowDeal ? `${customer.id}-${rowDeal.id}` : String(customer.id)} className="hover:bg-slate-50" style={{ height: ROW_HEIGHT }}>
 
 
 
@@ -4121,7 +4128,7 @@ export default function CustomersPage() {
                       </tr>
                     )}
 
-                    {!filtered.length && (
+                    {!flatRows.length && (
                       <tr>
                         <td
                           colSpan={5 + getAllAddressTypes().filter(type => type !== 'PRIMARY').length + dynamicColumns.length}

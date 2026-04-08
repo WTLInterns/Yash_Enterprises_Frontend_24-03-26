@@ -37,9 +37,12 @@ export default function MapCanvas({ apiKey, onMapReady }) {
       }
     }
 
-    // Already loaded
-    if (window.google?.maps) {
-      initializeMap();
+    // Already loaded — still need importLibrary with loading=async
+    if (window.google?.maps?.importLibrary) {
+      window.google.maps.importLibrary("maps")
+        .then(() => window.google.maps.importLibrary("marker"))
+        .then(() => initializeMap())
+        .catch(e => console.error("MapCanvas: importLibrary failed", e));
       return;
     }
 
@@ -47,24 +50,37 @@ export default function MapCanvas({ apiKey, onMapReady }) {
     const existingScript = document.getElementById("google-maps-script");
     if (existingScript) {
       console.log("MapCanvas: Script exists, waiting for load");
-      // If google maps already loaded but initMap was deleted, just init directly
-      if (window.google?.maps) {
-        initializeMap();
+      if (window.google?.maps?.importLibrary) {
+        window.google.maps.importLibrary("maps")
+          .then(() => window.google.maps.importLibrary("marker"))
+          .then(() => initializeMap())
+          .catch(e => console.error("MapCanvas: importLibrary failed", e));
       } else {
-        existingScript.addEventListener("load", initializeMap, { once: true });
+        existingScript.addEventListener("load", () => {
+          window.google.maps.importLibrary("maps")
+            .then(() => window.google.maps.importLibrary("marker"))
+            .then(() => initializeMap())
+            .catch(e => console.error("MapCanvas: importLibrary failed", e));
+        }, { once: true });
       }
       return;
     }
 
-    // Set window.initMap BEFORE appending the script
-    window.initMap = () => {
-      console.log("MapCanvas: Google Maps callback triggered");
-      initializeMap();
+    // Use importLibrary bootstrap — compatible with loading=async
+    window.__googleMapsInit = async () => {
+      console.log("MapCanvas: Google Maps bootstrap triggered");
+      try {
+        await window.google.maps.importLibrary("maps");
+        await window.google.maps.importLibrary("marker");
+        initializeMap();
+      } catch (e) {
+        console.error("MapCanvas: importLibrary failed", e);
+      }
     };
 
     const script = document.createElement("script");
     script.id  = "google-maps-script";
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&v=weekly&libraries=marker,visualization&callback=initMap&loading=async`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&v=weekly&callback=__googleMapsInit&loading=async`;
     script.async = true;
     script.defer = true;
     script.onerror = () => console.error("MapCanvas: Failed to load Google Maps script");

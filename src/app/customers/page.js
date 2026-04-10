@@ -1842,20 +1842,24 @@ export default function CustomersPage() {
         (customer.contactPhone || "").toLowerCase().includes(q);
       if (!textMatch) return false;
 
-      const deal = dealByClient[Number(customer.id)] ?? null;
-      if (!deal) return role === "ADMIN" || role === "MANAGER" || role === "HR";
-      const dealDept = (deal?.department || "").toUpperCase();
-
-      // ADMIN / MANAGER / HR → full access
+           // ADMIN / MANAGER / HR → full access
       if (role === "ADMIN" || role === "MANAGER" || role === "HR") return true;
 
-      // Department-based users → only their department
-      // ACCOUNT dept: also hide CLOSE_WIN / CLOSE_LOST
+      // Department-based users: check if customer has ANY deal in user's dept
       if (userDept) {
-        if (dealDept !== userDept) return false;
+        const clientDeals = deals.filter(
+          d => Number(d?.clientId ?? d?.client_id) === Number(customer.id)
+        );
+        if (clientDeals.length === 0) return false;
+        const deptDeals = clientDeals.filter(
+          d => (d?.department || "").toUpperCase() === userDept
+        );
+        if (deptDeals.length === 0) return false;
         if (userDept === "ACCOUNT") {
-          const stage = (deal?.stageCode || "").toUpperCase().replace(/ /g, "_");
-          return !deal?.movedToApproval && stage !== "CLOSE_WIN" && stage !== "CLOSE_LOST";
+          return deptDeals.some(d => {
+            const stage = (d?.stageCode || "").toUpperCase().replace(/ /g, "_");
+            return !d?.movedToApproval && stage !== "CLOSE_WIN" && stage !== "CLOSE_LOST";
+          });
         }
         return true;
       }
@@ -1882,8 +1886,10 @@ export default function CustomersPage() {
     // ── NEW: top department filter (Admin/Manager only) ──────────────
     if (topDepartmentFilter && (role === "ADMIN" || role === "MANAGER")) {
       result = result.filter(customer => {
-        const deal = dealByClient[Number(customer.id)];
-        return deal?.department === topDepartmentFilter;
+        return deals.some(
+          d => Number(d?.clientId ?? d?.client_id) === Number(customer.id) &&
+               d?.department === topDepartmentFilter
+        );
       });
     }
 
@@ -1972,15 +1978,34 @@ export default function CustomersPage() {
 
   // One row per deal (not per client) — so 431 deals = 431 rows
   const flatRows = useMemo(() => {
+    const authUser = getTabSafeAuthUser();
+    const role = (authUser?.role || userRole || "").toUpperCase();
+    const userDept = (authUser?.department || "").toUpperCase();
     const rows = [];
+
     filtered.forEach(customer => {
-      const clientDeals = deals.filter(
+      let clientDeals = deals.filter(
         d => Number(d?.clientId ?? d?.client_id ?? (typeof d?.client === 'object' ? d?.client?.id : d?.client)) === Number(customer.id)
       );
+
+      // Apply department filter to deals (not just customers)
+      if (topDepartmentFilter && (role === "ADMIN" || role === "MANAGER" || role === "HR")) {
+        clientDeals = clientDeals.filter(d => d?.department === topDepartmentFilter);
+      } else if (userDept && role !== "ADMIN" && role !== "MANAGER" && role !== "HR") {
+        // Dept users: only show their dept deals
+        clientDeals = clientDeals.filter(d => (d?.department || "").toUpperCase() === userDept);
+        // ACCOUNT: hide CLOSE_WIN / CLOSE_LOST
+        if (userDept === "ACCOUNT") {
+          clientDeals = clientDeals.filter(d => {
+            const stage = (d?.stageCode || "").toUpperCase().replace(/ /g, "_");
+            return !d?.movedToApproval && stage !== "CLOSE_WIN" && stage !== "CLOSE_LOST";
+          });
+        }
+      }
+
       if (clientDeals.length === 0) {
         rows.push({ customer, deal: null });
       } else {
-        // Sort deals: latest first
         const sorted = clientDeals.slice().sort((a, b) => {
           const td = new Date(b.createdAt) - new Date(a.createdAt);
           return td !== 0 ? td : (Number(b.id) || 0) - (Number(a.id) || 0);
@@ -1989,7 +2014,7 @@ export default function CustomersPage() {
       }
     });
     return rows;
-  }, [filtered, deals]);
+  }, [filtered, deals, topDepartmentFilter, userRole]);
 
   // Add column filter props for reuse
   const colFilterProps = {
@@ -3340,36 +3365,113 @@ export default function CustomersPage() {
   };
 
   const handleExportData = () => {
-    if (!customers.length) { addToast('No data to export', 'error'); return; }
-    const headers = ['ID', 'Name', 'Email', 'Phone', 'City', 'State', 'Country', 'Address', 'Pincode', 'Contact Name', 'Contact Number', 'Notes', 'Created At'];
-    const rows = customers.map(c => [
-      c.id ?? '',
-      c.name ?? '',
-      c.email ?? '',
-      c.contactPhone ?? c.contact_phone ?? '',
-      c.city ?? '',
-      c.state ?? '',
-      c.country ?? '',
-      c.address ?? '',
-      c.pincode ?? '',
-      c.contactName ?? c.contact_name ?? '',
-      c.contactNumber ?? c.contact_number ?? '',
-      (c.notes ?? '').replace(/,/g, ';'),
-      c.createdAt ?? c.created_at ?? '',
-    ]);
-    const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+    if (!flatRows.length) { addToast('No data to export', 'error'); return; }
+
+    const headers = [
+      'Deal ID', 'Customer Name', 'Email', 'Phone',
+      'Contact Person', 'Contact Number',
+      'Primary Address', 'City', 'State', 'Pincode',
+      'Bank', 'Branch', 'Taluka', 'District',
+      'Deal Stage', 'Department', 'Deal Value',
+      'Products', 'Closing Date', 'Owner',
+      'Created At', 'Updated At',
+    ];
+
+    const rows = flatRows.map(({ customer, deal }) => {
+      // Deal ID (dealCode like PPE1 or #id)
+      const dealId = deal?.dealCode
+        ? deal.dealCode
+        : deal?.id ? String(deal.id) : '';
+
+      // Bank details
+      const bankObj = deal?.bankId ? banks.find(b => Number(b.id) === Number(deal.bankId)) : null;
+      const bankName = deal?.bankName || deal?.relatedBankName || bankObj?.name || '';
+      const branchName = deal?.branchName || bankObj?.branchName || '';
+      const taluka = bankObj?.taluka || '';
+      const district = bankObj?.district || '';
+
+      // Primary address
+      const primaryAddr = customer.addresses?.find(a => a.addressType === 'PRIMARY') || customer.addresses?.[0];
+      const addressLine = primaryAddr?.addressLine || '';
+      const city = primaryAddr?.city || '';
+      const state = primaryAddr?.state || '';
+      const pincode = primaryAddr?.pincode || '';
+
+      // Stage display name
+      const dept = (deal?.department || '').trim();
+      const stageCode = (deal?.stageCode || '').toUpperCase();
+      const stageStages = getStagesForDepartment(dept) || [];
+      const stageObj = stageStages.find(s => s.stageCode === stageCode);
+      const stageName = stageObj?.stageName || stageCode;
+
+      // Products — from productNames array returned by /deals/all
+      const products = (deal?.productNames || []).join(', ');
+
+      // Deal value
+      const dealValue = deal?.valueAmount ? String(deal.valueAmount) : '';
+
+      // Closing date
+      const closingDate = deal?.closingDate
+        ? new Date(deal.closingDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+        : '';
+
+      // Owner
+      const owner = customer.ownerName || '';
+
+      // Dates — formatted as text to prevent Excel treating as date serial (#)
+      const fmt = (d) => {
+        if (!d) return '';
+        const dt = new Date(d);
+        const dd = String(dt.getDate()).padStart(2, '0');
+        const mm = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][dt.getMonth()];
+        return dd + '-' + mm + '-' + dt.getFullYear();
+      };
+      const createdAt = fmt(customer.createdAt);
+      const updatedAt = fmt(customer.updatedAt);
+
+      return [
+        dealId,
+        customer.name ?? '',
+        customer.email ?? '',
+        customer.contactPhone ?? '',
+        customer.contactName ?? '',
+        customer.contactNumber ?? '',
+        addressLine,
+        city,
+        state,
+        pincode,
+        bankName,
+        branchName,
+        taluka,
+        district,
+        stageName,
+        dept,
+        dealValue,
+        products,
+        closingDate,
+        owner,
+        createdAt,
+        updatedAt,
+      ];
+    });
+
+    const csv = [headers, ...rows]
+      .map(r => r.map(v => '"' + String(v ?? '').replace(/"/g, '""') + '"').join(','))
+      .join('\n');
+
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `customers-export-${new Date().toISOString().slice(0,10)}.csv`;
+    a.download = 'customers-export-' + new Date().toISOString().slice(0, 10) + '.csv';
     document.body.appendChild(a);
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
-    addToast(`Exported ${customers.length} records`, 'success');
+    addToast('Exported ' + flatRows.length + ' records', 'success');
   };
-  const handleDelete = async (id) => {
+
+    const handleDelete = async (id) => {
 
 
 
@@ -3715,10 +3817,10 @@ export default function CustomersPage() {
 
             {/* Record count badge */}
             <div className="text-sm text-slate-500 shrink-0">
-              <span className="font-medium text-slate-700">{filtered.length}</span>
-              {flatRows.length !== customers.length && (
-                <span> of {customers.length}</span>
-              )} customers
+              <span className="font-medium text-slate-700">{flatRows.length}</span>
+              {flatRows.length !== deals.length && (
+                <span> of {deals.length}</span>
+              )} deals
             </div>
 
             {/* Clear all filters button */}

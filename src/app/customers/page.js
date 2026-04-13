@@ -84,7 +84,7 @@ export default function CustomersPage() {
 
       if (!rawUserData) {
 
-        rawUserData = localStorage.getItem("user_data");
+        rawUserData = sessionStorage.getItem("user_data") || localStorage.getItem("user_data");
 
       }
 
@@ -104,7 +104,7 @@ export default function CustomersPage() {
 
   const [userRole, setUserRole] = useState(() => {
 
-    if (typeof window === 'undefined') return "ADMIN";
+    if (typeof window === 'undefined') return "";
 
     try {
 
@@ -112,15 +112,15 @@ export default function CustomersPage() {
 
       if (!role) {
 
-        role = localStorage.getItem("user_role");
+        role = sessionStorage.getItem("user_role") || localStorage.getItem("user_role");
 
       }
 
-      return role || "ADMIN";
+      return role || "";
 
     } catch {
 
-      return "ADMIN";
+      return "";
 
     }
 
@@ -148,7 +148,7 @@ export default function CustomersPage() {
 
           if (!rawUserData) {
 
-            rawUserData = localStorage.getItem("user_data");
+            rawUserData = sessionStorage.getItem("user_data") || localStorage.getItem("user_data");
 
           }
 
@@ -162,11 +162,11 @@ export default function CustomersPage() {
 
           if (!role) {
 
-            role = localStorage.getItem("user_role");
+            role = sessionStorage.getItem("user_role") || localStorage.getItem("user_role");
 
           }
 
-          setUserRole(role || "ADMIN");
+          setUserRole(role || "");
 
         } catch (error) {
 
@@ -246,7 +246,7 @@ export default function CustomersPage() {
 
       if (!rawUserData) {
 
-        rawUserData = localStorage.getItem("user_data");
+        rawUserData = sessionStorage.getItem("user_data") || localStorage.getItem("user_data");
 
       }
 
@@ -738,7 +738,12 @@ export default function CustomersPage() {
 
   const fetchDeals = async () => {
     try {
-      const res = await backendApi.get('/deals/all');
+      const _u2 = getTabSafeAuthUser();
+      const _r2 = (_u2?.role || '').toUpperCase();
+      const res = await (_r2 === 'ADMIN' || _r2 === 'MANAGER' || _r2 === 'HR'
+        ? backendApi.get('/deals/all')
+        : backendApi.get('/deals/filtered')
+      ).catch(() => []);
       const list = normalizeList(res);
       const normalized = list.map((d) => ({
         ...d,
@@ -802,7 +807,15 @@ export default function CustomersPage() {
       // Phase 2: deals + banks + addresses in parallel, non-blocking
       const authUser2 = getTabSafeAuthUser();
       Promise.all([
-        backendApi.get('/deals/all').catch(() => []),
+        (() => {
+          const _u = getTabSafeAuthUser();
+          const _r = (_u?.role || '').toUpperCase();
+          const _d = _u?.department || '';
+          if (_r === 'ADMIN' || _r === 'MANAGER' || _r === 'HR') {
+            return backendApi.get('/deals/all').catch(() => []);
+          }
+          return backendApi.get('/deals/filtered').catch(() => []);
+        })(),
         backendApi.get('/banks?size=9999').catch(() => ({ content: [] })),
         fetch('https://api.yashrajent.com/api/clients/addresses/all', {
           headers: {
@@ -1831,7 +1844,8 @@ export default function CustomersPage() {
   const filtered = useMemo(() => {
     const authUser = getTabSafeAuthUser();
     const role = (authUser?.role || userRole || "").toUpperCase();
-    const userDept = (authUser?.department || "").toUpperCase();
+    const userDept = (authUser?.department || authUser?.departmentName || authUser?.tlDepartmentName || "").toUpperCase().trim();
+    const isPrivileged = role === "ADMIN" || role === "MANAGER" || role === "HR";
 
     // ── text search ──────────────────────────────────────────────
     let result = customers.filter((customer) => {
@@ -1980,7 +1994,8 @@ export default function CustomersPage() {
   const flatRows = useMemo(() => {
     const authUser = getTabSafeAuthUser();
     const role = (authUser?.role || userRole || "").toUpperCase();
-    const userDept = (authUser?.department || "").toUpperCase();
+        const userDept = (authUser?.department || authUser?.departmentName || authUser?.tlDepartmentName || "").toUpperCase().trim();
+    const isPrivileged = role === "ADMIN" || role === "MANAGER" || role === "HR";
     const rows = [];
 
     filtered.forEach(customer => {
@@ -1989,9 +2004,9 @@ export default function CustomersPage() {
       );
 
       // Apply department filter to deals (not just customers)
-      if (topDepartmentFilter && (role === "ADMIN" || role === "MANAGER" || role === "HR")) {
+      if (topDepartmentFilter && isPrivileged) {
         clientDeals = clientDeals.filter(d => d?.department === topDepartmentFilter);
-      } else if (userDept && role !== "ADMIN" && role !== "MANAGER" && role !== "HR") {
+      } else if (userDept && !isPrivileged) {
         // Dept users: only show their dept deals
         clientDeals = clientDeals.filter(d => (d?.department || "").toUpperCase() === userDept);
         // ACCOUNT: hide CLOSE_WIN / CLOSE_LOST
@@ -2004,6 +2019,7 @@ export default function CustomersPage() {
       }
 
       if (clientDeals.length === 0) {
+        if (!isPrivileged) return;
         rows.push({ customer, deal: null });
       } else {
         const sorted = clientDeals.slice().sort((a, b) => {
@@ -3792,7 +3808,7 @@ export default function CustomersPage() {
             </div>
 
             {/* Top Department Filter — Admin/Manager only */}
-            {(userRole === "ADMIN" || userRole === "MANAGER") && (
+            {(() => { const _au = typeof window !== "undefined" ? (() => { try { return JSON.parse(sessionStorage.getItem("user_data") || "{}"); } catch { return {}; } })() : {}; return _au?.role === "ADMIN" || _au?.role === "MANAGER"; })() && (
               <div className="flex items-center gap-2">
                 <select
                   value={topDepartmentFilter}

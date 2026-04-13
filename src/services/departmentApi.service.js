@@ -22,7 +22,7 @@ const getAuthUser = () => {
 };
 
 const isPrivileged = (user) =>
-  !user || user.role === 'ADMIN' || user.role === 'MANAGER';
+  !user || user.role === 'ADMIN' || user.role === 'MANAGER' || user.role === 'HR';
 
 export const departmentApiService = {
   getCurrentDepartment: () => getAuthUser()?.department || null,
@@ -39,13 +39,12 @@ export const departmentApiService = {
 
   getCustomers: async (params = {}) => {
     const user = getAuthUser();
-    if (isPrivileged(user) || user?.role === 'HR') {
+    if (isPrivileged(user)) {
       const qs = new URLSearchParams({ ...params }).toString();
       return (await backendApi.get(`/clients${qs ? '?' + qs : ''}`)) || [];
     }
-    const dept = user?.department;
-    if (!dept) throw new Error('Department information required for customers access');
-    return (await backendApi.get(`/clients?${new URLSearchParams({ department: dept, ...params })}`)) || [];
+    // For dept users (ACCOUNT, etc.) — fetch all clients; frontend filters by deals
+    return (await backendApi.get(`/clients`)) || [];
   },
 
   getProducts: async (params = {}) => {

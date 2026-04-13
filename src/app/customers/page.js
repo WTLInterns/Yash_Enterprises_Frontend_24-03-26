@@ -3808,7 +3808,7 @@ export default function CustomersPage() {
             </div>
 
             {/* Top Department Filter — Admin/Manager only */}
-            {(() => { const _au = typeof window !== "undefined" ? (() => { try { return JSON.parse(sessionStorage.getItem("user_data") || "{}"); } catch { return {}; } })() : {}; return _au?.role === "ADMIN" || _au?.role === "MANAGER"; })() && (
+            {(userRole === "ADMIN" || userRole === "MANAGER") && (
               <div className="flex items-center gap-2">
                 <select
                   value={topDepartmentFilter}

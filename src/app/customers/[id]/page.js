@@ -232,7 +232,7 @@ export default function CustomerDetailPage() {
       // ── Fetch fresh addresses ──
       const authUser = loggedInUser;
       const addrResponse = await fetch(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080"}/api/clients/${customerId}/addresses`,
+        `${process.env.NEXT_PUBLIC_BACKEND_URL || "https://api.yashrajent.com"}/api/clients/${customerId}/addresses`,
         {
           headers: {
             "X-User-Id":         authUser?.id         ?? "",
@@ -751,7 +751,7 @@ export default function CustomerDetailPage() {
       return;
     }
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080"}/api/clients/geocode`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "https://api.yashrajent.com"}/api/clients/geocode`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -787,7 +787,7 @@ export default function CustomerDetailPage() {
     const lng = parseFloat(address.longitude);
     if (!lat || !lng) { addToast("Enter latitude and longitude first", "warning"); return; }
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080"}/api/clients/reverse-geocode`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "https://api.yashrajent.com"}/api/clients/reverse-geocode`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ latitude: lat, longitude: lng })
@@ -974,7 +974,7 @@ export default function CustomerDetailPage() {
 
         const authUser = loggedInUser;
 
-        const addressesResponse = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080"}/api/clients/${customerId}/addresses`, {
+        const addressesResponse = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "https://api.yashrajent.com"}/api/clients/${customerId}/addresses`, {
 
           headers: {
 
@@ -1772,7 +1772,7 @@ export default function CustomerDetailPage() {
       fd.append('body', emailForm.body || '');
       if (emailFile) fd.append('attachment', emailFile);
       const userId = loggedInUser?.id ?? '';
-      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080"}/api/deals/${dealId}/emails/send`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "https://api.yashrajent.com"}/api/deals/${dealId}/emails/send`, {
         method: 'POST',
         headers: { 'X-User-Id': String(userId) },
         body: fd,
@@ -1815,7 +1815,7 @@ export default function CustomerDetailPage() {
   async function handleDeleteExpense(expenseId) {
     if (!confirm('Delete this expense?')) return;
     try {
-      await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080"}/api/expenses/${expenseId}`, { method: 'DELETE' });
+      await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "https://api.yashrajent.com"}/api/expenses/${expenseId}`, { method: 'DELETE' });
       await fetchExpenses(deal?.clientId ?? customerId);
       addToast('Expense deleted', 'success');
     } catch (e) {
@@ -3605,7 +3605,7 @@ export default function CustomerDetailPage() {
     setViewingDoc(doc);
     setViewingDocBlobUrl(null);
     try {
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080";
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "https://api.yashrajent.com";
       const res = await fetch(`${backendUrl}/api/case-documents/view/${doc.id}`, {
         headers: {
           "X-User-Id": String(loggedInUser?.id || ""),
@@ -3668,7 +3668,7 @@ export default function CustomerDetailPage() {
 
 
 
-      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080"}/api/case-documents/upload`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "https://api.yashrajent.com"}/api/case-documents/upload`, {
 
 
 
@@ -3800,7 +3800,7 @@ export default function CustomerDetailPage() {
 
 
 
-    window.open(`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080"}/api/case-documents/download/${doc.id}`, "_blank");
+    window.open(`${process.env.NEXT_PUBLIC_BACKEND_URL || "https://api.yashrajent.com"}/api/case-documents/download/${doc.id}`, "_blank");
 
 
 
@@ -5153,7 +5153,7 @@ async function ensureDealId() {
       await clientApi.update(editForm.id, customerPayload);
 
       // Save addresses
-      await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080"}/api/clients/${editForm.id}/addresses`, {
+      await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "https://api.yashrajent.com"}/api/clients/${editForm.id}/addresses`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(addresses),
@@ -10264,7 +10264,7 @@ async function ensureDealId() {
 
 
 
-                              onError={() => window.open(`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080"}/api/case-documents/download/${viewingDoc.id}`, "_blank")}
+                              onError={() => window.open(`${process.env.NEXT_PUBLIC_BACKEND_URL || "https://api.yashrajent.com"}/api/case-documents/download/${viewingDoc.id}`, "_blank")}
 
 
 
@@ -10844,8 +10844,8 @@ async function ensureDealId() {
                               uploadData.append('expense', JSON.stringify(payload));
                               if (expenseFile) uploadData.append('file', expenseFile);
                               const expUrl = editingExpenseId
-                                ? `${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080"}/api/expenses/${editingExpenseId}`
-                                : `${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080"}/api/expenses`;
+                                ? `${process.env.NEXT_PUBLIC_BACKEND_URL || "https://api.yashrajent.com"}/api/expenses/${editingExpenseId}`
+                                : `${process.env.NEXT_PUBLIC_BACKEND_URL || "https://api.yashrajent.com"}/api/expenses`;
                               await fetch(expUrl, {
                                 method: editingExpenseId ? 'PUT' : 'POST',
                                 body: uploadData

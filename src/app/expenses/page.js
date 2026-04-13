@@ -47,6 +47,7 @@ export default function ExpenseOverviewPage() {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadResult, setUploadResult] = useState(null);
+  const [selectedUploadFile, setSelectedUploadFile] = useState(null);
   const [rejectModal, setRejectModal] = useState(null); // { id } when open
   const [rejectReason, setRejectReason] = useState('');
   const [showExportModal, setShowExportModal] = useState(false);
@@ -234,6 +235,7 @@ export default function ExpenseOverviewPage() {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       setUploadResult({ success: true, message: `Uploaded ${res.count || res.length || 'all'} expenses successfully` });
+      setSelectedUploadFile(null);
       loadExpenses();
     } catch (err) {
       setUploadResult({ success: false, message: err?.message || 'Upload failed' });
@@ -1287,6 +1289,18 @@ export default function ExpenseOverviewPage() {
               )}
             </label>
 
+            {selectedUploadFile && !uploadResult && (
+              <div className="mt-3 flex items-center justify-between bg-indigo-50 border border-indigo-200 rounded-lg px-4 py-3">
+                <span className="text-sm text-indigo-700 truncate max-w-[260px]"> {selectedUploadFile.name}</span>
+                <button
+                  onClick={() => handleBulkUpload(selectedUploadFile)}
+                  disabled={uploading}
+                  className="ml-3 flex items-center gap-2 bg-indigo-600 text-white text-sm font-medium px-4 py-1.5 rounded-lg hover:bg-indigo-700 disabled:opacity-50 shrink-0"
+                >
+                  {uploading ? 'Uploading...' : 'Upload Data'}
+                </button>
+              </div>
+            )}
             {uploadResult && (
               <div className={`mt-4 p-3 rounded text-sm ${
                 uploadResult.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'

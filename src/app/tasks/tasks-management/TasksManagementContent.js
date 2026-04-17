@@ -27,7 +27,6 @@ const formatDate = (dateString) => {
   if (!dateString) return '-';
   try {
     const date = new Date(dateString);
-    // Use a consistent format that works on both server and client
     return date.toLocaleDateString('en-US', {
       year: 'numeric',
       month: '2-digit',
@@ -38,6 +37,19 @@ const formatDate = (dateString) => {
   } catch (error) {
     return dateString;
   }
+};
+
+// Returns Tailwind colour class for a timeTaken string like "1h 20m"
+const timeTakenColor = (timeTaken) => {
+  if (!timeTaken) return 'text-slate-400';
+  const hMatch = timeTaken.match(/(\d+)h/);
+  const mMatch = timeTaken.match(/(\d+)m/);
+  const h = hMatch ? parseInt(hMatch[1], 10) : 0;
+  const m = mMatch ? parseInt(mMatch[1], 10) : 0;
+  const total = h * 60 + m;
+  if (total <= 60) return 'text-emerald-700';
+  if (total <= 120) return 'text-amber-700';
+  return 'text-rose-700';
 };
 
 // Status color function for proper badge colors
@@ -323,6 +335,7 @@ export default function TasksManagementContent() {
                     <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">End Time</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">Assigned To</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">Status</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">Time Taken</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">Actions</th>
                   </tr>
                 </thead>
@@ -344,6 +357,12 @@ export default function TasksManagementContent() {
                       <td className="px-6 py-4 text-sm text-slate-600 whitespace-nowrap">{task.assignedToEmployeeName || 'Unassigned'}</td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(task.status)}`}>{task.status}</span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {task.timeTaken
+                          ? <span className={`text-sm font-bold ${timeTakenColor(task.timeTaken)}`}>⏱ {task.timeTaken}</span>
+                          : <span className="text-sm text-slate-400">--</span>
+                        }
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
                         <div className="flex gap-2">

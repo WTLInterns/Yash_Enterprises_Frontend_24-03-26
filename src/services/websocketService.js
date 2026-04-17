@@ -111,7 +111,7 @@ class WebSocketService {
       this.subscriptions.set('attendance', attendanceSub);
 
       // Subscribe to task events
-      const taskSub = this.client.subscribe('/topic/task-events', (message) => {
+      const taskSub = this.client.subscribe('/topic/task-status-updates', (message) => {
         try {
           const data = JSON.parse(message.body);
           this.notifyListeners('task', data);

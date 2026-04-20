@@ -15,11 +15,11 @@ export default function TasksLayout({ children }) {
 
   return (
     <DashboardLayout>
-      <div className="flex flex-col h-full">
+      <div className="flex flex-col">
 
-        {/* 🔥 Sticky Tabs — sticks below the Topbar (top-0 since Topbar is sticky in its own container) */}
-        <div className="sticky top-0 z-30 bg-white border-b border-slate-200 shadow-sm flex-shrink-0">
-          <div className="flex gap-8 px-6">
+        {/* 🔥 Sticky Tabs */}
+        <div className="sticky top-0 z-20 bg-white border-b border-slate-200 shadow-sm flex-shrink-0 -mx-4 sm:-mx-6 px-4 sm:px-6">
+          <div className="flex gap-8 overflow-x-auto">
             {tabs.map((tab) => {
               const active = pathname === tab.href;
               return (
@@ -39,11 +39,9 @@ export default function TasksLayout({ children }) {
           </div>
         </div>
 
-        {/* 🔥 Scrollable Content */}
-        <div className="flex-1 overflow-y-auto">
-          <div className="py-6 px-6">
-            {children}
-          </div>
+        {/* 🔥 Content */}
+        <div className="py-6">
+          {children}
         </div>
 
       </div>

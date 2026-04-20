@@ -350,7 +350,7 @@ export default function DashboardLayout({ header, children }) {
       </div>
 
       {/* Main content: proper margin for fixed sidebar */}
-      <div className="flex-1 h-screen main-content flex flex-col overflow-hidden">
+      <div className="flex-1 h-screen main-content flex flex-col" style={{ minWidth: 0 }}>
         <Topbar
           tabs={header?.tabs || []}
           activeTabKey={getActiveTabKey()}

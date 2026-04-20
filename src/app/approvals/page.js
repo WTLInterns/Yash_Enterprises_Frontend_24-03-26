@@ -1,12 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { backendApi } from "@/services/api";
 import { getAuthUser } from "@/utils/authUser";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 
 export default function LeadApprovalsPage() {
   const user = getAuthUser();
+  const router = useRouter();
 
   const [toast, setToast] = useState({ show: false, message: '', type: 'info' });
   const addToast = (message, type = 'info') => {
@@ -156,8 +158,14 @@ export default function LeadApprovalsPage() {
                 <table className="min-w-full divide-y divide-slate-200">
                   <thead className="bg-slate-50">
                     <tr>
-                      {["Deal", "Client", "From Dept", "Current Stage", "Value", "Requested By", "Requested At", "Actions"].map(h => (
-                        <th key={h} className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                      {["Deal ID", "Deal", "Client", "From Dept", "Current Stage", "Value", "Requested By", "Requested At", "Actions"].map((h, i) => (
+                        <th
+                          key={h}
+                          className={`px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider ${
+                            i < 3 ? 'sticky bg-slate-50 z-10' : ''
+                          } ${i === 0 ? 'left-0' : i === 1 ? 'left-[80px]' : i === 2 ? 'left-[200px]' : ''}`}
+                          style={i < 3 ? { position: 'sticky', backgroundColor: 'rgb(248 250 252)' } : {}}
+                        >
                           {h}
                         </th>
                       ))}
@@ -166,17 +174,26 @@ export default function LeadApprovalsPage() {
                   <tbody className="bg-white divide-y divide-slate-200">
                     {approvals.map((approval) => (
                       <tr key={approval.id} className="hover:bg-slate-50">
-                        {/* Deal */}
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        {/* Deal ID - frozen */}
+                        <td className="px-6 py-4 whitespace-nowrap sticky left-0 bg-white z-10" style={{ position: 'sticky', left: 0, backgroundColor: 'white' }}>
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-indigo-100 text-indigo-800">
+                            {approval.dealCode || approval.fromDepartment && approval.dealId ? `${approval.fromDepartment}${approval.dealId}` : `#${approval.dealId}`}
+                          </span>
+                        </td>
+
+                        {/* Deal - frozen */}
+                        <td className="px-6 py-4 whitespace-nowrap sticky bg-white z-10" style={{ position: 'sticky', left: '80px', backgroundColor: 'white' }}>
                           <div className="text-sm font-medium text-slate-900">
                             {approval.dealName || `Deal #${approval.dealId}`}
                           </div>
-                          <div className="text-xs text-slate-500">ID: {approval.dealId}</div>
                         </td>
 
-                        {/* Client */}
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-slate-900">
+                        {/* Client - frozen + clickable */}
+                        <td className="px-6 py-4 whitespace-nowrap sticky bg-white z-10 border-r border-slate-200" style={{ position: 'sticky', left: '200px', backgroundColor: 'white' }}>
+                          <div
+                            className="text-sm font-medium text-indigo-600 cursor-pointer hover:underline"
+                            onClick={() => approval.clientId && router.push(`/customers/${approval.clientId}`)}
+                          >
                             {approval.clientName || (approval.clientId ? `Client #${approval.clientId}` : "—")}
                           </div>
                         </td>

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { departmentApiService } from "@/services/departmentApi.service";
-import { Plus, Search, Edit2, Trash2, User, MapPin, AlertCircle } from "lucide-react";
+import { Plus, Search, Edit2, Trash2, User, MapPin, AlertCircle, Upload, Download } from "lucide-react";
 import { toast } from 'react-toastify';
 import { useCustomerAddressSync } from "@/context/CustomerAddressContext";
 
@@ -83,6 +83,8 @@ export default function TasksManagementContent() {
   const [deleteTaskId, setDeleteTaskId] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const recordsPerPage = 5;
+  const excelInputRef = useRef(null);
+  const [uploading, setUploading] = useState(false);
 
   // 🔥 STABILIZE USER - Load once
   useEffect(() => {
@@ -210,6 +212,87 @@ export default function TasksManagementContent() {
     }
   };
 
+  const downloadSampleCSV = () => {
+    const headers = 'taskName,clientName,employeeName,department,scheduledStartTime,scheduledEndTime,status,taskDescription';
+    const sample1 = 'Visit Arbajs Shaikh,Arbajs shafik shaikh,Arbaj Shaikh,PPO,2026-04-25T10:00,2026-04-25T12:00,INQUIRY,Follow up visit';
+    const sample2 = 'Bank Document Collection,Ramesh Kumar,Suresh Patil,PPO,2026-04-26T09:00,2026-04-26T11:00,INQUIRY,Collect KYC documents';
+    const blob = new Blob([headers + '\n' + sample1 + '\n' + sample2], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'tasks_sample.csv'; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleBulkUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+    setUploading(true);
+    try {
+      const text = await file.text();
+      const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+      if (lines.length < 2) { toast.error('File is empty or has no data rows'); setUploading(false); return; }
+
+      const headerRow = lines[0].split(',').map(h => h.trim());
+      const rows = lines.slice(1).map(line => {
+        const vals = line.split(',').map(v => v.trim());
+        const obj = {};
+        headerRow.forEach((h, i) => { obj[h] = vals[i] || ''; });
+        return {
+          taskName:            obj.taskName || '',
+          clientName:          obj.clientName || '',
+          employeeName:        obj.employeeName || '',
+          department:          obj.department || '',
+          scheduledStartTime:  obj.scheduledStartTime || '',
+          scheduledEndTime:    obj.scheduledEndTime || '',
+          status:              obj.status || 'INQUIRY',
+          taskDescription:     obj.taskDescription || '',
+        };
+      }).filter(r => r.taskName);
+
+      if (!rows.length) { toast.error('No valid task rows found'); setUploading(false); return; }
+
+      const authUser = (() => { try { return JSON.parse(sessionStorage.getItem('user_data') || '{}'); } catch { return {}; } })();
+      const API = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api.yashrajent.com';
+
+      const res = await fetch(`${API}/api/tasks/bulk`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-User-Id': String(authUser?.id ?? ''),
+          'X-User-Role': authUser?.role || '',
+        },
+        body: JSON.stringify(rows),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `Server error ${res.status}`);
+      }
+
+      const result = await res.json();
+      const saved = result.saved ?? rows.length;
+      const total = result.total ?? rows.length;
+      const skipped = total - saved;
+
+      if (saved > 0) {
+        toast.success(`${saved} of ${total} tasks uploaded! Notifications sent to employees.`);
+      }
+      if (skipped > 0) {
+        // Show which rows were skipped
+        const skippedRows = (result.results || []).filter(r => r.status !== 'SAVED');
+        skippedRows.forEach(r => toast.warn(`Skipped: ${r.row?.taskName || '?'} — ${r.reason}`));
+      }
+
+      await loadData();
+    } catch (err) {
+      console.error('Bulk upload failed:', err);
+      toast.error('Upload failed: ' + err.message);
+    } finally {
+      setUploading(false);
+    }
+  };
+
   return (
     // 🔥 DEPARTMENT GUARD - Role-based validation
     !currentUser ? (
@@ -237,13 +320,22 @@ export default function TasksManagementContent() {
               Role: <span className="font-medium">{currentUser?.role || 'N/A'}</span>
             </p>
           </div>
-          <button
-            onClick={openCreateModal}
-            className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 transition-colors"
-          >
-            <Plus className="h-4 w-4" />
-            New Task
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={openCreateModal}
+              className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 transition-colors"
+            >
+              <Plus className="h-4 w-4" />
+              New Task
+            </button>
+            <button onClick={downloadSampleCSV} className="inline-flex items-center gap-2 rounded-lg bg-slate-600 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700">
+              <Download className="h-4 w-4" /> Sample CSV
+            </button>
+            <input ref={excelInputRef} type="file" accept=".csv" onChange={handleBulkUpload} className="hidden" />
+            <button onClick={() => excelInputRef.current?.click()} disabled={uploading} className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-50">
+              <Upload className="h-4 w-4" /> {uploading ? 'Uploading...' : 'Upload CSV'}
+            </button>
+          </div>
         </div>
 
         {/* Filters */}
@@ -349,7 +441,11 @@ export default function TasksManagementContent() {
                         <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-indigo-100 text-indigo-800">{task.department || '-'}</span>
                       </td>
                       {/* Sticky: Client */}
-                      <td style={{ position: 'sticky', left: 310, zIndex: 5, background: 'white', minWidth: 150 }} className="px-6 py-4 text-sm text-slate-600 border-r border-slate-200 whitespace-nowrap">{task.clientName || '-'}</td>
+                      <td style={{ position: 'sticky', left: 310, zIndex: 5, background: 'white', minWidth: 150 }} className="px-6 py-4 text-sm text-slate-600 border-r border-slate-200 whitespace-nowrap">
+                        {task.clientId ? (
+                          <a href={`/customers/${task.clientId}`} className="text-indigo-600 hover:underline font-medium">{task.clientName || '-'}</a>
+                        ) : (task.clientName || '-')}
+                      </td>
                       {/* Scrollable */}
                       <td className="px-6 py-4 text-sm text-slate-600 max-w-xs truncate whitespace-nowrap">{task.address || '-'}</td>
                       <td className="px-6 py-4 text-sm text-slate-600 whitespace-nowrap">{formatDate(task.scheduledStartTime)}</td>
@@ -563,8 +659,6 @@ function TaskModal({ task, employees, customFields, departments, currentUser, on
       });
     }
 
-    console.log('EDIT MODE - User role:', currentUser?.role, 'Task department:', task.department);
-
     setFormData({
       taskName: task.taskName || "",
       taskDescription: task.taskDescription || "",
@@ -578,8 +672,19 @@ function TaskModal({ task, employees, customFields, departments, currentUser, on
       status: task.status || "INQUIRY",
       clientId: task.clientId ? String(task.clientId) : "",
       customerAddressId: task.customerAddressId ? String(task.customerAddressId) : "",
+      address: task.address || "",
       customFields: valuesMap,
     });
+
+    // Pre-load addresses for the client so location dropdown is populated
+    if (task.clientId) {
+      fetchCustomerAddresses(task.clientId).then(() => {
+        // After addresses load, restore the saved customerAddressId
+        if (task.customerAddressId) {
+          setFormData(prev => ({ ...prev, customerAddressId: String(task.customerAddressId) }));
+        }
+      });
+    }
 
     fetchCustomFields(task.customTaskType || "Default Task");
   }, [task, currentUser]); // ✅ Only depend on task, not modalCustomFields

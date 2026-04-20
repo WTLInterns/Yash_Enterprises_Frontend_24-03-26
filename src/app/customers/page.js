@@ -272,6 +272,13 @@ export default function CustomersPage() {
   const [selectedDealIds, setSelectedDealIds] = useState([]);  // array, not Set — avoids stale reference bug
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  // Debounce search — 300ms so filtering only runs after user stops typing
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
 
   const [loading, setLoading] = useState(true);
 
@@ -372,8 +379,10 @@ export default function CustomersPage() {
   // ✅ NEW: Top department filter (Admin/Manager only)
   const [topDepartmentFilter, setTopDepartmentFilter] = useState("");
   const [allDepartments, setAllDepartments] = useState([]);
+  const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
+    setIsMounted(true); // Mark as mounted after hydration
     const _ud = (() => { try { return JSON.parse(sessionStorage.getItem('user_data') || localStorage.getItem('user_data') || '{}'); } catch { return {}; } })();
     fetch("https://api.yashrajent.com/api/stages/departments", {
       headers: { 'X-User-Id': String(_ud?.id ?? ''), 'X-User-Role': _ud?.role ?? '' }
@@ -398,6 +407,9 @@ export default function CustomersPage() {
 
 
   const [availableStages, setAvailableStages] = useState([]);
+
+  const [deptSearch, setDeptSearch] = useState("");
+  const [branchSearch, setBranchSearch] = useState("");
 
 
 
@@ -732,8 +744,8 @@ export default function CustomersPage() {
 
 
 
-  const fetchCustomers = async () => {
-    await loadAllData(false);
+  const fetchCustomers = async (silent = false) => {
+    await loadAllData(silent);
   };
 
   const fetchDeals = async () => {
@@ -744,16 +756,15 @@ export default function CustomersPage() {
         ? backendApi.get('/deals/all')
         : backendApi.get('/deals/filtered')
       ).catch(() => []);
-      const list = normalizeList(res);
-      const normalized = list.map((d) => ({
+      setDeals(normalizeList(res).map(d => ({
         ...d,
         clientId: d.clientId ?? d.client_id ?? null,
         stageCode: d.stageCode || d.stage || "",
         valueAmount: d.calculatedValue ?? d.valueAmount ?? 0,
+        calculatedValue: d.calculatedValue ?? null,
         dealCode: d.dealCode ?? null,
         movedToApproval: d.movedToApproval ?? false,
-      }));
-      setDeals(normalized);
+      })));
     } catch (err) {
       console.error("Failed to fetch deals:", err);
     }
@@ -784,72 +795,87 @@ export default function CustomersPage() {
 
 
   useEffect(() => {
-    // Clear stale cache to ensure clientId/bankId fields are fresh
-    sessionStorage.removeItem('crm_customers_cache');
     loadAllData(false);
   }, []);
 
   const loadAllData = async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      // Phase 1: customers first — show table immediately
-      const customersData = await departmentApiService.getCustomers();
+      const authUser2 = getTabSafeAuthUser();
+      const role2 = (authUser2?.role || '').toUpperCase();
+
+      // Fire ALL requests in parallel — customers + deals + banks simultaneously
+      const [customersData, dealsRes, banksRes] = await Promise.all([
+        departmentApiService.getCustomers().catch(() => []),
+        (role2 === 'ADMIN' || role2 === 'MANAGER' || role2 === 'HR'
+          ? backendApi.get('/deals/all')
+          : backendApi.get('/deals/filtered')
+        ).catch(() => []),
+        backendApi.get('/banks?size=9999').catch(() => ({ content: [] })),
+      ]);
+
       const keys = new Set();
       customersData.forEach(c => {
         if (c?.customFields && typeof c.customFields === 'object') {
           Object.keys(c.customFields).forEach(k => keys.add(k));
         }
       });
+
+      const normalizedDeals = normalizeList(dealsRes).map(d => ({
+        ...d,
+        clientId: d.clientId ?? d.client_id ?? null,
+        stageCode: d.stageCode || d.stage || '',
+        valueAmount: d.calculatedValue ?? d.valueAmount ?? 0,
+        calculatedValue: d.calculatedValue ?? null,
+        dealCode: d.dealCode ?? null,
+        movedToApproval: d.movedToApproval ?? false,
+      }));
+
+      // ✅ Show table IMMEDIATELY — no address fetching here
       setCustomers(customersData.map(c => ({ ...c, addresses: c.addresses || [] })));
       setDynamicColumns([...keys]);
-      if (!silent) setLoading(false); // table visible NOW
+      setDeals(normalizedDeals);
+      setBanks(normalizeList(banksRes));
 
-      // Phase 2: deals + banks + addresses in parallel, non-blocking
-      const authUser2 = getTabSafeAuthUser();
-      Promise.all([
-        (() => {
-          const _u = getTabSafeAuthUser();
-          const _r = (_u?.role || '').toUpperCase();
-          const _d = _u?.department || '';
-          if (_r === 'ADMIN' || _r === 'MANAGER' || _r === 'HR') {
-            return backendApi.get('/deals/all').catch(() => []);
-          }
-          return backendApi.get('/deals/filtered').catch(() => []);
-        })(),
-        backendApi.get('/banks?size=9999').catch(() => ({ content: [] })),
-        fetch('https://api.yashrajent.com/api/clients/addresses/all', {
-          headers: {
-            'X-User-Id': String(authUser2?.id ?? ''),
-            'X-User-Role': authUser2?.role ?? '',
-            'X-User-Department': authUser2?.department ?? '',
-          }
-        }).then(r => r.ok ? r.json() : []).catch(() => []),
-      ]).then(([dealsRes, banksRes, allAddresses]) => {
-        const normalizedDeals = normalizeList(dealsRes).map(d => ({
-          ...d,
-          clientId: d.clientId ?? d.client_id ?? null,
-          stageCode: d.stageCode || d.stage || '',
-          valueAmount: d.calculatedValue ?? d.valueAmount ?? 0,
-          dealCode: d.dealCode ?? null,
-          movedToApproval: d.movedToApproval ?? false,
-        }));
-        setDeals(normalizedDeals);
-        setBanks(normalizeList(banksRes));
-        if (allAddresses.length) {
-          const addrByClient = {};
-          allAddresses.forEach(addr => {
-            if (!addrByClient[addr.clientId]) addrByClient[addr.clientId] = [];
-            addrByClient[addr.clientId].push(addr);
-          });
-          setCustomers(prev => prev.map(c => ({ ...c, addresses: addrByClient[c.id] || c.addresses || [] })));
-        }
-      });
     } catch (err) {
       console.error('Failed to load data:', err);
       if (!silent) addToast('Failed to load customers', 'error');
     } finally {
       if (!silent) setLoading(false);
     }
+
+    // ✅ Load addresses in background AFTER table is visible (non-blocking)
+    setTimeout(() => loadAddressesBackground(), 200);
+  };
+
+  // Loads addresses in batches of 15 — runs after table is already rendered
+  const loadAddressesBackground = async () => {
+    try {
+      const authUser3 = getTabSafeAuthUser();
+      const headers = {
+        'X-User-Id': String(authUser3?.id ?? ''),
+        'X-User-Role': authUser3?.role ?? '',
+      };
+      // Use ref which is updated by useEffect
+      const snap = customersRef.current;
+      if (!snap || snap.length === 0) return;
+      const BATCH = 15;
+      for (let i = 0; i < snap.length; i += BATCH) {
+        const batch = snap.slice(i, i + BATCH);
+        const settled = await Promise.allSettled(
+          batch.map(c =>
+            fetch(`https://api.yashrajent.com/api/clients/${c.id}/addresses`, { headers })
+              .then(r => r.ok ? r.json() : [])
+              .catch(() => [])
+          )
+        );
+        const updates = {};
+        batch.forEach((c, j) => {
+          updates[c.id] = settled[j]?.status === 'fulfilled' ? settled[j].value : [];
+        });
+        setCustomers(prev => prev.map(c => c.id in updates ? { ...c, addresses: updates[c.id] } : c));
+      }
+    } catch {}
   };
 
     // Detect edit query param and open edit drawer — runs ONCE when customers first load
@@ -1738,8 +1764,18 @@ export default function CustomersPage() {
 
   // Full address from customer PRIMARY address
   const getFullAddress = (customer) => {
-    if (!customer?.addresses?.length) return "-";
-    const primary = customer.addresses.find(a => a.addressType === 'PRIMARY') || customer.addresses[0];
+    if (!customer?.addresses?.length) {
+      // Fallback to direct address fields if available
+      const parts = [
+        customer?.addressLine,
+        customer?.city, 
+        customer?.state, 
+        customer?.pincode
+      ].filter(Boolean);
+      return parts.length > 0 ? parts.join(", ") : "-";
+    }
+    const primary = customer.addresses.find(a => a?.addressType === 'PRIMARY') || customer.addresses[0];
+    if (!primary) return "-";
     const parts = [primary?.addressLine, primary?.city, primary?.state, primary?.pincode].filter(Boolean);
     return parts.join(", ") || "-";
   };
@@ -1849,7 +1885,7 @@ export default function CustomersPage() {
 
     // ── text search ──────────────────────────────────────────────
     let result = customers.filter((customer) => {
-      const q = search.toLowerCase();
+      const q = debouncedSearch.toLowerCase();
       const textMatch =
         (customer.name || "").toLowerCase().includes(q) ||
         (customer.email || "").toLowerCase().includes(q) ||
@@ -1988,7 +2024,7 @@ export default function CustomersPage() {
     }
 
     return result;
-  }, [customers, deals, search, filterDepartment, filterStage, columnFilters, sortConfig, userRole, topDepartmentFilter]);
+  }, [customers, deals, debouncedSearch, filterDepartment, filterStage, columnFilters, sortConfig, userRole, topDepartmentFilter]);
 
   // One row per deal (not per client) — so 431 deals = 431 rows
   const flatRows = useMemo(() => {
@@ -2101,6 +2137,7 @@ export default function CustomersPage() {
 
     setFormDepartment("");
     setAvailableStages([]);
+    setBranchSearch("");
     setShowCreateDrawer(true);
   };
 
@@ -2179,6 +2216,8 @@ export default function CustomersPage() {
         department: latestDeal?.department,
         bankId: latestDeal?.bankId,
         branchName: latestDeal?.branchName,
+        taluka: (() => { const bk = latestDeal?.bankId ? banks.find(b => Number(b.id) === Number(latestDeal.bankId)) : null; return bk?.taluka || ''; })(),
+        district: (() => { const bk = latestDeal?.bankId ? banks.find(b => Number(b.id) === Number(latestDeal.bankId)) : null; return bk?.district || ''; })(),
       });
 
       // 4️⃣ Normalise stage code to UPPERCASE (same as table)
@@ -2257,18 +2296,30 @@ export default function CustomersPage() {
 
 
 
-  const openDetails = (customer) => {
-
-
-
+  const openDetails = async (customer) => {
     setSelectedCustomer(customer);
-
-
-
     setShowDetailsDrawer(true);
 
-
-
+    // Fetch addresses if not already loaded
+    if (!customer.addresses || customer.addresses.length === 0) {
+      try {
+        const authUser = getTabSafeAuthUser();
+        const res = await fetch(`https://api.yashrajent.com/api/clients/${customer.id}/addresses`, {
+          headers: {
+            "X-User-Id": String(authUser?.id ?? ""),
+            "X-User-Role": authUser?.role ?? "",
+          },
+        });
+        if (res.ok) {
+          const addresses = await res.json();
+          setSelectedCustomer(prev => ({ ...prev, addresses }));
+          // Also update the customers list so table Address column shows data
+          setCustomers(prev =>
+            prev.map(c => c.id === customer.id ? { ...c, addresses } : c)
+          );
+        }
+      } catch {}
+    }
   };
 
 
@@ -2857,7 +2908,7 @@ export default function CustomersPage() {
 
 
 
-        clientId: savedCustomer.id,
+        clientId: Number(savedCustomer.id),
 
 
 
@@ -3095,15 +3146,8 @@ export default function CustomersPage() {
 
 
 
-      // Refresh data to show updated addresses
-
-
-
-      await fetchCustomers(true);
-
-
-
-      await fetchDeals();
+      // Refresh data after save
+      await loadAllData(true);
 
 
 
@@ -3371,8 +3415,7 @@ export default function CustomersPage() {
       }
       addToast(`${count} customer(s) deleted successfully`, 'success');
       setSelectedDealIds([]);
-      await fetchCustomers(true);
-      await fetchDeals();
+      await loadAllData(true);
     } catch (err) {
       addToast('Failed to delete: ' + err.message, 'error');
     } finally {
@@ -3394,10 +3437,12 @@ export default function CustomersPage() {
     ];
 
     const rows = flatRows.map(({ customer, deal }) => {
-      // Deal ID (dealCode like PPE1 or #id)
+      // Deal ID (dealCode like PPE1 or dept+id fallback)
       const dealId = deal?.dealCode
         ? deal.dealCode
-        : deal?.id ? String(deal.id) : '';
+        : deal?.department && deal?.id
+          ? `${deal.department.toLowerCase()}${deal.id}`
+          : deal?.id ? String(deal.id) : '';
 
       // Bank details
       const bankObj = deal?.bankId ? banks.find(b => Number(b.id) === Number(deal.bankId)) : null;
@@ -3424,7 +3469,7 @@ export default function CustomersPage() {
       const products = (deal?.productNames || []).join(', ');
 
       // Deal value
-      const dealValue = deal?.valueAmount ? String(deal.valueAmount) : '';
+      const dealValue = (deal?.calculatedValue ?? deal?.valueAmount) ? String(deal.calculatedValue ?? deal.valueAmount) : '';
 
       // Closing date
       const closingDate = deal?.closingDate
@@ -3578,14 +3623,7 @@ export default function CustomersPage() {
 
 
       addToast("Customer deleted successfully", "success");
-
-
-
-      await fetchCustomers(true);
-
-
-
-      await fetchDeals();
+      await loadAllData(true);
 
 
 
@@ -3647,13 +3685,7 @@ export default function CustomersPage() {
 
 
 
-        await fetchCustomers(true);
-
-
-
-        await fetchDeals();
-
-
+        await loadAllData(true);
 
         return;
 
@@ -3808,7 +3840,7 @@ export default function CustomersPage() {
             </div>
 
             {/* Top Department Filter — Admin/Manager only */}
-            {(userRole === "ADMIN" || userRole === "MANAGER") && (
+            {isMounted && (userRole === "ADMIN" || userRole === "MANAGER") && (
               <div className="flex items-center gap-2">
                 <select
                   value={topDepartmentFilter}
@@ -3939,7 +3971,7 @@ export default function CustomersPage() {
                       <ColFilterTh label="Branch" colKey="branchName" {...colFilterProps} />
                       <ColFilterTh label="Taluka" colKey="taluka"     {...colFilterProps} />
                       <ColFilterTh label="District" colKey="district"   {...colFilterProps} />
-                      <ColFilterTh label="Deal Stage" colKey="stageCode"  {...colFilterProps} />
+                      <ColFilterTh label="Dept / Stage" colKey="stageCode"  {...colFilterProps} />
                       <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">Deal Value</th>
                       <ColFilterTh label="Owner" colKey="ownerName"  {...colFilterProps} />
                       <ColFilterTh label="Department" colKey="department" {...colFilterProps} />
@@ -4022,7 +4054,17 @@ export default function CustomersPage() {
                           </td>
                           {/* Sticky ID column */}
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900 sticky left-[40px] bg-white z-10 border-r border-slate-200" style={{ position: 'sticky', left: '40px', backgroundColor: 'white', zIndex: 10 }}>
-                            {customerDeal?.dealCode ? customerDeal.dealCode.toLowerCase() : (customerDeal?.id ? `#${customerDeal.id}` : "-")}
+                            {customerDeal?.dealCode ? (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-indigo-100 text-indigo-800">
+                                {customerDeal.dealCode.toLowerCase()}
+                              </span>
+                            ) : customerDeal?.department && customerDeal?.id ? (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-700">
+                                {customerDeal.department.toLowerCase()}{customerDeal.id}
+                              </span>
+                            ) : customerDeal?.id ? (
+                              <span className="text-slate-400 text-xs">#{customerDeal.id}</span>
+                            ) : "-"}
                           </td>
 
 
@@ -4088,18 +4130,28 @@ export default function CustomersPage() {
 
                           {/* Deal Stage */}
                           <td className="px-6 py-4 whitespace-nowrap text-sm">
-                            {normStageCode ? (
-                              <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${getDealStageStyle(normStageCode, dealDepartment).bg} ${getDealStageStyle(normStageCode, dealDepartment).text} ${getDealStageStyle(normStageCode, dealDepartment).border}`}>
-                                {getStageDisplayName(normStageCode, dealDepartment)}
-                              </span>
-                            ) : (
-                              <span className="text-slate-400">-</span>
-                            )}
+                            <div className="flex flex-col gap-0.5">
+                              {dealDepartment && (
+                                <span className="text-xs font-semibold text-slate-700">{dealDepartment}</span>
+                              )}
+                              {normStageCode ? (
+                                <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${getDealStageStyle(normStageCode, dealDepartment).bg} ${getDealStageStyle(normStageCode, dealDepartment).text} ${getDealStageStyle(normStageCode, dealDepartment).border}`}>
+                                  {getStageDisplayName(normStageCode, dealDepartment)}
+                                </span>
+                              ) : (
+                                <span className="text-slate-400">-</span>
+                              )}
+                            </div>
                           </td>
 
                           {/* Amount */}
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700">
-                            {customerDeal?.valueAmount ? formatCurrency(customerDeal.valueAmount) : "-"}
+                            {(() => {
+                              const v = customerDeal?.calculatedValue ?? customerDeal?.valueAmount;
+                              if (!v && v !== 0) return "-";
+                              const n = Number(v);
+                              return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 2 }).format(n);
+                            })()}
                           </td>
 
                           {/* Owner */}
@@ -6378,7 +6430,14 @@ export default function CustomersPage() {
 
                           </label>
 
-
+                          {/* Search input for department */}
+                          <input
+                            type="text"
+                            placeholder="Search department..."
+                            value={deptSearch}
+                            onChange={(e) => setDeptSearch(e.target.value)}
+                            className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 mb-1"
+                          />
 
                           <select
 
@@ -6391,6 +6450,7 @@ export default function CustomersPage() {
 
 
                               setFormDepartment(dept);
+                              setDeptSearch("");
 
                               setForm(prev => ({ ...prev, stage: "" }));
 
@@ -6442,7 +6502,9 @@ export default function CustomersPage() {
 
                             {Array.isArray(departments) && departments.length > 0 ? (
 
-                              departments.map(dept => (
+                              departments
+                                .filter(dept => dept.toLowerCase().includes(deptSearch.toLowerCase()))
+                                .map(dept => (
 
                                 <option key={dept} value={dept}>{dept}</option>
 
@@ -6582,7 +6644,10 @@ export default function CustomersPage() {
 
 
 
-                        {/* Bank */}
+
+
+
+
 
 
 
@@ -6591,201 +6656,85 @@ export default function CustomersPage() {
 
 
                           <label className="block text-sm font-medium text-slate-700 mb-2">
-
-
-
-                            Bank
-
-
-
+                            Branch Name
                           </label>
-
-
-
+                          <input
+                            type="text"
+                            placeholder="Search branch..."
+                            value={branchSearch}
+                            onChange={(e) => setBranchSearch(e.target.value)}
+                            className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 mb-1"
+                          />
                           <select
-
-                            value={banks.some(b => String(b.id) === String(form.bankId)) ? form.bankId : ""}
-
-                            onChange={async (e) => {
-
-
-
-                              const bankId = e.target.value;
-
-
-
-                              const bank = banks.find(b => Number(b.id) === Number(bankId));
-
-
-
-                              setForm({
-
-                                ...form,
-
-                                bankId,
-
-                                branchName: bank?.branchName || "",
-
-                                taluka: bank?.taluka || "",
-
-                                district: bank?.district || ""
-
-                              });
-
-
-
-
-
-
-
-                              if (bankId) {
-
-
-
-                                try {
-
-
-
-                                  const response = await fetch(`https://api.yashrajent.com/api/banks/${bankId}`);
-
-
-
-                                  if (response.ok) {
-
-
-
-                                    const bank = await response.json();
-
-
-
-                                    setForm(prev => ({
-
-
-
-                                      ...prev,
-
-                                      branchName: bank.branchName || prev.branchName,
-
-                                      taluka: bank.taluka || prev.taluka,
-
-                                      district: bank.district || prev.district
-
-                                    }));
-
-
-
-                                  }
-
-
-
-                                } catch (error) {
-
-
-
-                                  console.error("Failed to fetch bank details:", error);
-
-
-
-                                }
-
-
-
+                            value={form.bankId || ""}
+                            onChange={(e) => {
+                              const bank = banks.find(b => String(b.id) === String(e.target.value));
+                              if (bank) {
+                                setForm(prev => ({
+                                  ...prev,
+                                  bankId: String(bank.id),
+                                  branchName: bank.branchName || "",
+                                  taluka: bank.taluka || "",
+                                  district: bank.district || ""
+                                }));
+                                setBranchSearch("");
                               }
-
-
-
                             }}
-
-
-
                             className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-
-
-
                           >
-
-
-
-                            <option value="">Select bank</option>
-
-
-
-                            {banks.map((bank) => (
-
-
-
-                              <option key={bank.id} value={String(bank.id)}>
-
-
-
-                                {bank.name}
-
-
-
-                              </option>
-
-
-
-                            ))}
-
-
-
+                            <option value="">Select branch</option>
+                            {banks
+                              .filter(b => {
+                                const q = branchSearch.toLowerCase();
+                                return !q ||
+                                  (b.branchName || "").toLowerCase().includes(q) ||
+                                  (b.name || "").toLowerCase().includes(q);
+                              })
+                              .map((bank) => (
+                                <option key={bank.id} value={String(bank.id)}>
+                                  {bank.branchName || bank.name}{bank.name && bank.branchName ? ` (${bank.name})` : ""}
+                                </option>
+                              ))}
                           </select>
 
 
 
                         </div>
 
-
-
-
-
-
-
+                        {/* Bank - auto-filled from branch */}
                         <div>
-
-
-
-                          <label className="block text-sm font-medium text-slate-700 mb-2">
-
-
-
-                            Branch Name
-
-
-
-                          </label>
-
-
-
+                          <label className="block text-sm font-medium text-slate-700 mb-2">Bank</label>
                           <input
-
-
-
                             type="text"
-
-
-
-                            value={form.branchName}
-
-
-
-                            onChange={(e) => setForm({ ...form, branchName: e.target.value })}
-
-
-
-                            className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-
-
-
-                            placeholder="Branch name"
-
-
-
+                            value={banks.find(b => String(b.id) === String(form.bankId))?.name || ""}
+                            readOnly
+                            className="w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-700 cursor-default"
+                            placeholder="Auto-filled from branch"
                           />
+                        </div>
 
+                        {/* Taluka - auto-filled from bank */}
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-2">Taluka</label>
+                          <input
+                            type="text"
+                            value={form.taluka || ""}
+                            readOnly
+                            className="w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-700 cursor-default"
+                            placeholder="Auto-filled from bank"
+                          />
+                        </div>
 
-
+                        {/* District - auto-filled from bank */}
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-2">District</label>
+                          <input
+                            type="text"
+                            value={form.district || ""}
+                            readOnly
+                            className="w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-700 cursor-default"
+                            placeholder="Auto-filled from bank"
+                          />
                         </div>
 
 
@@ -7343,8 +7292,7 @@ export default function CustomersPage() {
           onClose={() => setShowExcelUploadModal(false)}
           onUploadSuccess={(result) => {
             addToast(`Successfully imported ${result.success} customers/deals`, "success");
-            fetchCustomers();
-            fetchDeals();
+            loadAllData(true);
             setShowExcelUploadModal(false);
           }}
         />

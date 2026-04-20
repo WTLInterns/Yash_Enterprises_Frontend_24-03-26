@@ -1,12 +1,17 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
+
+const PUBLIC_PATHS = ["/login", "/admin-register", "/addOrganization"];
 
 export default function AuthGuard({ children, allowedRoles = [] }) {
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
+    if (PUBLIC_PATHS.some((p) => pathname?.startsWith(p))) return;
+
     try {
       // sessionStorage ONLY — localStorage causes cross-tab loop
       const raw = sessionStorage.getItem("user_data");
@@ -23,7 +28,7 @@ export default function AuthGuard({ children, allowedRoles = [] }) {
     } catch {
       router.replace("/login");
     }
-  }, [router]);
+  }, [router, pathname]);
 
   return <>{children}</>;
 }

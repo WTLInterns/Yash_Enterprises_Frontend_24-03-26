@@ -366,6 +366,11 @@ export default function CustomerDetailPage() {
 
       }
 
+      // 🔥 FIX: Listen for expense updates from /expenses page
+      if (e.detail?.type === 'EXPENSE_UPDATED' && Number(e.detail?.clientId) === Number(customerId)) {
+        fetchExpenses(customerId);
+      }
+
     };
 
 
@@ -966,63 +971,27 @@ export default function CustomerDetailPage() {
 
       const data = await backendApi.get(`/clients/${customerId}`);
 
-      
+      // Set the customer immediately so the page can render right away.
+      setCustomer({ ...data, addresses: data.addresses || [] });
+      setForm({ customFields: data.customFields || {} });
 
-      // Fetch addresses for this customer
-
-      try {
-
-        const authUser = loggedInUser;
-
-        const addressesResponse = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "https://api.yashrajent.com"}/api/clients/${customerId}/addresses`, {
-
-          headers: {
-
-            "X-User-Id": authUser?.id || "",
-
-            "X-User-Role": authUser?.role || "",
-
-            "X-User-Department": authUser?.department || ""
-
-          }
-
-        });
-
-        
-
-        const addresses = addressesResponse.ok ? await addressesResponse.json() : [];
-
-        
-
-        // Merge addresses with customer data
-
-        const customerWithAddresses = {
-
-          ...data,
-
-          addresses: addresses || []
-
-        };
-
-        
-
-        setCustomer(customerWithAddresses);
-
-      } catch (addressError) {
-
-        console.error("Failed to load addresses:", addressError);
-
-        // Still set customer data even if addresses fail
-
-        setCustomer({
-
-          ...data,
-
-          addresses: []
-
-        });
-
-      }
+      // Fetch addresses for this customer in the background.
+      (async () => {
+        try {
+          const authUser = loggedInUser;
+          const addressesResponse = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "https://api.yashrajent.com"}/api/clients/${customerId}/addresses`, {
+            headers: {
+              "X-User-Id": authUser?.id || "",
+              "X-User-Role": authUser?.role || "",
+              "X-User-Department": authUser?.department || ""
+            }
+          });
+          const addresses = addressesResponse.ok ? await addressesResponse.json() : [];
+          setCustomer(prev => prev ? { ...prev, addresses: addresses || [] } : { ...data, addresses: addresses || [] });
+        } catch (addressError) {
+          console.error("Failed to load addresses:", addressError);
+        }
+      })();
 
 
 
@@ -1737,10 +1706,12 @@ export default function CustomerDetailPage() {
   // 🔥 NEW: Fetch expenses by clientId for CRM accounting
   async function fetchExpenses(clientIdOverride) {
     try {
-      const cid = clientIdOverride ?? deal?.clientId ?? customerId;
+      const cid = clientIdOverride ?? customerId;
       if (!cid) return;
+      // Fetch by clientId — covers expenses added from both /customers/[id] and /expenses page
       const res = await backendApi.get(`/expenses?clientId=${cid}`);
-      setExpenses(Array.isArray(res) ? res : []);
+      const list = Array.isArray(res) ? res : (res?.content || []);
+      setExpenses(list);
     } catch (e) {
       console.error("Expense fetch failed", e);
       setExpenses([]);
@@ -1816,8 +1787,11 @@ export default function CustomerDetailPage() {
     if (!confirm('Delete this expense?')) return;
     try {
       await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "https://api.yashrajent.com"}/api/expenses/${expenseId}`, { method: 'DELETE' });
-      await fetchExpenses(deal?.clientId ?? customerId);
+      await fetchExpenses(customerId);
       addToast('Expense deleted', 'success');
+      window.dispatchEvent(new CustomEvent('crm-data-update', {
+        detail: { type: 'EXPENSE_UPDATED', clientId: Number(customerId) }
+      }));
     } catch (e) {
       addToast('Failed to delete expense', 'error');
     }
@@ -2541,7 +2515,7 @@ export default function CustomerDetailPage() {
 
 
 
-        const [timelineSettled, stagesSettled, notesSettled, tasksSettled, eventsSettled, callsSettled, productsSettled] = await Promise.allSettled([
+        const [timelineSettled, stagesSettled, notesSettled, tasksSettled, eventsSettled, callsSettled, productsSettled, clientTasksSettled] = await Promise.allSettled([
 
 
 
@@ -2570,6 +2544,7 @@ export default function CustomerDetailPage() {
 
 
           backendApi.get(`/deals/${resolvedDealId}/products`),
+          fetch(`https://api.yashrajent.com/api/tasks?clientId=${customerId}`).then(r => r.ok ? r.json() : []).catch(() => []),
 
 
 
@@ -2708,9 +2683,25 @@ export default function CustomerDetailPage() {
 
 
 
-        setTasks(tasksSettled.status === "fulfilled" ? adaptActivities(tasksSettled.value) : []);
-
-
+        setTasks((() => {
+          const dealTasks = tasksSettled.status === "fulfilled" ? adaptActivities(tasksSettled.value) : [];
+          // Client tasks from /api/tasks?clientId= — adapt to same shape
+          const rawClientTasks = clientTasksSettled.status === "fulfilled" ? (Array.isArray(clientTasksSettled.value) ? clientTasksSettled.value : (clientTasksSettled.value?.content || [])) : [];
+          const clientTasksMapped = rawClientTasks.map(t => ({
+            id: `ct-${t.id}`,
+            name: t.taskName || t.name || "",
+            title: t.taskName || t.name || "",
+            dueDate: t.scheduledEndTime || t.endDate || null,
+            status: t.status || "",
+            owner: t.assignedToEmployeeName || "",
+            description: t.taskDescription || "",
+            priority: null,
+          }));
+          // Merge, deduplicate by id
+          const seen = new Set(dealTasks.map(t => t.id));
+          const merged = [...dealTasks, ...clientTasksMapped.filter(t => !seen.has(t.id))];
+          return merged;
+        })());
 
         setEvents(eventsSettled.status === "fulfilled" ? adaptActivities(eventsSettled.value) : []);
 
@@ -2761,27 +2752,24 @@ export default function CustomerDetailPage() {
 
 
         // Load product catalog and field definitions
-        await loadCatalogProducts();
-        await loadProductFieldDefs();
-
-        // 🔥 NEW: Load expenses for CRM accounting (pass clientId directly since deal may not be in state yet)
-        await fetchExpenses(dealRes?.clientId ?? customerId);
-        await loadExpenseEmployees();
-
-        // Load email history
-        try {
-          const emailRes = await backendApi.get(`/deals/${resolvedDealId}/emails`);
-          if (isMounted) setEmailHistory(Array.isArray(emailRes) ? emailRes : []);
-        } catch (_e) {
-          if (isMounted) setEmailHistory([]);
-        }
-
-
-
-
-
-
-
+        const backgroundDealTasks = [
+                  loadCatalogProducts(),
+                            loadProductFieldDefs(),
+                                      fetchExpenses(customerId),
+                                                loadExpenseEmployees(),
+                                                          (async () => {
+                                                                      try {
+                                                                                    const emailRes = await backendApi.get(`/deals/${resolvedDealId}/emails`);
+                                                                                                  if (isMounted) setEmailHistory(Array.isArray(emailRes) ? emailRes : []);
+                                                                                                              } catch (_e) {
+                                                                                                                            if (isMounted) setEmailHistory([]);
+                                                                                                                                        }
+                                                                                                                                                  })(),
+                                                                                                                                                          ];
+                                                                                                                                                                  Promise.allSettled(backgroundDealTasks).catch((err) => {
+                                                                                                                                                                            console.error('Background deal load failed', err);
+                                                                                                                                                                                    });
+                                                                                                                                                                                    
         if (dealRes?.bankId) {
 
 
@@ -6952,6 +6940,17 @@ async function ensureDealId() {
 
                     </div>
 
+                    {/* Department */}
+                    {deal?.department && (
+                      <div className="flex items-start gap-3">
+                        <Building2 className="h-4 w-4 text-slate-400 mt-0.5" />
+                        <div className="flex-1">
+                          <div className="text-xs font-medium text-slate-500">Department</div>
+                          <div className="text-sm text-slate-900 font-semibold">{deal.department}</div>
+                        </div>
+                      </div>
+                    )}
+
 
 
                     {/* Addresses */}
@@ -10837,7 +10836,11 @@ async function ensureDealId() {
                               const payload = {
                                 ...expenseForm,
                                 clientId: customerId,
-                                clientName: customer?.name || '',
+                                clientName: customer?.name || safeCustomer?.name || '',
+                                dealId: dealId ?? null,
+                                departmentName: deal?.department || '',
+                                stageCode: deal?.stageCode || '',
+                                expenseType: dealId ? 'DEAL' : 'COMPANY',
                                 amount: Number(expenseForm.amount)
                               };
                               const uploadData = new FormData();
@@ -10855,7 +10858,11 @@ async function ensureDealId() {
                               setExpenseFile(null);
                               setEditingExpenseId(null);
                               setShowExpenseModal(false);
-                              await fetchExpenses(deal?.clientId ?? customerId);
+                              await fetchExpenses(customerId);
+                              // Broadcast so /expenses page also refreshes
+                              window.dispatchEvent(new CustomEvent('crm-data-update', {
+                                detail: { type: 'EXPENSE_UPDATED', clientId: Number(customerId) }
+                              }));
                             } catch (error) {
                               console.error('Failed to save expense:', error);
                               addToast('Failed to save expense', 'error');

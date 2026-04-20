@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useMemo } from 'react';
 import { Bell, X, Check, Settings, LogOut, User, Menu, RefreshCw, CheckCheck, Trash2, Clock, Calendar } from 'lucide-react';
 import { backendApi } from '../../services/api';
 import webSocketService from '../../services/websocketService';
@@ -10,6 +10,9 @@ import { getTabSafeItem } from '@/utils/tabSafeStorage';
 export default function Topbar({ tabs, activeTabKey, onTabClick }) {
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState([]);
+  const bellRef = useRef(null);
+  const [panelPos, setPanelPos] = useState(null); // null = not calculated yet
+  
   const [loading, setLoading] = useState(false);
   const [markingAll, setMarkingAll] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
@@ -362,15 +365,21 @@ export default function Topbar({ tabs, activeTabKey, onTabClick }) {
       };
     }, [userId, userRole, userDepartment]);
 
-    // ✅ FIX: Allow page scroll when notification panel is open (overlay should be click-only)
-    useEffect(() => {
-      if (typeof window === 'undefined') return;
-      if (open) {
-        // ensure body scroll is not blocked by overlay
-        document.body.style.overflow = '';
-      }
-      // no cleanup required — do not force overflow style on close
-    }, [open]);
+  // Calculate panel position synchronously before paint
+  useLayoutEffect(() => {
+    if (open && bellRef.current) {
+      const rect = bellRef.current.getBoundingClientRect();
+      const panelWidth = Math.min(420, window.innerWidth - 16);
+      const rightEdge = window.innerWidth - rect.right;
+      setPanelPos({
+        top: rect.bottom + 8,
+        right: Math.max(8, rightEdge),
+        width: panelWidth,
+      });
+    } else {
+      setPanelPos(null);
+    }
+  }, [open]);
 
   // ✅ All Firebase and WebSocket functionality is working correctly
   // ✅ Tab visibility notifications are implemented  
@@ -401,6 +410,7 @@ export default function Topbar({ tabs, activeTabKey, onTabClick }) {
 
         <div className="relative flex-shrink-0">
           <button
+            ref={bellRef}
             type="button"
             onClick={() => {
               setOpen((v) => !v);
@@ -416,13 +426,23 @@ export default function Topbar({ tabs, activeTabKey, onTabClick }) {
             )}
           </button>
 
-          {open && (
+          {open && panelPos && (
             <>
               <div
-                className="fixed inset-0 bg-black/20 z-40 pointer-events-auto"
+                className="fixed inset-0 bg-black/20 z-[9998] pointer-events-auto"
                 onClick={() => setOpen(false)}
               />
-              <div className="absolute right-0 mt-2 w-[95vw] sm:w-[420px] max-h-[80vh] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl z-50 animate-in slide-in-from-top-2 duration-200 flex flex-col">
+              <div
+                style={{
+                  position: 'fixed',
+                  top: panelPos.top,
+                  right: panelPos.right,
+                  width: panelPos.width,
+                  zIndex: 9999,
+                  maxHeight: '80vh',
+                }}
+                className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl flex flex-col"
+              >
                 {/* Header */}
                 <div className="bg-slate-800 text-white p-4 flex-shrink-0">
                   <div className="flex items-center justify-between mb-3">

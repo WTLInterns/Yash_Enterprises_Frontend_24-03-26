@@ -1,7 +1,6 @@
 import "./globals.css";
 import WebSocketProvider from "../components/WebSocketProvider";
 import ToastProvider from "../components/common/ToastProvider";
-import AuthGuard from "../components/auth/AuthGuard";
 import ToastContainerClient from "../components/common/ToastContainerClient";
 import { CustomerAddressProvider } from "../context/CustomerAddressContext";
 import { StageProvider } from "../context/StageContext";
@@ -32,9 +31,7 @@ export default function RootLayout({ children }) {
           <ToastProvider>
             <CustomerAddressProvider>
               <StageProvider>
-                <AuthGuard>
-                  {children}
-                </AuthGuard>
+                {children}
               </StageProvider>
             </CustomerAddressProvider>
           </ToastProvider>

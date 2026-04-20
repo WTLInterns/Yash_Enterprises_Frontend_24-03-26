@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
+import React from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { backendApi } from '@/services/api';
 import {
@@ -32,18 +33,19 @@ export default function ExpenseOverviewPage() {
   const pageSize = 10;
 
   const [clients, setClients] = useState([]);
+  const [deals, setDeals] = useState([]);
   const [clientProducts, setClientProducts] = useState([]);
   const [clientDealId, setClientDealId] = useState(null);
-  const [dealStats, setDealStats] = useState({ totalDeals: 0, closeWin: 0, closeLost: 0, pending: 0 });
-  const [productSales, setProductSales] = useState([]);
-  const [productSalesOpen, setProductSalesOpen] = useState(false);
-  const [selectedExpense, setSelectedExpense] = useState(null);
-  const [previewImage, setPreviewImage] = useState(null);
+  const [selectedDealId, setSelectedDealId] = useState('');
+  const [selectedClientId, setSelectedClientId] = useState('');
+  const [selectedClientDepartment, setSelectedClientDepartment] = useState('');
+  const [selectedStageCode, setSelectedStageCode] = useState('');
+  const [availableStages, setAvailableStages] = useState([]);
+  const [expenseType, setExpenseType] = useState('DEAL');
   const [showFormModal, setShowFormModal] = useState(false);
   const [editExpense, setEditExpense] = useState(null);
   const [saving, setSaving] = useState(false);
   const [filePreview, setFilePreview] = useState(null);
-  const [selectedClientId, setSelectedClientId] = useState('');
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadResult, setUploadResult] = useState(null);
@@ -55,6 +57,13 @@ export default function ExpenseOverviewPage() {
   const [exportEmployeeId, setExportEmployeeId] = useState('');
   const [exportFromDate, setExportFromDate] = useState('');
   const [exportToDate, setExportToDate] = useState('');
+  const [productSalesOpen, setProductSalesOpen] = useState(false);
+  const [productSales, setProductSales] = useState([]);
+  const [dealStats, setDealStats] = useState({ totalDeals: 0, closeWin: 0, closeLost: 0, pending: 0 });
+  const [previewImage, setPreviewImage] = useState(null);
+  const [selectedExpense, setSelectedExpense] = useState(null);
+  const [clientSearch, setClientSearch] = useState('');
+  const [employeeSearch, setEmployeeSearch] = useState('');
 
   // Get current user info for role-based filtering
   const [currentUser, setCurrentUser] = useState(null);
@@ -83,6 +92,7 @@ export default function ExpenseOverviewPage() {
     loadExpenses();
     loadEmployees();
     loadClients();
+    loadDeals();
     loadDealStats();
     loadProductSales();
   }, []);
@@ -117,6 +127,19 @@ export default function ExpenseOverviewPage() {
     }
   }
 
+  async function loadDeals() {
+    try {
+      const res = await backendApi.get('/deals/all');
+      setDeals(Array.isArray(res) ? res : (res?.content || []));
+    } catch (err) {
+      // fallback to /deals
+      try {
+        const res2 = await backendApi.get('/deals?size=9999');
+        setDeals(Array.isArray(res2) ? res2 : (res2?.content || []));
+      } catch { setDeals([]); }
+    }
+  }
+
   async function loadDealStats() {
     try {
       const res = await backendApi.get('/deals?size=9999');
@@ -141,17 +164,39 @@ export default function ExpenseOverviewPage() {
     }
   }
 
+  async function handleDealChange(dealId) {
+    setSelectedDealId(dealId);
+    setClientProducts([]);
+    setClientDealId(null);
+    setSelectedClientDepartment('');
+    setSelectedClientId('');
+    setSelectedStageCode('');
+    if (!dealId) return;
+    const deal = deals.find(d => String(d.id) === String(dealId));
+    if (!deal) return;
+    setClientDealId(deal.id);
+    setSelectedClientId(String(deal.clientId || deal.client_id || ''));
+    setSelectedClientDepartment(deal.department || '');
+    setSelectedStageCode(deal.stageCode || '');
+    try {
+      const products = await backendApi.get(`/deals/${deal.id}/products`).catch(() => []);
+      setClientProducts(Array.isArray(products) ? products : []);
+    } catch {}
+  }
+
   async function handleClientChange(clientId) {
     setSelectedClientId(clientId);
     setClientProducts([]);
     setClientDealId(null);
+    setSelectedClientDepartment('');
     if (!clientId) return;
     try {
-      const deals = await backendApi.get(`/deals?clientId=${clientId}&size=9999`);
-      const list = Array.isArray(deals) ? deals : (deals?.content || []);
+      const dealsRes = await backendApi.get(`/deals?clientId=${clientId}&size=9999`);
+      const list = Array.isArray(dealsRes) ? dealsRes : (dealsRes?.content || []);
       const deal = list.sort((a, b) => (b.id || 0) - (a.id || 0))[0];
       if (!deal) return;
       setClientDealId(deal.id);
+      setSelectedClientDepartment(deal.department || deal.departmentName || '');
       const products = await backendApi.get(`/deals/${deal.id}/products`).catch(() => []);
       setClientProducts(Array.isArray(products) ? products : []);
     } catch (err) {
@@ -172,8 +217,10 @@ export default function ExpenseOverviewPage() {
       return;
     }
 
-    const clientId = formData.get("clientId");
-    const selectedClient = clients.find(c => String(c.id) === String(clientId));
+    const dealId = formData.get("dealId") || selectedDealId || null;
+    const dealObj = dealId ? deals.find(d => String(d.id) === String(dealId)) : null;
+    const deptFromDeal = dealObj?.department || selectedClientDepartment || null;
+    const stageFromDeal = dealObj?.stageCode || selectedStageCode || null;
 
     const payload = {
       employeeId: formData.get("employeeId"),
@@ -182,8 +229,12 @@ export default function ExpenseOverviewPage() {
       description: formData.get("description"),
       expenseDate: formData.get("expenseDate"),
       status: formData.get("status"),
-      clientId: clientId || null,
-      clientName: selectedClient ? (selectedClient.name || selectedClient.clientName || selectedClient.companyName) : null
+      dealId: dealId ? Number(dealId) : null,
+      clientId: dealObj?.clientId || null,
+      clientName: dealObj ? (dealObj.clientName || dealObj.name || null) : null,
+      departmentName: deptFromDeal,
+      stageCode: stageFromDeal,
+      expenseType: dealId ? 'DEAL' : 'COMPANY'
     };
 
     const uploadData = new FormData();
@@ -212,10 +263,26 @@ export default function ExpenseOverviewPage() {
       setPreviewImage(null);
       setFilePreview(null);
       setSelectedClientId('');
+      setSelectedDealId('');
+      setSelectedClientDepartment('');
       setClientProducts([]);
       setClientDealId(null);
+      setClientSearch('');
+      setEmployeeSearch('');
       e.target.reset();
       loadExpenses();
+      // Broadcast so /customers/[id] page refreshes expenses
+      const broadcastClientId = dealObj?.clientId || payload.clientId || clientId;
+      if (broadcastClientId) {
+        window.dispatchEvent(new CustomEvent('crm-data-update', {
+          detail: { type: 'EXPENSE_UPDATED', clientId: Number(broadcastClientId) }
+        }));
+        if (typeof BroadcastChannel !== 'undefined') {
+          const ch = new BroadcastChannel('crm-updates');
+          ch.postMessage({ type: 'EXPENSE_UPDATED', clientId: Number(broadcastClientId) });
+          ch.close();
+        }
+      }
 
     } catch(err){
       console.error("Failed saving expense", err);
@@ -248,16 +315,27 @@ export default function ExpenseOverviewPage() {
     const workbook = new ExcelJS.Workbook();
     const ws = workbook.addWorksheet('Expenses');
     ws.columns = [
-      { header: 'Employee Name', key: 'employeeName', width: 20 },
-      { header: 'Client Name', key: 'clientName', width: 20 },
-      { header: 'Department', key: 'departmentName', width: 20 },
-      { header: 'Category', key: 'category', width: 20 },
-      { header: 'Description', key: 'description', width: 30 },
-      { header: 'Amount', key: 'amount', width: 15 },
-      { header: 'Expense Date (YYYY-MM-DD)', key: 'expenseDate', width: 25 },
-      { header: 'Status', key: 'status', width: 15 },
+      { header: 'Employee Name',             key: 'employeeName',   width: 22 },
+      { header: 'Deal Code (PPE1/PPO2/…)',   key: 'dealCode',       width: 20 },
+      { header: 'Client Name (if no Deal)',  key: 'clientName',     width: 22 },
+      { header: 'Department (PPE/PPO/…)',   key: 'department',     width: 22 },
+      { header: 'Stage Code (DOP/PPS/…)',   key: 'stageCode',      width: 20 },
+      { header: 'Category',                  key: 'category',       width: 18 },
+      { header: 'Description',               key: 'description',    width: 30 },
+      { header: 'Amount',                    key: 'amount',         width: 15 },
+      { header: 'Expense Date (YYYY-MM-DD)', key: 'expenseDate',    width: 25 },
+      { header: 'Status',                    key: 'status',         width: 15 },
     ];
-    ws.addRow({ employeeName: 'John Doe', clientName: 'ABC Corp', departmentName: 'PPO', category: 'Travel', description: 'Client visit', amount: 500, expenseDate: '2024-01-15', status: 'PENDING' });
+    ws.getRow(1).eachCell(cell => {
+      cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF3F51B5' } };
+    });
+    ws.addRow({
+      employeeName: 'John Doe', dealCode: 'PPE1', clientName: '',
+      department: '', stageCode: '',
+      category: 'Travel', description: 'Client visit',
+      amount: 500, expenseDate: '2024-01-15', status: 'PENDING'
+    });
     const buffer = await workbook.xlsx.writeBuffer();
     saveAs(new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), 'expenses-template.xlsx');
   }
@@ -547,8 +625,11 @@ export default function ExpenseOverviewPage() {
               setEditExpense(null);
               setFilePreview(null);
               setSelectedClientId('');
+              setSelectedDealId('');
               setClientProducts([]);
               setClientDealId(null);
+              setClientSearch('');
+              setEmployeeSearch('');
               setShowFormModal(true);
             }}
             className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-md text-sm hover:bg-indigo-700"
@@ -685,6 +766,7 @@ export default function ExpenseOverviewPage() {
                 <tr>
                   <th className="p-3 text-left">Employee</th>
                   <th className="p-3 text-left">Client</th>
+                  <th className="p-3 text-left">Department</th>
                   <th className="p-3 text-left">Category</th>
                   <th className="p-3 text-left">Amount</th>
                   <th className="p-3 text-left">Date</th>
@@ -714,17 +796,22 @@ export default function ExpenseOverviewPage() {
                             {e.employeeName || "Unknown"}
                           </div>
 
-                          <div className="text-xs text-gray-500">
-                            {e.departmentName || "Department"}
-                          </div>
+
                         </div>
 
                       </div>
                     </td>
 
-                    {/* CATEGORY */}
+                    {/* CLIENT */}
                     <td className="p-3">
                       <span className="text-xs text-gray-600">{e.clientName || '-'}</span>
+                    </td>
+
+                    {/* CLIENT DEPARTMENT */}
+                    <td className="p-3">
+                      <span className="text-xs text-gray-600">
+                        {e.departmentName || e.clientDepartment || e.department || '-'}
+                      </span>
                     </td>
 
                     {/* CATEGORY */}
@@ -799,8 +886,12 @@ export default function ExpenseOverviewPage() {
                             setEditExpense(e);
                             setFilePreview(null);
                             setSelectedClientId(e.clientId || '');
+                            setSelectedDealId(e.dealId ? String(e.dealId) : '');
+                            setSelectedClientDepartment(e.departmentName || '');
                             setClientProducts([]);
-                            setClientDealId(null);
+                            setClientDealId(e.dealId || null);
+                            setClientSearch('');
+                            setEmployeeSearch('');
                             setShowFormModal(true);
                           }}
                           className="p-2 bg-gray-100 rounded"
@@ -916,7 +1007,7 @@ export default function ExpenseOverviewPage() {
 
           <div
             className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-            onClick={()=>setShowFormModal(false)}
+            onClick={()=>{ setShowFormModal(false); setClientSearch(''); setEmployeeSearch(''); }}
           />
 
           <div className="relative bg-white rounded-lg shadow-lg w-[500px] p-6">
@@ -934,48 +1025,47 @@ export default function ExpenseOverviewPage() {
 
             <form onSubmit={handleSubmit} className="space-y-3 max-h-[70vh] overflow-y-auto pr-1" key={editExpense?.id || "new"}>
 
-              {/* Employee */}
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">Employee *</label>
-                <select
-                  name="employeeId"
-                  defaultValue={editExpense?.employeeId || ""}
-                  required
-                  className="w-full border rounded px-3 py-2 text-sm"
-                >
-                  <option value="">Select Employee</option>
-                  {employees.map(emp => (
-                    <option key={emp.id} value={emp.id}>
-                      {emp.firstName} {emp.lastName} — {emp.departmentName || emp.tlDepartmentName || emp.department || 'No Dept'} ({emp.roleName})
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {/* Employee — searchable dropdown */}
+              <SearchableDropdown
+                label="Employee *"
+                required
+                name="employeeId"
+                value={editExpense?.employeeId ? String(editExpense.employeeId) : ''}
+                placeholder="Search by name or department..."
+                options={employees.map(emp => ({
+                  value: String(emp.id),
+                  label: `${emp.firstName} ${emp.lastName}`,
+                  sub: `${emp.departmentName || emp.tlDepartmentName || emp.department || 'No Dept'} · ${emp.roleName || ''}`,
+                }))}
+              />
 
-              {/* Client */}
+              {/* Deal dropdown — replaces Client dropdown */}
               <div>
-                <label className="block text-xs text-gray-500 mb-1">Client (optional)</label>
-                <select
-                  name="clientId"
-                  value={selectedClientId}
-                  onChange={e => handleClientChange(e.target.value)}
-                  className="w-full border rounded px-3 py-2 text-sm"
-                >
-                  <option value="">No Client</option>
-                  {clients.map(c => (
-                    <option key={c.id} value={c.id}>
-                      {c.name || c.clientName || c.companyName}
-                    </option>
-                  ))}
-                </select>
-                {selectedClientId && clientProducts.length > 0 && (
+                <SearchableDropdown
+                  label="Deal / Client (optional)"
+                  name="dealId"
+                  value={selectedDealId ? String(selectedDealId) : (editExpense?.dealId ? String(editExpense.dealId) : '')}
+                  placeholder="Search by client name or department..."
+                  options={[
+                    { value: '', label: 'No Deal', sub: '' },
+                    ...deals.map(d => ({
+                      value: String(d.id),
+                      label: `${d.dealCode || ('#' + d.id)} - ${d.clientName || d.name || 'Unknown'}`,
+                      sub: `${d.department || ''} · ${d.stageCode || ''}`,
+                    }))
+                  ]}
+                  onChange={val => handleDealChange(val)}
+                />
+                {selectedDealId && selectedClientDepartment && (
+                  <div className="mt-1 text-xs text-indigo-600 font-medium">
+                    {selectedClientDepartment}{selectedStageCode ? ` · ${selectedStageCode}` : ''}
+                  </div>
+                )}
+                {selectedDealId && clientProducts.length > 0 && (
                   <div className="mt-2 p-2 bg-indigo-50 rounded text-xs text-indigo-700 flex gap-4">
                     <span>Products: <b>{productSummary.totalQty}</b></span>
                     <span>Total Value: <b>₹{productSummary.totalPrice.toLocaleString('en-IN')}</b></span>
                   </div>
-                )}
-                {selectedClientId && clientProducts.length === 0 && clientDealId && (
-                  <p className="text-xs text-gray-400 mt-1">No products linked to this client's deal.</p>
                 )}
               </div>
 
@@ -1351,3 +1441,79 @@ function StatusBadge({status}){
   )
 }
 
+// Proper searchable dropdown — type to filter, click to select, hidden input for form submit
+function SearchableDropdown({ label, name, value, placeholder, options = [], onChange, required }) {
+  const [query, setQuery] = useState('');
+  const [open, setOpen] = useState(false);
+  const [internalValue, setInternalValue] = useState(value || '');
+  const ref = React.useRef(null);
+
+  // Sync external value (e.g. when editExpense changes)
+  React.useEffect(() => { setInternalValue(value || ''); }, [value]);
+
+  // Close on outside click
+  React.useEffect(() => {
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const selected = options.find(o => String(o.value) === String(internalValue));
+  const displayText = selected?.value ? selected.label : '';
+
+  const filtered = options.filter(o => {
+    if (!query) return true;
+    const q = query.toLowerCase();
+    return (
+      o.label.toLowerCase().includes(q) ||
+      (o.sub || '').toLowerCase().includes(q)
+    );
+  });
+
+  function select(opt) {
+    setInternalValue(opt.value);
+    setQuery('');
+    setOpen(false);
+    if (onChange) onChange(opt.value);
+  }
+
+  return (
+    <div ref={ref} className="relative">
+      {label && <label className="block text-xs text-gray-500 mb-1">{label}</label>}
+
+      {/* Hidden input so form.get(name) works */}
+      <input type="hidden" name={name} value={internalValue} required={required} />
+
+      {/* Visible input */}
+      <input
+        type="text"
+        autoComplete="off"
+        placeholder={open ? placeholder : (displayText || placeholder)}
+        value={open ? query : displayText}
+        onFocus={() => { setOpen(true); setQuery(''); }}
+        onChange={e => { setQuery(e.target.value); setOpen(true); }}
+        className="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+      />
+
+      {/* Dropdown list */}
+      {open && (
+        <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-52 overflow-y-auto">
+          {filtered.length === 0 ? (
+            <div className="px-3 py-2 text-xs text-gray-400">No results</div>
+          ) : (
+            filtered.map((opt, i) => (
+              <div
+                key={opt.value || i}
+                onMouseDown={() => select(opt)}
+                className={`px-3 py-2 cursor-pointer hover:bg-indigo-50 ${String(internalValue) === String(opt.value) ? 'bg-indigo-50 font-medium' : ''}`}
+              >
+                <div className="text-sm text-gray-800">{opt.label || <span className="text-gray-400 italic">None</span>}</div>
+                {opt.sub && <div className="text-xs text-gray-400">{opt.sub}</div>}
+              </div>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}

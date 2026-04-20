@@ -384,7 +384,7 @@ export default function CustomersPage() {
   useEffect(() => {
     setIsMounted(true); // Mark as mounted after hydration
     const _ud = (() => { try { return JSON.parse(sessionStorage.getItem('user_data') || localStorage.getItem('user_data') || '{}'); } catch { return {}; } })();
-    fetch("https://api.yashrajent.com/api/stages/departments", {
+    fetch("http://localhost:8080/api/stages/departments", {
       headers: { 'X-User-Id': String(_ud?.id ?? ''), 'X-User-Role': _ud?.role ?? '' }
     })
       .then(r => r.ok ? r.json() : [])
@@ -843,39 +843,8 @@ export default function CustomersPage() {
     } finally {
       if (!silent) setLoading(false);
     }
-
-    // ✅ Load addresses in background AFTER table is visible (non-blocking)
-    setTimeout(() => loadAddressesBackground(), 200);
-  };
-
-  // Loads addresses in batches of 15 — runs after table is already rendered
-  const loadAddressesBackground = async () => {
-    try {
-      const authUser3 = getTabSafeAuthUser();
-      const headers = {
-        'X-User-Id': String(authUser3?.id ?? ''),
-        'X-User-Role': authUser3?.role ?? '',
-      };
-      // Use ref which is updated by useEffect
-      const snap = customersRef.current;
-      if (!snap || snap.length === 0) return;
-      const BATCH = 15;
-      for (let i = 0; i < snap.length; i += BATCH) {
-        const batch = snap.slice(i, i + BATCH);
-        const settled = await Promise.allSettled(
-          batch.map(c =>
-            fetch(`https://api.yashrajent.com/api/clients/${c.id}/addresses`, { headers })
-              .then(r => r.ok ? r.json() : [])
-              .catch(() => [])
-          )
-        );
-        const updates = {};
-        batch.forEach((c, j) => {
-          updates[c.id] = settled[j]?.status === 'fulfilled' ? settled[j].value : [];
-        });
-        setCustomers(prev => prev.map(c => c.id in updates ? { ...c, addresses: updates[c.id] } : c));
-      }
-    } catch {}
+    // ❌ REMOVED: loadAddressesBackground() — was causing N+1 API calls on every load
+    // Addresses are now fetched only when needed (edit/details open)
   };
 
     // Detect edit query param and open edit drawer — runs ONCE when customers first load
@@ -1396,7 +1365,7 @@ export default function CustomersPage() {
 
 
 
-      const response = await fetch('https://api.yashrajent.com/api/clients/geocode', {
+      const response = await fetch('http://localhost:8080/api/clients/geocode', {
 
 
 
@@ -1624,7 +1593,7 @@ export default function CustomersPage() {
 
 
 
-      const response = await fetch('https://api.yashrajent.com/api/clients/reverse-geocode', {
+      const response = await fetch('http://localhost:8080/api/clients/reverse-geocode', {
 
 
 
@@ -2230,7 +2199,7 @@ export default function CustomersPage() {
       // but backendApi.get("/api/clients/...") becomes /api/api/clients/... → 500!
       const authUser = getTabSafeAuthUser();
       const addrResponse = await fetch(
-        `https://api.yashrajent.com/api/clients/${customer.id}/addresses`,
+        `http://localhost:8080/api/clients/${customer.id}/addresses`,
         {
           headers: {
             "X-User-Id": String(authUser?.id ?? ""),
@@ -2304,7 +2273,7 @@ export default function CustomersPage() {
     if (!customer.addresses || customer.addresses.length === 0) {
       try {
         const authUser = getTabSafeAuthUser();
-        const res = await fetch(`https://api.yashrajent.com/api/clients/${customer.id}/addresses`, {
+        const res = await fetch(`http://localhost:8080/api/clients/${customer.id}/addresses`, {
           headers: {
             "X-User-Id": String(authUser?.id ?? ""),
             "X-User-Role": authUser?.role ?? "",
@@ -2782,7 +2751,7 @@ export default function CustomersPage() {
 
 
 
-        await fetch(`https://api.yashrajent.com/api/clients/${savedCustomer.id}/addresses`, {
+        await fetch(`http://localhost:8080/api/clients/${savedCustomer.id}/addresses`, {
 
 
 
@@ -2836,7 +2805,7 @@ export default function CustomersPage() {
 
 
 
-        await fetch(`https://api.yashrajent.com/api/clients/${savedCustomer.id}/addresses`, {
+        await fetch(`http://localhost:8080/api/clients/${savedCustomer.id}/addresses`, {
 
 
 
@@ -3082,72 +3051,42 @@ export default function CustomersPage() {
 
       addToast(selectedCustomer?.id ? "Customer updated successfully" : "Customer created successfully", "success");
 
-
-
-
-
-
-
-      // 🔥 CRITICAL: Broadcast customer update to other tabs for real-time updates
-
-      if (typeof window !== 'undefined') {
-
-        const customerId = selectedCustomer?.id || savedCustomer?.id;
-
-        if (customerId) {
-
-          // Custom event for same tab
-
-          const event = new CustomEvent('crm-data-update', {
-
-            detail: {
-
-              type: 'CUSTOMER_UPDATED',
-
-              customerId: customerId,
-
-              action: selectedCustomer?.id ? 'updated' : 'created',
-
-              userId: getTabSafeAuthUser()?.id
-
-            }
-
-          });
-
-          window.dispatchEvent(event);
-
-
-
-          // BroadcastChannel for cross-tab communication
-
-          if (typeof BroadcastChannel !== 'undefined') {
-
-            const channel = new BroadcastChannel('crm-updates');
-
-            channel.postMessage({
-
-              type: 'CUSTOMER_UPDATED',
-
-              customerId: customerId,
-
-              action: selectedCustomer?.id ? 'updated' : 'created',
-
-              userId: getTabSafeAuthUser()?.id
-
-            });
-
-            channel.close();
-
-          }
-
+      // 🔥 Optimistic update — only reload deals (fast), not full page reload
+      // This avoids the 10-15 sec lag after save
+      try {
+        const authUser2 = getTabSafeAuthUser();
+        const role2 = (authUser2?.role || '').toUpperCase();
+        const dealsRes = await (role2 === 'ADMIN' || role2 === 'MANAGER' || role2 === 'HR'
+          ? backendApi.get('/deals/all')
+          : backendApi.get('/deals/filtered')
+        ).catch(() => []);
+        const normalizedDeals = normalizeList(dealsRes).map(d => ({
+          ...d,
+          clientId: d.clientId ?? d.client_id ?? null,
+          stageCode: d.stageCode || d.stage || '',
+          valueAmount: d.calculatedValue ?? d.valueAmount ?? 0,
+          calculatedValue: d.calculatedValue ?? null,
+          dealCode: d.dealCode ?? null,
+          movedToApproval: d.movedToApproval ?? false,
+        }));
+        setDeals(normalizedDeals);
+        // Update or add the customer in local state without full reload
+        if (selectedCustomer?.id) {
+          setCustomers(prev => prev.map(c => c.id === savedCustomer.id ? { ...c, ...savedCustomer } : c));
+        } else {
+          setCustomers(prev => [{ ...savedCustomer, addresses: [] }, ...prev]);
         }
+      } catch {}
 
+      // Broadcast to other tabs
+      if (typeof window !== 'undefined') {
+        const customerId = selectedCustomer?.id || savedCustomer?.id;
+        if (customerId && typeof BroadcastChannel !== 'undefined') {
+          const channel = new BroadcastChannel('crm-updates');
+          channel.postMessage({ type: 'CUSTOMER_UPDATED', customerId, action: selectedCustomer?.id ? 'updated' : 'created', userId: getTabSafeAuthUser()?.id });
+          channel.close();
+        }
       }
-
-
-
-      // Refresh data after save
-      await loadAllData(true);
 
 
 
@@ -3400,7 +3339,7 @@ export default function CustomersPage() {
     setBulkDeleting(true);
     try {
       const authUser = getTabSafeAuthUser();
-      const res = await fetch('https://api.yashrajent.com/api/clients/bulk', {
+      const res = await fetch('http://localhost:8080/api/clients/bulk', {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
@@ -3623,7 +3562,7 @@ export default function CustomersPage() {
 
 
       addToast("Customer deleted successfully", "success");
-      await loadAllData(true);
+      // Optimistic — already removed from state above, no full reload needed
 
 
 

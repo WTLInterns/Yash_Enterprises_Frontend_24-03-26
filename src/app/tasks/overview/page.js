@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { CheckCircle, AlertCircle, PlayCircle, Clock, Calendar, Building2 } from "lucide-react";
 
-const API = process.env.NEXT_PUBLIC_BACKEND_URL || "https://api.yashrajent.com";
+const API = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080";
 
 const getCurrentUser = () => {
   if (typeof window === "undefined") return null;

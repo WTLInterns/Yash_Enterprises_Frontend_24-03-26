@@ -21,7 +21,7 @@ export default function ReportsPage() {
     try {
       setLoading(true);
       const params = new URLSearchParams({ from, to, teamId: teamId || '', format: 'csv' });
-      const url = `https://api.yashrajent.com/api/reports/attendance?${params}`;
+      const url = `http://localhost:8080/api/reports/attendance?${params}`;
       window.open(url, '_blank');
     } catch (err) {
       console.error('Failed to export attendance', err);
@@ -38,7 +38,7 @@ export default function ReportsPage() {
     try {
       setLoading(true);
       const params = new URLSearchParams({ month, teamId: teamId || '' });
-      const url = `https://api.yashrajent.com/api/reports/salary?${params}`;
+      const url = `http://localhost:8080/api/reports/salary?${params}`;
       const res = await fetch(url);
       const blob = await res.blob();
       const downloadUrl = window.URL.createObjectURL(blob);

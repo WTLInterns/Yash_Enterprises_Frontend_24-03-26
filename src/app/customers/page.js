@@ -1,11 +1,11 @@
 "use client";
 
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback, useDeferredValue } from 'react';
 
 
 
-import { Search, Edit2, Trash2, Eye, Settings, X, Plus, Calendar, DollarSign, Building, User, Phone, Mail, MapPin, Map, Home, Shield, Upload, Download } from "lucide-react";
+import { Search, Edit2, Trash2, Eye, Settings, X, Plus, Calendar, DollarSign, Building, User, Phone, Mail, MapPin, Map as MapIcon, Home, Shield, Upload, Download } from "lucide-react";
 import Link from "next/link";
 
 
@@ -72,7 +72,7 @@ export default function CustomersPage() {
 
 
 
-  // 🔥 CRITICAL FIX: Use tab-safe storage for multi-tab login isolation
+  //  CRITICAL FIX: Use tab-safe storage for multi-tab login isolation
 
   const [userName, setUserName] = useState(() => {
 
@@ -128,7 +128,7 @@ export default function CustomersPage() {
 
 
 
-  // 🔥 CRITICAL: Cross-tab user data sync
+  //  CRITICAL: Cross-tab user data sync
 
   useEffect(() => {
 
@@ -170,8 +170,6 @@ export default function CustomersPage() {
 
         } catch (error) {
 
-          console.error("Error updating user data from storage:", error);
-
         }
 
       }
@@ -192,8 +190,6 @@ export default function CustomersPage() {
 
         if (e.data?.type === 'CUSTOMER_UPDATED') {
 
-          console.log("🔄 Customer updated in another tab, refreshing list...");
-
           fetchCustomers();
 
         }
@@ -201,8 +197,6 @@ export default function CustomersPage() {
 
 
         if (e.data?.type === 'DEAL_STAGE_CHANGED') {
-
-          console.log("🔄 Deal stage changed in another tab, refreshing deals...");
 
           fetchDeals();
 
@@ -234,33 +228,26 @@ export default function CustomersPage() {
 
 
 
-  // 🔥 CRITICAL: Tab-safe auth user function
-
-  const getTabSafeAuthUser = () => {
-
+  //  CRITICAL: Tab-safe auth user function  memoized to avoid JSON.parse on every render
+  const authUserRef = useRef(null);
+  const getTabSafeAuthUser = useCallback(() => {
     if (typeof window === 'undefined') return null;
-
+    if (authUserRef.current) return authUserRef.current;
     try {
-
       let rawUserData = getTabSafeItem("user_data");
+      if (!rawUserData) rawUserData = sessionStorage.getItem("user_data") || localStorage.getItem("user_data");
+      const user = rawUserData ? JSON.parse(rawUserData) : null;
+      authUserRef.current = user;
+      return user;
+    } catch { return null; }
+  }, []);
 
-      if (!rawUserData) {
-
-        rawUserData = sessionStorage.getItem("user_data") || localStorage.getItem("user_data");
-
-      }
-
-      return rawUserData ? JSON.parse(rawUserData) : null;
-
-    } catch (error) {
-
-      console.error("Error getting auth user:", error);
-
-      return null;
-
-    }
-
-  };
+  // Clear auth cache on storage change
+  useEffect(() => {
+    const clear = () => { authUserRef.current = null; };
+    window.addEventListener('storage', clear);
+    return () => window.removeEventListener('storage', clear);
+  }, []);
 
 
 
@@ -269,16 +256,11 @@ export default function CustomersPage() {
   const [customers, setCustomers] = useState([]);
   const [banks, setBanks] = useState([]);
   const [deals, setDeals] = useState([]);
-  const [selectedDealIds, setSelectedDealIds] = useState([]);  // array, not Set — avoids stale reference bug
+  const [selectedDealIds, setSelectedDealIds] = useState([]);  // array, not Set  avoids stale reference bug
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-
-  // Debounce search — 300ms so filtering only runs after user stops typing
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(search), 300);
-    return () => clearTimeout(t);
-  }, [search]);
+  // useDeferredValue: input stays instant, heavy filtering deferred by React scheduler
+  const debouncedSearch = useDeferredValue(search);
 
   const [loading, setLoading] = useState(true);
 
@@ -298,7 +280,7 @@ export default function CustomersPage() {
 
   // Virtual scrolling useEffect
   // IMPORTANT: dep=[loading] so it re-attaches AFTER table renders (when loading becomes false)
-  // With dep=[] it ran at mount when loading=true → tbody not rendered → tbodyRef=null → no scroll
+  // With dep=[] it ran at mount when loading=true  tbody not rendered  tbodyRef=null  no scroll
   useEffect(() => {
     if (loading) return; // table not rendered yet
     // small delay to let React finish rendering the tbody
@@ -322,7 +304,7 @@ export default function CustomersPage() {
         delete el._scrollCleanup;
       }
     };
-  }, [loading]); // re-run when loading changes from true → false
+  }, [loading]); // re-run when loading changes from true  false
 
 
 
@@ -350,7 +332,7 @@ export default function CustomersPage() {
 
 
 
-  // 🎯 Account transfer dialog state
+  //  Account transfer dialog state
 
   const [showAccountTransferDialog, setShowAccountTransferDialog] = useState(false);
 
@@ -376,7 +358,7 @@ export default function CustomersPage() {
 
   const [filterAvailableStages, setFilterAvailableStages] = useState([]);
 
-  // ✅ NEW: Top department filter (Admin/Manager only)
+  //  NEW: Top department filter (Admin/Manager only)
   const [topDepartmentFilter, setTopDepartmentFilter] = useState("");
   const [allDepartments, setAllDepartments] = useState([]);
   const [isMounted, setIsMounted] = useState(false);
@@ -384,7 +366,7 @@ export default function CustomersPage() {
   useEffect(() => {
     setIsMounted(true); // Mark as mounted after hydration
     const _ud = (() => { try { return JSON.parse(sessionStorage.getItem('user_data') || localStorage.getItem('user_data') || '{}'); } catch { return {}; } })();
-    fetch("https://api.yashrajent.com/api/stages/departments", {
+    fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "https://api.yashrajent.com"}/api/stages/departments`, {
       headers: { 'X-User-Id': String(_ud?.id ?? ''), 'X-User-Role': _ud?.role ?? '' }
     })
       .then(r => r.ok ? r.json() : [])
@@ -398,271 +380,30 @@ export default function CustomersPage() {
 
 
 
-  // For create/edit form
-
-
-
+  // For create/edit form  these are passed to the drawer component
+  // They are kept here so openEdit/openCreate can set them
   const [formDepartment, setFormDepartment] = useState("");
-
-
-
   const [availableStages, setAvailableStages] = useState([]);
-
   const [deptSearch, setDeptSearch] = useState("");
   const [branchSearch, setBranchSearch] = useState("");
-
-
-
-
-
-
-
   const [form, setForm] = useState({
-
-
-
-    name: "",
-
-
-
-    email: "",
-
-
-
-    phone: "",
-
-
-
+    name: "", email: "", phone: "",
     addresses: {
-
-
-
-      primary: {
-
-
-
-        enabled: true,
-
-
-
-        addressLine: "",
-
-
-
-        city: "",
-
-
-
-        pincode: "",
-
-
-
-        latitude: "",
-
-
-
-        longitude: ""
-
-
-
-      },
-
-
-
-      branch: {
-
-
-
-        enabled: false,
-
-
-
-        id: null,
-
-
-
-        addressLine: "",
-
-
-
-        city: "",
-
-
-
-        pincode: "",
-
-
-
-        latitude: "",
-
-
-
-        longitude: ""
-
-
-
-      },
-
-
-
-      police: {
-
-
-
-        enabled: false,
-
-
-
-        id: null,
-
-
-
-        addressLine: "",
-
-
-
-        city: "",
-
-
-
-        pincode: "",
-
-
-
-        latitude: "",
-
-
-
-        longitude: ""
-
-
-
-      },
-
-
-
-      tahsil: {
-
-
-
-        enabled: false,
-
-
-
-        id: null,
-
-
-
-        addressLine: "",
-
-
-
-        city: "",
-
-
-
-        pincode: "",
-
-
-
-        latitude: "",
-
-
-
-        longitude: ""
-
-
-
-      }
-
-
-
+      primary: { enabled: true, id: null, addressLine: "", city: "", state: "", pincode: "", latitude: "", longitude: "" },
+      branch:  { enabled: false, id: null, addressLine: "", city: "", state: "", pincode: "", latitude: "", longitude: "" },
+      police:  { enabled: false, id: null, addressLine: "", city: "", state: "", pincode: "", latitude: "", longitude: "" },
+      tahsil:  { enabled: false, id: null, addressLine: "", city: "", state: "", pincode: "", latitude: "", longitude: "" },
     },
-
-
-
-    contactName: "",
-
-
-
-    contactNumber: "",
-
-
-
-    bankId: "",
-
-
-
-    branchName: "",
-
-
-
-    stage: "",
-
-
-
-    valueAmount: "",
-
-
-
-    closingDate: "",
-
-
-
-    description: "",
-
-
-
-    customFields: {}
-
-
-
+    contactName: "", contactNumber: "", bankId: "", branchName: "",
+    stage: "", valueAmount: "", closingDate: "", description: "", customFields: {}
   });
 
-
-
-
-
   // Load stages for deal form when department changes (create/edit)
-
   useEffect(() => {
-
-    if (!formDepartment) {
-
-      setAvailableStages([]);
-
-      setForm(prev => ({ ...prev, stage: "" }));
-
-      return;
-
-    }
-
-
-
+    if (!formDepartment) { setAvailableStages([]); setForm(prev => ({ ...prev, stage: "" })); return; }
     let cancelled = false;
-
-    fetchStagesForDepartment(formDepartment)
-
-      .then(stages => {
-
-        if (!cancelled) setAvailableStages(stages || []);
-
-      })
-
-      .catch(() => {
-
-        if (!cancelled) setAvailableStages([]);
-
-      });
-
-
-
-    return () => {
-
-      cancelled = true;
-
-    };
-
+    fetchStagesForDepartment(formDepartment).then(stages => { if (!cancelled) setAvailableStages(stages || []); }).catch(() => { if (!cancelled) setAvailableStages([]); });
+    return () => { cancelled = true; };
   }, [formDepartment]);
 
 
@@ -671,7 +412,7 @@ export default function CustomersPage() {
 
 
 
-  // ✅ Normalize backend response
+  //  Normalize backend response
 
 
 
@@ -699,7 +440,7 @@ export default function CustomersPage() {
 
 
 
-  // ✅ Extract status from various error shapes
+  //  Extract status from various error shapes
 
 
 
@@ -749,25 +490,7 @@ export default function CustomersPage() {
   };
 
   const fetchDeals = async () => {
-    try {
-      const _u2 = getTabSafeAuthUser();
-      const _r2 = (_u2?.role || '').toUpperCase();
-      const res = await (_r2 === 'ADMIN' || _r2 === 'MANAGER' || _r2 === 'HR'
-        ? backendApi.get('/deals/all')
-        : backendApi.get('/deals/filtered')
-      ).catch(() => []);
-      setDeals(normalizeList(res).map(d => ({
-        ...d,
-        clientId: d.clientId ?? d.client_id ?? null,
-        stageCode: d.stageCode || d.stage || "",
-        valueAmount: d.calculatedValue ?? d.valueAmount ?? 0,
-        calculatedValue: d.calculatedValue ?? null,
-        dealCode: d.dealCode ?? null,
-        movedToApproval: d.movedToApproval ?? false,
-      })));
-    } catch (err) {
-      console.error("Failed to fetch deals:", err);
-    }
+    await loadAllData(true);
   };
 
 
@@ -781,12 +504,22 @@ export default function CustomersPage() {
       const res = await backendApi.get("/client-fields");
       setClientFieldDefinitions(res);
     } catch (err) {
-      console.error("Failed to fetch client field definitions:", err);
+
     }
   };
 
   // Load client fields once on mount
   useEffect(() => { fetchClientFields(); }, []);
+
+  // Fetch full banks list when drawer opens (needed for branch dropdown)
+  useEffect(() => {
+    if (!showCreateDrawer) return;
+    backendApi.get('/banks?size=9999').then(res => {
+      const list = Array.isArray(res) ? res : (res?.content || []);
+      if (list.length > 0) setBanks(list);
+    }).catch(() => {});
+  }, [showCreateDrawer]);
+
 
 
 
@@ -801,53 +534,79 @@ export default function CustomersPage() {
   const loadAllData = async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      const authUser2 = getTabSafeAuthUser();
-      const role2 = (authUser2?.role || '').toUpperCase();
+      // Single API call  returns clients + all deals + all addresses + bank info
+      // Replaces 3 separate calls + N per-row address fetches
+      const data = await backendApi.get('/clients/with-deals').catch(() => []);
+      const rows = Array.isArray(data) ? data : [];
 
-      // Fire ALL requests in parallel — customers + deals + banks simultaneously
-      const [customersData, dealsRes, banksRes] = await Promise.all([
-        departmentApiService.getCustomers().catch(() => []),
-        (role2 === 'ADMIN' || role2 === 'MANAGER' || role2 === 'HR'
-          ? backendApi.get('/deals/all')
-          : backendApi.get('/deals/filtered')
-        ).catch(() => []),
-        backendApi.get('/banks?size=9999').catch(() => ({ content: [] })),
-      ]);
+      const customersData = rows.map(r => ({
+        id: r.id,
+        name: r.name,
+        email: r.email,
+        contactPhone: r.contactPhone,
+        contactName: r.contactName,
+        contactNumber: r.contactNumber,
+        ownerName: r.ownerName,
+        ownerId: r.ownerId,
+        createdAt: r.createdAt,
+        updatedAt: r.updatedAt,
+        addresses: Array.isArray(r.addresses) ? r.addresses : [],
+        customFields: r.customFields || {},
+        // fallback flat address fields if backend sends them
+        addressLine: r.addressLine || r.address || "",
+        city: r.city || "",
+        state: r.state || "",
+        pincode: r.pincode || "",
+      }));
+
+      const allDeals = rows.flatMap(r =>
+        (r.deals || []).map(d => ({
+          ...d,
+          clientId: r.id,
+          stageCode: (d.stageCode || '').toUpperCase(),
+          valueAmount: d.calculatedValue ?? d.valueAmount ?? 0,
+          calculatedValue: d.calculatedValue ?? d.valueAmount ?? null,
+          movedToApproval: d.movedToApproval ?? false,
+          dealCode: d.dealCode ?? null,
+          productNames: d.productNames || [],
+        }))
+      );
+
+      // Build banks list from deal data (for branch dropdown in form)
+      const banksMap = {};
+      allDeals.forEach(d => {
+        if (d.bankId && !banksMap[d.bankId]) {
+          banksMap[d.bankId] = {
+            id: d.bankId,
+            name: d.bankName || '',
+            branchName: d.branchName || '',
+            taluka: d.taluka || '',
+            district: d.district || '',
+          };
+        }
+      });
 
       const keys = new Set();
       customersData.forEach(c => {
-        if (c?.customFields && typeof c.customFields === 'object') {
+        if (c.customFields && typeof c.customFields === 'object') {
           Object.keys(c.customFields).forEach(k => keys.add(k));
         }
       });
 
-      const normalizedDeals = normalizeList(dealsRes).map(d => ({
-        ...d,
-        clientId: d.clientId ?? d.client_id ?? null,
-        stageCode: d.stageCode || d.stage || '',
-        valueAmount: d.calculatedValue ?? d.valueAmount ?? 0,
-        calculatedValue: d.calculatedValue ?? null,
-        dealCode: d.dealCode ?? null,
-        movedToApproval: d.movedToApproval ?? false,
-      }));
-
-      // ✅ Show table IMMEDIATELY — no address fetching here
-      setCustomers(customersData.map(c => ({ ...c, addresses: c.addresses || [] })));
+      setCustomers(customersData);
+      setDeals(allDeals);
+      setBanks(Object.values(banksMap));
       setDynamicColumns([...keys]);
-      setDeals(normalizedDeals);
-      setBanks(normalizeList(banksRes));
 
     } catch (err) {
-      console.error('Failed to load data:', err);
+
       if (!silent) addToast('Failed to load customers', 'error');
     } finally {
       if (!silent) setLoading(false);
     }
-    // ❌ REMOVED: loadAddressesBackground() — was causing N+1 API calls on every load
-    // Addresses are now fetched only when needed (edit/details open)
   };
 
-    // Detect edit query param and open edit drawer — runs ONCE when customers first load
+    // Detect edit query param and open edit drawer  runs ONCE when customers first load
   const editOpenedRef = useRef(false);
   const customersRef = useRef([]);
   useEffect(() => { customersRef.current = customers; }, [customers]);
@@ -868,7 +627,7 @@ export default function CustomersPage() {
       }
     }, 200);
     return () => clearInterval(interval);
-  }, []); // runs once on mount — no customers dep = no loop
+  }, []); // runs once on mount  no customers dep = no loop
 
   // Close column filter dropdown when clicking outside
   useEffect(() => {
@@ -1075,7 +834,7 @@ export default function CustomersPage() {
 
 
 
-    // 🔥 FIX: Handle different possible data structures
+    //  FIX: Handle different possible data structures
 
 
 
@@ -1083,7 +842,7 @@ export default function CustomersPage() {
 
 
 
-    // 🔥 FIX: First try deal ownerName (from backend API)
+    //  FIX: First try deal ownerName (from backend API)
 
     if (customer.ownerName) {
 
@@ -1401,11 +1160,11 @@ export default function CustomersPage() {
 
 
 
-          state: address.state,        // ✅ DYNAMIC STATE
+          state: address.state,        //  DYNAMIC STATE
 
 
 
-          country: "India"           // ✅ FIXED: Country (can be dynamic later)
+          country: "India"           //  FIXED: Country (can be dynamic later)
 
 
 
@@ -1483,16 +1242,6 @@ export default function CustomersPage() {
 
       } else {
 
-
-
-        console.log('❌ GEOCODE FAILED:', data.message);
-
-
-
-
-
-
-
         // Show improved error message for geocoding failures
 
 
@@ -1505,7 +1254,7 @@ export default function CustomersPage() {
 
 
 
-          ? '🔔 Location Not Found\n\nWe could not detect exact coordinates for this address.\n\nPlease refine address or include a nearby landmark.'
+          ? ' Location Not Found\n\nWe could not detect exact coordinates for this address.\n\nPlease refine address or include a nearby landmark.'
 
 
 
@@ -1526,12 +1275,6 @@ export default function CustomersPage() {
 
 
     } catch (error) {
-
-
-
-      console.error('Geocoding error:', error);
-
-
 
       addToast('Failed to geocode address', "error");
 
@@ -1657,7 +1400,7 @@ export default function CustomersPage() {
 
 
 
-          addToast(`✅ Address updated from coordinates!`, "success");
+          addToast(` Address updated from coordinates!`, "success");
 
 
 
@@ -1666,12 +1409,6 @@ export default function CustomersPage() {
 
 
       } else {
-
-
-
-        console.log('❌ REVERSE GEOCODE FAILED:', data.message);
-
-
 
         addToast(data.message || 'Could not reverse geocode coordinates', "warning");
 
@@ -1682,12 +1419,6 @@ export default function CustomersPage() {
 
 
     } catch (error) {
-
-
-
-      console.error('Reverse geocoding error:', error);
-
-
 
       addToast('Failed to reverse geocode coordinates', "error");
 
@@ -1705,31 +1436,28 @@ export default function CustomersPage() {
 
 
 
-  // 🔥 STEP 2: BANK DETAILS HELPER FUNCTION
+  // O(1) bank lookup map  must be defined before getBankDetails
+  const banksMap = useMemo(() => {
+    const m = {};
+    banks.forEach(b => { m[Number(b.id)] = b; });
+    return m;
+  }, [banks]);
 
-  const getBankDetails = (deal) => {
-    // Bank name: prefer deal's relatedBankName, fall back to banks[] lookup by bankId
-    const bankObj = deal?.bankId
-      ? banks.find(b => Number(b.id) === Number(deal.bankId))
-      : null;
-
+  const getBankDetails = useCallback((deal) => {
+    const bankObj = deal?.bankId ? banksMap[Number(deal.bankId)] : null;
     return {
       name: deal?.bankName || deal?.relatedBankName || bankObj?.name || "-",
-      // branchName on the deal is the specific branch for this deal
       branch: deal?.branchName || bankObj?.branchName || "-",
     };
-  };
+  }, [banksMap]);
 
-  // Taluka/District from BANK (not customer address)
-  const getCustomerLocation = (customer, deal) => {
-    const bankObj = deal?.bankId
-      ? banks.find(b => Number(b.id) === Number(deal.bankId))
-      : null;
+  const getCustomerLocation = useCallback((customer, deal) => {
+    const bankObj = deal?.bankId ? banksMap[Number(deal.bankId)] : null;
     return {
       taluka: bankObj?.taluka || "-",
       district: bankObj?.district || "-",
     };
-  };
+  }, [banksMap]);
 
   // Full address from customer PRIMARY address
   const getFullAddress = (customer) => {
@@ -1752,44 +1480,24 @@ export default function CustomersPage() {
   // Column filter helper functions
   const getUniqueColValues = (colKey) => {
     const vals = new Set();
-
     customers.forEach(customer => {
-      const customerDeals = deals.filter(
-        d => Number(d?.clientId ?? d?.client_id ?? (typeof d?.client === 'object' ? d?.client?.id : d?.client)) === Number(customer.id)
-      );
-      const deal = customerDeals
-        .slice()
-        .sort((a, b) => {
-          const td = new Date(b.createdAt) - new Date(a.createdAt);
-          return td !== 0 ? td : (Number(b.id) || 0) - (Number(a.id) || 0);
-        })[0] ?? null;
-
+      const deal = latestDealByClient.get(Number(customer.id)) ?? null;
       const bankDetails = getBankDetails(deal);
-      const bankObj = deal?.bankId ? banks.find(b => Number(b.id) === Number(deal.bankId)) : null;
-
       const valueMap = {
         name: customer.name || null,
         bankName: bankDetails.name !== '-' ? bankDetails.name : null,
         branchName: bankDetails.branch !== '-' ? bankDetails.branch : null,
-        taluka: bankObj?.taluka || null,
-        district: bankObj?.district || null,
+        taluka: deal?.taluka || null,
+        district: deal?.district || null,
         stageCode: deal?.stageCode ? deal.stageCode.toUpperCase() : null,
         department: deal?.department ? deal.department.trim() : null,
         ownerName: customer.ownerName || null,
-        // ✅ ADDED: createdAt was missing before
-        createdAt: customer.createdAt
-          ? new Date(customer.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
-          : null,
-        // ✅ ADDED: updatedAt 
-        updatedAt: customer.updatedAt
-          ? new Date(customer.updatedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
-          : null,
+        createdAt: customer.createdAt ? new Date(customer.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : null,
+        updatedAt: customer.updatedAt ? new Date(customer.updatedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : null,
       };
-
       const v = valueMap[colKey];
       if (v) vals.add(v);
     });
-
     return [...vals].sort();
   };
 
@@ -1830,49 +1538,66 @@ export default function CustomersPage() {
     );
   };
 
-  // Build clientId → latest deal map at component scope for table rows
-  const dealByClient = useMemo(() => {
-    const map = {};
-    deals.forEach(d => {
+  // Build clientId  latest deal map at component scope for table rows
+
+  // Pre-index deals by clientId  O(n) once, reused everywhere
+  const dealsByClientMap = useMemo(() => {
+    const map = new Map();
+    for (const d of deals) {
       const cid = Number(d.clientId ?? d.client_id ?? (typeof d.client === 'object' ? d.client?.id : d.client) ?? null);
-      if (!cid) return;
-      const existing = map[cid];
-      if (!existing) { map[cid] = d; return; }
-      const tDiff = new Date(d.createdAt) - new Date(existing.createdAt);
-      if (tDiff > 0 || (tDiff === 0 && Number(d.id) > Number(existing.id))) {
-        map[cid] = d;
-      }
-    });
+      if (!cid) continue;
+      if (!map.has(cid)) map.set(cid, []);
+      map.get(cid).push(d);
+    }
     return map;
   }, [deals]);
+
+  // Pre-compute latest deal per client  O(n) once
+  const latestDealByClient = useMemo(() => {
+    const map = new Map();
+    for (const [cid, list] of dealsByClientMap.entries()) {
+      const latest = list.reduce((best, d) => {
+        if (!best) return d;
+        const td = new Date(d.createdAt) - new Date(best.createdAt);
+        return (td > 0 || (td === 0 && Number(d.id) > Number(best.id))) ? d : best;
+      }, null);
+      map.set(cid, latest);
+    }
+    return map;
+  }, [dealsByClientMap]);
+
+  // Legacy single-entry map (kept for getBankDetails calls in table rows)
+  const dealByClient = latestDealByClient;
+
+
+  // Cache auth user â€” avoids JSON.parse on every filtered/flatRows recompute
+  const cachedAuthUser = useMemo(() => getTabSafeAuthUser(), [userRole]);
+  const cachedRole = useMemo(() => (cachedAuthUser?.role || userRole || "").toUpperCase(), [cachedAuthUser, userRole]);
+  const cachedUserDept = useMemo(() => (cachedAuthUser?.department || cachedAuthUser?.departmentName || cachedAuthUser?.tlDepartmentName || "").toUpperCase().trim(), [cachedAuthUser]);
+  const isPrivilegedUser = useMemo(() => cachedRole === "ADMIN" || cachedRole === "MANAGER" || cachedRole === "HR", [cachedRole]);
 
   const filtered = useMemo(() => {
     const authUser = getTabSafeAuthUser();
     const role = (authUser?.role || userRole || "").toUpperCase();
     const userDept = (authUser?.department || authUser?.departmentName || authUser?.tlDepartmentName || "").toUpperCase().trim();
     const isPrivileged = role === "ADMIN" || role === "MANAGER" || role === "HR";
+    const q = debouncedSearch.toLowerCase();
 
-    // ── text search ──────────────────────────────────────────────
     let result = customers.filter((customer) => {
-      const q = debouncedSearch.toLowerCase();
+      // text search
       const textMatch =
+        !q ||
         (customer.name || "").toLowerCase().includes(q) ||
         (customer.email || "").toLowerCase().includes(q) ||
         (customer.contactPhone || "").toLowerCase().includes(q);
       if (!textMatch) return false;
 
-           // ADMIN / MANAGER / HR → full access
-      if (role === "ADMIN" || role === "MANAGER" || role === "HR") return true;
+      if (isPrivileged) return true;
 
-      // Department-based users: check if customer has ANY deal in user's dept
       if (userDept) {
-        const clientDeals = deals.filter(
-          d => Number(d?.clientId ?? d?.client_id) === Number(customer.id)
-        );
+        const clientDeals = dealsByClientMap.get(Number(customer.id)) || [];
         if (clientDeals.length === 0) return false;
-        const deptDeals = clientDeals.filter(
-          d => (d?.department || "").toUpperCase() === userDept
-        );
+        const deptDeals = clientDeals.filter(d => (d?.department || "").toUpperCase() === userDept);
         if (deptDeals.length === 0) return false;
         if (userDept === "ACCOUNT") {
           return deptDeals.some(d => {
@@ -1882,102 +1607,61 @@ export default function CustomersPage() {
         }
         return true;
       }
-
       return false;
     });
 
-    // ── legacy dept/stage dropdown filters ───────────────────────
+    // legacy dept/stage dropdown filters
     if (filterDepartment || filterStage) {
       result = result.filter(customer => {
-        const customerDeals = deals.filter(
-          d => Number(d?.clientId ?? d?.client_id) === Number(customer.id)
-        );
-        if (filterDepartment && filterStage) {
-          return customerDeals.some(d => d.department === filterDepartment && d.stageCode === filterStage);
-        } else if (filterDepartment) {
-          return customerDeals.some(d => d.department === filterDepartment);
-        } else {
-          return customerDeals.some(d => d.stageCode === filterStage);
-        }
+        const clientDeals = dealsByClientMap.get(Number(customer.id)) || [];
+        if (filterDepartment && filterStage) return clientDeals.some(d => d.department === filterDepartment && d.stageCode === filterStage);
+        if (filterDepartment) return clientDeals.some(d => d.department === filterDepartment);
+        return clientDeals.some(d => d.stageCode === filterStage);
       });
     }
 
-    // ── NEW: top department filter (Admin/Manager only) ──────────────
-    if (topDepartmentFilter && (role === "ADMIN" || role === "MANAGER")) {
-      result = result.filter(customer => {
-        return deals.some(
-          d => Number(d?.clientId ?? d?.client_id) === Number(customer.id) &&
-               d?.department === topDepartmentFilter
-        );
-      });
+    // top department filter
+    if (topDepartmentFilter && isPrivileged) {
+      result = result.filter(customer =>
+        (dealsByClientMap.get(Number(customer.id)) || []).some(d => d?.department === topDepartmentFilter)
+      );
     }
 
-    // ── NEW: per-column filters ─────────────────────────────────────
+    // per-column filters
     Object.entries(columnFilters).forEach(([colKey, allowedSet]) => {
-      if (!allowedSet || allowedSet.size === 0) {
-        result = []; // nothing passes if nothing selected
-        return;
-      }
+      if (!allowedSet || allowedSet.size === 0) { result = []; return; }
       result = result.filter(customer => {
-        const customerDeals = deals.filter(
-          d => Number(d?.clientId ?? d?.client_id) === Number(customer.id)
-        );
-        const deal = customerDeals
-          .slice()
-          .sort((a, b) => {
-            const td = new Date(b.createdAt) - new Date(a.createdAt);
-            return td !== 0 ? td : (Number(b.id) || 0) - (Number(a.id) || 0);
-          })[0] ?? null;
-
+        const deal = latestDealByClient.get(Number(customer.id)) ?? null;
         const bankDetails = getBankDetails(deal);
-        const bankObj2 = deal?.bankId ? banks.find(b => Number(b.id) === Number(deal.bankId)) : null;
-
         const valueMap = {
           name: customer.name || '',
           bankName: bankDetails.name !== '-' ? bankDetails.name : '',
           branchName: bankDetails.branch !== '-' ? bankDetails.branch : '',
-          taluka: bankObj2?.taluka || '',
-          district: bankObj2?.district || '',
+          taluka: deal?.taluka || '',
+          district: deal?.district || '',
           stageCode: deal?.stageCode ? deal.stageCode.toUpperCase() : '',
           department: deal?.department ? deal.department.trim() : '',
           ownerName: customer.ownerName || '',
-          // ✅ ADDED: createdAt filter matching
-          createdAt: customer.createdAt
-            ? new Date(customer.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
-            : '',
-          // ✅ ADDED: updatedAt filter matching
-          updatedAt: customer.updatedAt
-            ? new Date(customer.updatedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
-            : '',
+          createdAt: customer.createdAt ? new Date(customer.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '',
+          updatedAt: customer.updatedAt ? new Date(customer.updatedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '',
         };
-
         const val = valueMap[colKey];
-        // empty value: show row only if empty/dash is also in the filter
         return val ? allowedSet.has(val) : allowedSet.has('(Empty)');
       });
     });
 
-    // ── NEW: column sort ────────────────────────────────────────────
+    // column sort
     if (sortConfig.key) {
       result = [...result].sort((a, b) => {
         const getVal = (customer) => {
-          const customerDeals = deals.filter(
-            d => Number(d?.clientId ?? d?.client_id) === Number(customer.id)
-          );
-          const deal = customerDeals
-            .slice()
-            .sort((a, b) => {
-              const td = new Date(b.createdAt) - new Date(a.createdAt);
-              return td !== 0 ? td : (Number(b.id) || 0) - (Number(a.id) || 0);
-            })[0] ?? null;
+          const deal = latestDealByClient.get(Number(customer.id)) ?? null;
           const bd = getBankDetails(deal);
-          const bankObj3 = deal?.bankId ? banks.find(b => Number(b.id) === Number(deal.bankId)) : null;
           const vm = {
             name: customer.name || '',
             bankName: bd.name !== '-' ? bd.name : '',
             branchName: bd.branch !== '-' ? bd.branch : '',
-            taluka: bankObj3?.taluka || '',
-            district: bankObj3?.district || '',
+            taluka: deal?.taluka || '',
+            district: deal?.district || '',
             stageCode: deal?.stageCode || '',
             department: deal?.department || '',
             ownerName: customer.ownerName || '',
@@ -1993,28 +1677,23 @@ export default function CustomersPage() {
     }
 
     return result;
-  }, [customers, deals, debouncedSearch, filterDepartment, filterStage, columnFilters, sortConfig, userRole, topDepartmentFilter]);
+  }, [customers, dealsByClientMap, latestDealByClient, debouncedSearch, filterDepartment, filterStage, columnFilters, sortConfig, cachedRole, cachedUserDept, isPrivilegedUser, topDepartmentFilter]);
 
-  // One row per deal (not per client) — so 431 deals = 431 rows
+  // One row per deal  uses pre-indexed map, no deals.filter() per customer
   const flatRows = useMemo(() => {
     const authUser = getTabSafeAuthUser();
     const role = (authUser?.role || userRole || "").toUpperCase();
-        const userDept = (authUser?.department || authUser?.departmentName || authUser?.tlDepartmentName || "").toUpperCase().trim();
+    const userDept = (authUser?.department || authUser?.departmentName || authUser?.tlDepartmentName || "").toUpperCase().trim();
     const isPrivileged = role === "ADMIN" || role === "MANAGER" || role === "HR";
     const rows = [];
 
     filtered.forEach(customer => {
-      let clientDeals = deals.filter(
-        d => Number(d?.clientId ?? d?.client_id ?? (typeof d?.client === 'object' ? d?.client?.id : d?.client)) === Number(customer.id)
-      );
+      let clientDeals = dealsByClientMap.get(Number(customer.id)) || [];
 
-      // Apply department filter to deals (not just customers)
       if (topDepartmentFilter && isPrivileged) {
         clientDeals = clientDeals.filter(d => d?.department === topDepartmentFilter);
       } else if (userDept && !isPrivileged) {
-        // Dept users: only show their dept deals
         clientDeals = clientDeals.filter(d => (d?.department || "").toUpperCase() === userDept);
-        // ACCOUNT: hide CLOSE_WIN / CLOSE_LOST
         if (userDept === "ACCOUNT") {
           clientDeals = clientDeals.filter(d => {
             const stage = (d?.stageCode || "").toUpperCase().replace(/ /g, "_");
@@ -2035,7 +1714,8 @@ export default function CustomersPage() {
       }
     });
     return rows;
-  }, [filtered, deals, topDepartmentFilter, userRole]);
+  }, [filtered, dealsByClientMap, topDepartmentFilter, cachedRole, cachedUserDept, isPrivilegedUser]);
+
 
   // Add column filter props for reuse
   const colFilterProps = {
@@ -2046,7 +1726,7 @@ export default function CustomersPage() {
     isColFilterActive, handleColSort, sortConfig,
   };
 
-  // ✅ Reset modal and open create
+  //  Reset modal and open create
   const openCreate = () => {
     setSelectedCustomer(null);
 
@@ -2120,7 +1800,7 @@ export default function CustomersPage() {
   // Edit: always fetch fresh data
 
   /**
-   * Converts backend addresses ARRAY → form addresses OBJECT.
+   * Converts backend addresses ARRAY  form addresses OBJECT.
    *
    * API shape  : [{ addressType:"PRIMARY", addressLine, city, state,
    *                 pincode, latitude, longitude, id }, ...]
@@ -2128,7 +1808,7 @@ export default function CustomersPage() {
    *                branch:  { enabled, id, addressLine, ... }, ... }
    */
   const mapAddressesToForm = (addresses = []) => {
-    // Safe defaults — primary always enabled, others off
+    // Safe defaults  primary always enabled, others off
     const result = {
       primary: { enabled: true, id: null, addressLine: "", city: "", state: "", pincode: "", latitude: "", longitude: "" },
       branch: { enabled: false, id: null, addressLine: "", city: "", state: "", pincode: "", latitude: "", longitude: "" },
@@ -2139,7 +1819,7 @@ export default function CustomersPage() {
     if (!Array.isArray(addresses)) return result;
 
     addresses.forEach(addr => {
-      const key = (addr.addressType ?? "").toLowerCase(); // "PRIMARY" → "primary"
+      const key = (addr.addressType ?? "").toLowerCase(); // "PRIMARY"  "primary"
       if (!(key in result)) return;                        // skip unknown types
 
       result[key] = {
@@ -2149,7 +1829,7 @@ export default function CustomersPage() {
         city: addr.city ?? "",
         state: addr.state ?? "",
         pincode: addr.pincode ?? "",
-        // latitude / longitude come back as numbers — form expects strings
+        // latitude / longitude come back as numbers  form expects strings
         latitude: addr.latitude != null ? String(addr.latitude) : "",
         longitude: addr.longitude != null ? String(addr.longitude) : "",
       };
@@ -2160,16 +1840,14 @@ export default function CustomersPage() {
 
   const openEdit = async (customer) => {
     try {
-      // 1️⃣ Fresh customer data
+      // 1 Fresh customer data
       const freshCustomer = await clientApi.getById(customer.id);
-      console.log("🔥 EDIT DEBUG 1: Fresh customer data:", freshCustomer);
 
-      // 2️⃣ All deals for this customer
+      // 2 All deals for this customer
       const dealsRes = await backendApi.get(`/deals?clientId=${customer.id}`).catch(() => []);
       const allDeals = normalizeList(dealsRes);
-      console.log("🔥 EDIT DEBUG 2: All deals for customer:", allDeals);
 
-      // 3️⃣ Pick LATEST deal by createdAt DESC + id DESC tiebreaker (same logic as table)
+      // 3 Pick LATEST deal by createdAt DESC + id DESC tiebreaker (same logic as table)
       // Handles Excel uploads where ALL deals have the SAME createdAt
       const latestDeal = allDeals
         .slice()
@@ -2178,25 +1856,15 @@ export default function CustomersPage() {
           if (timeDiff !== 0) return timeDiff;
           return (Number(b.id) || 0) - (Number(a.id) || 0); // tiebreaker
         })[0] ?? null;
-      console.log("🔥 EDIT DEBUG 3: Latest deal selected:", {
-        id: latestDeal?.id,
-        createdAt: latestDeal?.createdAt,
-        stageCode: latestDeal?.stageCode,
-        department: latestDeal?.department,
-        bankId: latestDeal?.bankId,
-        branchName: latestDeal?.branchName,
-        taluka: (() => { const bk = latestDeal?.bankId ? banks.find(b => Number(b.id) === Number(latestDeal.bankId)) : null; return bk?.taluka || ''; })(),
-        district: (() => { const bk = latestDeal?.bankId ? banks.find(b => Number(b.id) === Number(latestDeal.bankId)) : null; return bk?.district || ''; })(),
-      });
+      
 
-      // 4️⃣ Normalise stage code to UPPERCASE (same as table)
+      // 4 Normalise stage code to UPPERCASE (same as table)
       const rawStageCode = latestDeal?.stageCode ?? latestDeal?.stage ?? "";
       const normStageCode = rawStageCode.toUpperCase();
-      console.log("🔥 EDIT DEBUG 4: Normalized stage code:", normStageCode);
 
       // FIX 1: fetch addresses using fetch() not backendApi
-      // backendApi already adds /api prefix → /api/clients is correct
-      // but backendApi.get("/api/clients/...") becomes /api/api/clients/... → 500!
+      // backendApi already adds /api prefix  /api/clients is correct
+      // but backendApi.get("/api/clients/...") becomes /api/api/clients/...  500!
       const authUser = getTabSafeAuthUser();
       const addrResponse = await fetch(
         `https://api.yashrajent.com/api/clients/${customer.id}/addresses`,
@@ -2210,12 +1878,8 @@ export default function CustomersPage() {
       ).catch(() => null);
       const addressesRes = addrResponse?.ok ? await addrResponse.json() : [];
       const mappedAddresses = mapAddressesToForm(addressesRes);
-      console.log("🔥 EDIT DEBUG 5: Addresses:", {
-        raw: addressesRes,
-        mapped: mappedAddresses,
-      });
 
-      // 6️⃣ Pre‑fill form with ALL fields
+      // 6 Prefill form with ALL fields
       setSelectedCustomer(freshCustomer);
       setForm({
         name: freshCustomer.name ?? "",
@@ -2229,7 +1893,7 @@ export default function CustomersPage() {
         branchName: latestDeal?.branchName ?? "",
         valueAmount: latestDeal?.valueAmount ?? 0,
         closingDate: latestDeal?.closingDate ?? "",
-        stage: normStageCode,                     // ← UPPERCASE
+        stage: normStageCode,                     //  UPPERCASE
         department: latestDeal?.department ?? "",
         description: latestDeal?.description ?? "",
 
@@ -2239,7 +1903,7 @@ export default function CustomersPage() {
         customFields: {}
       });
 
-      // 7️⃣ Department & stage handling (exact copy of detail page)
+      // 7 Department & stage handling (exact copy of detail page)
       if (latestDeal?.department && departments.includes(latestDeal.department)) {
         setFormDepartment(latestDeal.department);
         const stages = await fetchStagesForDepartment(latestDeal.department);
@@ -2249,14 +1913,14 @@ export default function CustomersPage() {
           stage: stages?.some(s => (s.stageCode ?? "").toUpperCase() === normStageCode) ? normStageCode : ""
         }));
       } else {
-        // No department → reset department dropdown
+        // No department  reset department dropdown
         setFormDepartment("");
         setAvailableStages([]);
       }
 
       setShowCreateDrawer(true);
     } catch (err) {
-      console.error("Failed to load customer:", err);
+
       addToast("Failed to load customer details", "error");
     }
   };
@@ -2465,7 +2129,7 @@ export default function CustomersPage() {
 
 
 
-          state: form.addresses.primary.state?.trim() || "",        // ✅ ADD STATE
+          state: form.addresses.primary.state?.trim() || "",        //  ADD STATE
 
 
 
@@ -2525,7 +2189,7 @@ export default function CustomersPage() {
 
 
 
-          state: form.addresses.branch.state?.trim() || "",        // ✅ ADD STATE
+          state: form.addresses.branch.state?.trim() || "",        //  ADD STATE
 
 
 
@@ -2581,7 +2245,7 @@ export default function CustomersPage() {
 
 
 
-          state: form.addresses.police.state?.trim() || "",        // ✅ ADD STATE
+          state: form.addresses.police.state?.trim() || "",        //  ADD STATE
 
 
 
@@ -2637,7 +2301,7 @@ export default function CustomersPage() {
 
 
 
-          state: form.addresses.tahsil.state?.trim() || "",        // ✅ ADD STATE
+          state: form.addresses.tahsil.state?.trim() || "",        //  ADD STATE
 
 
 
@@ -2729,7 +2393,7 @@ export default function CustomersPage() {
 
 
 
-        // 📢 Broadcast customer update activity
+        //  Broadcast customer update activity
 
         broadcastActivity(createActivity(
 
@@ -2783,7 +2447,7 @@ export default function CustomersPage() {
 
 
 
-        // 📢 Broadcast customer creation activity
+        //  Broadcast customer creation activity
 
         broadcastActivity(createActivity(
 
@@ -2901,7 +2565,7 @@ export default function CustomersPage() {
 
 
 
-        department: formDepartment, // ✅ FIX
+        department: formDepartment, //  FIX
 
 
 
@@ -2929,7 +2593,7 @@ export default function CustomersPage() {
 
 
 
-        // 🔥 CRITICAL FIX: Normalize clientId mapping for deal lookup
+        //  CRITICAL FIX: Normalize clientId mapping for deal lookup
 
         const existingDeal = deals.find((deal) => Number(deal?.clientId ?? deal?.client_id) === Number(selectedCustomer.id));
 
@@ -2945,7 +2609,7 @@ export default function CustomersPage() {
 
 
 
-          // 📢 Broadcast deal update activity
+          //  Broadcast deal update activity
 
           broadcastActivity(createActivity(
 
@@ -2971,7 +2635,7 @@ export default function CustomersPage() {
 
 
 
-          // 📢 Broadcast deal creation activity
+          //  Broadcast deal creation activity
 
           broadcastActivity(createActivity(
 
@@ -2993,7 +2657,7 @@ export default function CustomersPage() {
 
 
 
-        // 📢 Broadcast deal stage change if stage changed
+        //  Broadcast deal stage change if stage changed
 
         if (form.stage && existingDeal?.stageCode !== form.stage) {
 
@@ -3023,7 +2687,7 @@ export default function CustomersPage() {
 
 
 
-        // 📢 Broadcast deal creation activity for new customer
+        //  Broadcast deal creation activity for new customer
 
         broadcastActivity(createActivity(
 
@@ -3051,32 +2715,8 @@ export default function CustomersPage() {
 
       addToast(selectedCustomer?.id ? "Customer updated successfully" : "Customer created successfully", "success");
 
-      // 🔥 Optimistic update — only reload deals (fast), not full page reload
-      // This avoids the 10-15 sec lag after save
-      try {
-        const authUser2 = getTabSafeAuthUser();
-        const role2 = (authUser2?.role || '').toUpperCase();
-        const dealsRes = await (role2 === 'ADMIN' || role2 === 'MANAGER' || role2 === 'HR'
-          ? backendApi.get('/deals/all')
-          : backendApi.get('/deals/filtered')
-        ).catch(() => []);
-        const normalizedDeals = normalizeList(dealsRes).map(d => ({
-          ...d,
-          clientId: d.clientId ?? d.client_id ?? null,
-          stageCode: d.stageCode || d.stage || '',
-          valueAmount: d.calculatedValue ?? d.valueAmount ?? 0,
-          calculatedValue: d.calculatedValue ?? null,
-          dealCode: d.dealCode ?? null,
-          movedToApproval: d.movedToApproval ?? false,
-        }));
-        setDeals(normalizedDeals);
-        // Update or add the customer in local state without full reload
-        if (selectedCustomer?.id) {
-          setCustomers(prev => prev.map(c => c.id === savedCustomer.id ? { ...c, ...savedCustomer } : c));
-        } else {
-          setCustomers(prev => [{ ...savedCustomer, addresses: [] }, ...prev]);
-        }
-      } catch {}
+      // Reload all data silently after save (single API call)
+      await loadAllData(true).catch(() => {});
 
       // Broadcast to other tabs
       if (typeof window !== 'undefined') {
@@ -3264,12 +2904,6 @@ export default function CustomersPage() {
 
     } catch (err) {
 
-
-
-      console.error("Save failed:", err);
-
-
-
       const status = getStatusFromError(err);
 
 
@@ -3404,7 +3038,7 @@ export default function CustomersPage() {
       const stageObj = stageStages.find(s => s.stageCode === stageCode);
       const stageName = stageObj?.stageName || stageCode;
 
-      // Products — from productNames array returned by /deals/all
+      // Products  from productNames array returned by /deals/all
       const products = (deal?.productNames || []).join(', ');
 
       // Deal value
@@ -3418,7 +3052,7 @@ export default function CustomersPage() {
       // Owner
       const owner = customer.ownerName || '';
 
-      // Dates — formatted as text to prevent Excel treating as date serial (#)
+      // Dates  formatted as text to prevent Excel treating as date serial (#)
       const fmt = (d) => {
         if (!d) return '';
         const dt = new Date(d);
@@ -3511,7 +3145,7 @@ export default function CustomersPage() {
 
 
 
-      // 🔥 CRITICAL FIX: Normalize clientId mapping for deal lookup
+      //  CRITICAL FIX: Normalize clientId mapping for deal lookup
 
       const customerDeal = deals.find(deal => Number(deal?.clientId ?? deal?.client_id) === Number(id));
 
@@ -3562,17 +3196,11 @@ export default function CustomersPage() {
 
 
       addToast("Customer deleted successfully", "success");
-      // Optimistic — already removed from state above, no full reload needed
+      // Optimistic  already removed from state above, no full reload needed
 
 
 
     } catch (err) {
-
-
-
-      console.error("Delete failed:", err);
-
-
 
       const status = getStatusFromError(err);
 
@@ -3594,7 +3222,7 @@ export default function CustomersPage() {
 
 
 
-        // 🔥 CRITICAL FIX: Normalize clientId mapping for deal filtering
+        //  CRITICAL FIX: Normalize clientId mapping for deal filtering
 
         setDeals((prev) => prev.filter((d) => Number(d?.clientId ?? d?.client_id) !== Number(id)));
 
@@ -3762,23 +3390,9 @@ export default function CustomersPage() {
         <div className="space-y-2 mb-2">
           {/* Top row: search + record count */}
           <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2 border border-slate-200 rounded-lg px-3 py-2 flex-1 max-w-md bg-white shadow-sm">
-              <Search size={16} className="text-slate-400 shrink-0" />
-              <input
-                type="text"
-                placeholder="Search by name or phone..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="flex-1 outline-none text-sm bg-transparent text-slate-900 placeholder:text-slate-400"
-              />
-              {search && (
-                <button onClick={() => setSearch("")} className="text-slate-400 hover:text-slate-600">
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              )}
-            </div>
+            <SearchBar value={search} onChange={setSearch} />
 
-            {/* Top Department Filter — Admin/Manager only */}
+            {/* Top Department Filter  Admin/Manager only */}
             {isMounted && (userRole === "ADMIN" || userRole === "MANAGER") && (
               <div className="flex items-center gap-2">
                 <select
@@ -3903,7 +3517,7 @@ export default function CustomersPage() {
                         Customer Name
                       </th>
 
-                      {/* Filterable columns — use ColFilterTh */}
+                      {/* Filterable columns  use ColFilterTh */}
                       <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">Address</th>
                       <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">Phone + Contact</th>
                       <ColFilterTh label="Bank" colKey="bankName"   {...colFilterProps} />
@@ -3958,12 +3572,12 @@ export default function CustomersPage() {
 
 
 
-                      // FIX 3 ▸ Normalise stageCode to UPPERCASE for consistent matching
+                      // FIX 3  Normalise stageCode to UPPERCASE for consistent matching
                       const rawStageCode = customerDeal?.stageCode ?? customerDeal?.stage ?? "";
                       const normStageCode = rawStageCode.toUpperCase();
                       const dealDepartment = (customerDeal?.department ?? "").trim();
 
-                      // FIX 2 ▸ Resolve bank details from the deal object (not bankId alone)
+                      // FIX 2  Resolve bank details from the deal object (not bankId alone)
                       const bankDetails = getBankDetails(customerDeal);
                       const customerLocation = getCustomerLocation(customer, customerDeal);
 
@@ -4263,2758 +3877,34 @@ export default function CustomersPage() {
           );
         })()}
 
-        {/* ✅ CREATE/EDIT DRAWER */}
-
-
-
+        {/*  CREATE/EDIT DRAWER  rendered outside main render tree to prevent table re-renders */}
         {showCreateDrawer && (
-
-
-
-          <>
-
-
-
-            <div
-
-
-
-              className="fixed inset-0 z-[60] bg-slate-900/60 backdrop-blur-sm"
-
-
-
-              onClick={() => setShowCreateDrawer(false)}
-
-
-
-            />
-
-
-
-
-
-
-
-            <div className="fixed inset-0 z-[70] flex items-center justify-center px-4 py-6">
-
-
-
-              <div className="relative w-full max-w-3xl h-[85vh] rounded-2xl bg-white shadow-2xl flex flex-col overflow-hidden">
-
-
-
-
-
-
-
-                {/* HEADER fixed */}
-
-
-
-                <div className="flex items-start justify-between border-b border-slate-200 px-6 py-4 shrink-0">
-
-
-
-                  <div>
-
-
-
-                    <h2 className="text-lg font-semibold text-slate-900">
-
-
-
-                      {selectedCustomer ? "Edit Customer" : "Create Customer"}
-
-
-
-                    </h2>
-
-
-
-                    <p className="mt-1 text-sm text-slate-500">
-
-
-
-                      {selectedCustomer ? "Update customer information" : "Add a new customer and deal"}
-
-
-
-                    </p>
-
-
-
-                  </div>
-
-
-
-
-
-
-
-                  <button
-
-
-
-                    type="button"
-
-
-
-                    onClick={() => setShowCreateDrawer(false)}
-
-
-
-                    className="rounded-full p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
-
-
-
-                  >
-
-
-
-                    <X className="h-5 w-5" />
-
-
-
-                  </button>
-
-
-
-                </div>
-
-
-
-
-
-
-
-                {/* BODY scrollable */}
-
-
-
-                <div className="flex-1 overflow-y-auto px-6 py-4">
-
-
-
-                  <div className="space-y-6">
-
-
-
-                    {/* Customer Information */}
-
-
-
-                    <div>
-
-
-
-                      <h3 className="text-base font-medium text-slate-900 mb-4 flex items-center gap-2">
-
-
-
-                        <User className="h-4 w-4" />
-
-
-
-                        Customer Information
-
-
-
-                      </h3>
-
-
-
-
-
-
-
-                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-
-
-
-                        <div>
-
-
-
-                          <label className="block text-sm font-medium text-slate-700 mb-2">
-
-
-
-                            Customer Name <span className="text-rose-500">*</span>
-
-
-
-                          </label>
-
-
-
-                          <input
-
-
-
-                            type="text"
-
-
-
-                            value={form.name}
-
-
-
-                            onChange={(e) => setForm({ ...form, name: e.target.value })}
-
-
-
-                            className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-
-
-
-                            placeholder="Enter customer name"
-
-
-
-                          />
-
-
-
-                        </div>
-
-
-
-
-
-
-
-                        <div>
-
-
-
-                          <label className="block text-sm font-medium text-slate-700 mb-2">
-
-
-
-                            Email
-
-
-
-                          </label>
-
-
-
-                          <input
-
-
-
-                            type="email"
-
-
-
-                            value={form.email}
-
-
-
-                            onChange={(e) => setForm({ ...form, email: e.target.value })}
-
-
-
-                            className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-
-
-
-                            placeholder="customer@example.com"
-
-
-
-                          />
-
-
-
-                        </div>
-
-
-
-
-
-
-
-                        <div>
-
-
-
-                          <label className="block text-sm font-medium text-slate-700 mb-2">
-
-
-
-                            Phone
-
-
-
-                          </label>
-
-
-
-                          <input
-
-
-
-                            type="tel"
-
-
-
-                            value={form.phone}
-
-
-
-                            onChange={(e) => setForm({ ...form, phone: e.target.value })}
-
-
-
-                            className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-
-
-
-                            placeholder="+1 (555) 123-4567"
-
-
-
-                          />
-
-
-
-                        </div>
-
-
-
-
-
-
-
-                        <div>
-
-
-
-                          <label className="block text-sm font-medium text-slate-700 mb-2">
-
-
-
-                            Contact Person
-
-
-
-                          </label>
-
-
-
-                          <input
-
-
-
-                            type="text"
-
-
-
-                            value={form.contactName}
-
-
-
-                            onChange={(e) => setForm({ ...form, contactName: e.target.value })}
-
-
-
-                            className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-
-
-
-                            placeholder="Contact person name"
-
-
-
-                          />
-
-
-
-                        </div>
-
-
-
-
-
-
-
-                        <div>
-
-
-
-                          <label className="block text-sm font-medium text-slate-700 mb-2">
-
-
-
-                            Contact Number
-
-
-
-                          </label>
-
-
-
-                          <input
-
-
-
-                            type="tel"
-
-
-
-                            value={form.contactNumber}
-
-
-
-                            onChange={(e) => setForm({ ...form, contactNumber: e.target.value })}
-
-
-
-                            className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-
-
-
-                            placeholder="Contact person phone number"
-
-
-
-                          />
-
-
-
-                        </div>
-
-
-
-                      </div>
-
-
-
-
-
-
-
-                      <div className="mt-4">
-
-
-
-                        <label className="block text-sm font-medium text-slate-700 mb-2">
-
-
-
-                          Primary Address (Default Tracking) *
-
-
-
-                        </label>
-
-
-
-                        <div className="space-y-3 p-4 border border-blue-200 rounded-lg bg-blue-50">
-
-
-
-                          <div>
-
-
-
-                            <label className="block text-xs font-medium text-slate-600 mb-1">Address Line *</label>
-
-
-
-                            <textarea
-
-
-
-                              value={form.addresses.primary.addressLine}
-
-
-
-                              onChange={(e) => handleAddressFieldChange('primary', 'addressLine', e.target.value)}
-
-
-
-                              rows={2}
-
-
-
-                              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 resize-none"
-
-
-
-                              placeholder="Enter primary address"
-
-
-
-                            />
-
-
-
-                          </div>
-
-
-
-                          <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
-
-
-
-                            <div>
-
-
-
-                              <label className="block text-xs font-medium text-slate-600 mb-1">City *</label>
-
-
-
-                              <input
-
-
-
-                                type="text"
-
-
-
-                                value={form.addresses.primary.city}
-
-
-
-                                onChange={(e) => handleAddressFieldChange('primary', 'city', e.target.value)}
-
-
-
-                                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-
-
-
-                                placeholder="Enter city"
-
-
-
-                              />
-
-
-
-                            </div>
-
-
-
-                            <div>
-
-
-
-                              <label className="block text-xs font-medium text-slate-600 mb-1">State *</label>
-
-
-
-                              <input
-
-
-
-                                type="text"
-
-
-
-                                value={form.addresses.primary.state}
-
-
-
-                                onChange={(e) => handleAddressFieldChange('primary', 'state', e.target.value)}
-
-
-
-                                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-
-
-
-                                placeholder="Enter state"
-
-
-
-                              />
-
-
-
-                            </div>
-
-
-
-                            <div>
-
-
-
-                              <label className="block text-xs font-medium text-slate-600 mb-1">Pincode</label>
-
-
-
-                              <input
-
-
-
-                                type="text"
-
-
-
-                                value={form.addresses.primary.pincode}
-
-
-
-                                onChange={(e) => handleAddressFieldChange('primary', 'pincode', e.target.value)}
-
-
-
-                                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-
-
-
-                                placeholder="Enter pincode"
-
-
-
-                              />
-
-
-
-                            </div>
-
-
-
-                            <div>
-
-
-
-                              <label className="block text-xs font-medium text-slate-600 mb-1">Latitude *</label>
-
-
-
-                              <input
-
-
-
-                                type="number"
-
-
-
-                                step="any"
-
-
-
-                                value={form.addresses.primary.latitude}
-
-
-
-                                onChange={(e) => handleAddressFieldChange('primary', 'latitude', e.target.value)}
-
-
-
-                                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-
-
-
-                                placeholder="Enter latitude"
-
-
-
-                              />
-
-
-
-                            </div>
-
-
-
-                          </div>
-
-
-
-                          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-
-
-
-                            <div>
-
-
-
-                              <label className="block text-xs font-medium text-slate-600 mb-1">Longitude *</label>
-
-
-
-                              <input
-
-
-
-                                type="number"
-
-
-
-                                step="any"
-
-
-
-                                value={form.addresses.primary.longitude}
-
-
-
-                                onChange={(e) => handleAddressFieldChange('primary', 'longitude', e.target.value)}
-
-
-
-                                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-
-
-
-                                placeholder="Enter longitude"
-
-
-
-                              />
-
-
-
-                            </div>
-
-
-
-                            <div className="flex items-center gap-2">
-
-
-
-                              <button
-
-
-
-                                type="button"
-
-
-
-                                onClick={() => handleAddressGeocode('primary')}
-
-
-
-                                className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
-
-
-
-                              >
-
-
-
-                                <MapPin className="h-4 w-4" />
-
-
-
-                                Auto-Geocode
-
-
-
-                              </button>
-
-
-
-                              <button
-
-
-
-                                type="button"
-
-
-
-                                onClick={() => handleReverseGeocode('primary')}
-
-
-
-                                className="flex items-center gap-2 px-3 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors"
-
-
-
-                                disabled={!form.addresses.primary.latitude || !form.addresses.primary.longitude}
-
-
-
-                              >
-
-
-
-                                <Map className="h-4 w-4" />
-
-
-
-                                Reverse Geocode
-
-
-
-                              </button>
-
-
-
-                            </div>
-
-
-
-                          </div>
-
-
-
-                        </div>
-
-
-
-                      </div>
-
-
-
-
-
-
-
-                      <div className="mt-6">
-
-
-
-                        <label className="block text-sm font-medium text-slate-700 mb-2">
-
-
-
-                          Additional Addresses (Optional)
-
-
-
-                        </label>
-
-
-
-                        <div className="space-y-4">
-
-
-
-                          {/* Police Station Address */}
-
-
-
-                          <div className="p-4 border border-slate-200 rounded-lg">
-
-
-
-                            <div className="flex items-center mb-3">
-
-
-
-                              <input
-
-
-
-                                type="checkbox"
-
-
-
-                                checked={form.addresses.police.enabled}
-
-
-
-                                onChange={(e) => handleAddressToggle('police', e.target.checked)}
-
-
-
-                                className="mr-2"
-
-
-
-                              />
-
-
-
-                              <label className="text-sm font-medium text-slate-700">Police Station Address</label>
-
-
-
-                            </div>
-
-
-
-                            {form.addresses.police.enabled && (
-
-
-
-                              <div className="space-y-3">
-
-
-
-                                <div>
-
-
-
-                                  <label className="block text-xs font-medium text-slate-600 mb-1">Address Line</label>
-
-
-
-                                  <textarea
-
-
-
-                                    value={form.addresses.police.addressLine}
-
-
-
-                                    onChange={(e) => handleAddressFieldChange('police', 'addressLine', e.target.value)}
-
-
-
-                                    rows={2}
-
-
-
-                                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 resize-none"
-
-
-
-                                    placeholder="Enter police station address"
-
-
-
-                                  />
-
-
-
-                                </div>
-
-
-
-                                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-
-
-
-                                  <div>
-
-
-
-                                    <label className="block text-xs font-medium text-slate-600 mb-1">City</label>
-
-
-
-                                    <input
-
-
-
-                                      type="text"
-
-
-
-                                      value={form.addresses.police.city}
-
-
-
-                                      onChange={(e) => handleAddressFieldChange('police', 'city', e.target.value)}
-
-
-
-                                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-
-
-
-                                      placeholder="Enter city"
-
-
-
-                                    />
-
-
-
-                                  </div>
-
-
-
-                                  <div>
-
-
-
-                                    <label className="block text-xs font-medium text-slate-600 mb-1">State</label>
-
-
-
-                                    <input
-
-
-
-                                      type="text"
-
-
-
-                                      value={form.addresses.police.state}
-
-
-
-                                      onChange={(e) => handleAddressFieldChange('police', 'state', e.target.value)}
-
-
-
-                                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-
-
-
-                                      placeholder="Enter state"
-
-
-
-                                    />
-
-
-
-                                  </div>
-
-
-
-                                  <div>
-
-
-
-                                    <label className="block text-xs font-medium text-slate-600 mb-1">Pincode</label>
-
-
-
-                                    <input
-
-
-
-                                      type="text"
-
-
-
-                                      value={form.addresses.police.pincode}
-
-
-
-                                      onChange={(e) => handleAddressFieldChange('police', 'pincode', e.target.value)}
-
-
-
-                                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-
-
-
-                                      placeholder="Enter pincode"
-
-
-
-                                    />
-
-
-
-                                  </div>
-
-
-
-                                </div>
-
-
-
-                                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-
-
-
-                                  <div>
-
-
-
-                                    <label className="block text-xs font-medium text-slate-600 mb-1">Latitude (optional)</label>
-
-
-
-                                    <input
-
-
-
-                                      type="number"
-
-
-
-                                      step="any"
-
-
-
-                                      value={form.addresses.police.latitude}
-
-
-
-                                      onChange={(e) => handleAddressFieldChange('police', 'latitude', e.target.value)}
-
-
-
-                                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-
-
-
-                                      placeholder="Enter latitude"
-
-
-
-                                    />
-
-
-
-                                  </div>
-
-
-
-                                  <div>
-
-
-
-                                    <label className="block text-xs font-medium text-slate-600 mb-1">Longitude (optional)</label>
-
-
-
-                                    <input
-
-
-
-                                      type="number"
-
-
-
-                                      step="any"
-
-
-
-                                      value={form.addresses.police.longitude}
-
-
-
-                                      onChange={(e) => handleAddressFieldChange('police', 'longitude', e.target.value)}
-
-
-
-                                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-
-
-
-                                      placeholder="Enter longitude"
-
-
-
-                                    />
-
-
-
-                                  </div>
-
-
-
-                                </div>
-
-
-
-                                <div className="flex items-center gap-2 mt-3">
-
-
-
-                                  <button
-
-
-
-                                    type="button"
-
-
-
-                                    onClick={() => handleAddressGeocode('police')}
-
-
-
-                                    className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
-
-
-
-                                  >
-
-
-
-                                    <MapPin className="h-4 w-4" />
-
-
-
-                                    Auto-Geocode
-
-
-
-                                  </button>
-
-
-
-                                  <button
-
-
-
-                                    type="button"
-
-
-
-                                    onClick={() => handleReverseGeocode('police')}
-
-
-
-                                    className="flex items-center gap-2 px-3 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors"
-
-
-
-                                    disabled={!form.addresses.police.latitude || !form.addresses.police.longitude}
-
-
-
-                                  >
-
-
-
-                                    <Map className="h-4 w-4" />
-
-
-
-                                    Reverse Geocode
-
-
-
-                                  </button>
-
-
-
-                                </div>
-
-
-
-                              </div>
-
-
-
-                            )}
-
-
-
-                          </div>
-
-
-
-                          {/* Branch Address */}
-
-
-
-                          <div className="p-4 border border-slate-200 rounded-lg">
-
-
-
-                            <div className="flex items-center mb-3">
-
-
-
-                              <input
-
-
-
-                                type="checkbox"
-
-
-
-                                checked={form.addresses.branch.enabled}
-
-
-
-                                onChange={(e) => handleAddressToggle('branch', e.target.checked)}
-
-
-
-                                className="mr-2"
-
-
-
-                              />
-
-
-
-                              <label className="text-sm font-medium text-slate-700">Branch Address</label>
-
-
-
-                            </div>
-
-
-
-                            {form.addresses.branch.enabled && (
-
-
-
-                              <div className="space-y-3">
-
-
-
-                                <div>
-
-
-
-                                  <label className="block text-xs font-medium text-slate-600 mb-1">Address Line</label>
-
-
-
-                                  <textarea
-
-
-
-                                    value={form.addresses.branch.addressLine}
-
-
-
-                                    onChange={(e) => handleAddressFieldChange('branch', 'addressLine', e.target.value)}
-
-
-
-                                    rows={2}
-
-
-
-                                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 resize-none"
-
-
-
-                                    placeholder="Enter branch address"
-
-
-
-                                  />
-
-
-
-                                </div>
-
-
-
-                                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-
-
-
-                                  <div>
-
-
-
-                                    <label className="block text-xs font-medium text-slate-600 mb-1">City</label>
-
-
-
-                                    <input
-
-
-
-                                      type="text"
-
-
-
-                                      value={form.addresses.branch.city}
-
-
-
-                                      onChange={(e) => handleAddressFieldChange('branch', 'city', e.target.value)}
-
-
-
-                                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-
-
-
-                                      placeholder="Enter city"
-
-
-
-                                    />
-
-
-
-                                  </div>
-
-
-
-                                  <div>
-
-
-
-                                    <label className="block text-xs font-medium text-slate-600 mb-1">State</label>
-
-
-
-                                    <input
-
-
-
-                                      type="text"
-
-
-
-                                      value={form.addresses.branch.state}
-
-
-
-                                      onChange={(e) => handleAddressFieldChange('branch', 'state', e.target.value)}
-
-
-
-                                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-
-
-
-                                      placeholder="Enter state"
-
-
-
-                                    />
-
-
-
-                                  </div>
-
-
-
-                                  <div>
-
-
-
-                                    <label className="block text-xs font-medium text-slate-600 mb-1">Pincode</label>
-
-
-
-                                    <input
-
-
-
-                                      type="text"
-
-
-
-                                      value={form.addresses.branch.pincode}
-
-
-
-                                      onChange={(e) => handleAddressFieldChange('branch', 'pincode', e.target.value)}
-
-
-
-                                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-
-
-
-                                      placeholder="Enter pincode"
-
-
-
-                                    />
-
-
-
-                                  </div>
-
-
-
-                                </div>
-
-
-
-                                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-
-
-
-                                  <div>
-
-
-
-                                    <label className="block text-xs font-medium text-slate-600 mb-1">Latitude (optional)</label>
-
-
-
-                                    <input
-
-
-
-                                      type="number"
-
-
-
-                                      step="any"
-
-
-
-                                      value={form.addresses.branch.latitude}
-
-
-
-                                      onChange={(e) => handleAddressFieldChange('branch', 'latitude', e.target.value)}
-
-
-
-                                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-
-
-
-                                      placeholder="Enter latitude"
-
-
-
-                                    />
-
-
-
-                                  </div>
-
-
-
-                                  <div>
-
-
-
-                                    <label className="block text-xs font-medium text-slate-600 mb-1">Longitude (optional)</label>
-
-
-
-                                    <input
-
-
-
-                                      type="number"
-
-
-
-                                      step="any"
-
-
-
-                                      value={form.addresses.branch.longitude}
-
-
-
-                                      onChange={(e) => handleAddressFieldChange('branch', 'longitude', e.target.value)}
-
-
-
-                                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-
-
-
-                                      placeholder="Enter longitude"
-
-
-
-                                    />
-
-
-
-                                  </div>
-
-
-
-                                </div>
-
-
-
-                                <div className="flex items-center gap-2 mt-3">
-
-
-
-                                  <button
-
-
-
-                                    type="button"
-
-
-
-                                    onClick={() => handleAddressGeocode('branch')}
-
-
-
-                                    className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
-
-
-
-                                  >
-
-
-
-                                    <MapPin className="h-4 w-4" />
-
-
-
-                                    Auto-Geocode
-
-
-
-                                  </button>
-
-
-
-                                  <button
-
-
-
-                                    type="button"
-
-
-
-                                    onClick={() => handleReverseGeocode('branch')}
-
-
-
-                                    className="flex items-center gap-2 px-3 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors"
-
-
-
-                                    disabled={!form.addresses.branch.latitude || !form.addresses.branch.longitude}
-
-
-
-                                  >
-
-
-
-                                    <Map className="h-4 w-4" />
-
-
-
-                                    Reverse Geocode
-
-
-
-                                  </button>
-
-
-
-                                </div>
-
-
-
-                              </div>
-
-
-
-                            )}
-
-
-
-                          </div>
-
-
-
-
-
-
-
-                          {/* Tahsil Address */}
-
-
-
-                          <div className="p-4 border border-slate-200 rounded-lg">
-
-
-
-                            <div className="flex items-center mb-3">
-
-
-
-                              <input
-
-
-
-                                type="checkbox"
-
-
-
-                                checked={form.addresses.tahsil.enabled}
-
-
-
-                                onChange={(e) => handleAddressToggle('tahsil', e.target.checked)}
-
-
-
-                                className="mr-2"
-
-
-
-                              />
-
-
-
-                              <label className="text-sm font-medium text-slate-700">Tahsil Address</label>
-
-
-
-                            </div>
-
-
-
-                            {form.addresses.tahsil.enabled && (
-
-
-
-                              <div className="space-y-3">
-
-
-
-                                <div>
-
-
-
-                                  <label className="block text-xs font-medium text-slate-600 mb-1">Address Line</label>
-
-
-
-                                  <textarea
-
-
-
-                                    value={form.addresses.tahsil.addressLine}
-
-
-
-                                    onChange={(e) => handleAddressFieldChange('tahsil', 'addressLine', e.target.value)}
-
-
-
-                                    rows={2}
-
-
-
-                                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 resize-none"
-
-
-
-                                    placeholder="Enter tahsil address"
-
-
-
-                                  />
-
-
-
-                                </div>
-
-
-
-                                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-
-
-
-                                  <div>
-
-
-
-                                    <label className="block text-xs font-medium text-slate-600 mb-1">City</label>
-
-
-
-                                    <input
-
-
-
-                                      type="text"
-
-
-
-                                      value={form.addresses.tahsil.city}
-
-
-
-                                      onChange={(e) => handleAddressFieldChange('tahsil', 'city', e.target.value)}
-
-
-
-                                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-
-
-
-                                      placeholder="Enter city"
-
-
-
-                                    />
-
-
-
-                                  </div>
-
-
-
-                                  <div>
-
-
-
-                                    <label className="block text-xs font-medium text-slate-600 mb-1">State</label>
-
-
-
-                                    <input
-
-
-
-                                      type="text"
-
-
-
-                                      value={form.addresses.tahsil.state}
-
-
-
-                                      onChange={(e) => handleAddressFieldChange('tahsil', 'state', e.target.value)}
-
-
-
-                                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-
-
-
-                                      placeholder="Enter state"
-
-
-
-                                    />
-
-
-
-                                  </div>
-
-
-
-                                  <div>
-
-
-
-                                    <label className="block text-xs font-medium text-slate-600 mb-1">Pincode</label>
-
-
-
-                                    <input
-
-
-
-                                      type="text"
-
-
-
-                                      value={form.addresses.tahsil.pincode}
-
-
-
-                                      onChange={(e) => handleAddressFieldChange('tahsil', 'pincode', e.target.value)}
-
-
-
-                                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-
-
-
-                                      placeholder="Enter pincode"
-
-
-
-                                    />
-
-
-
-                                  </div>
-
-
-
-                                </div>
-
-
-
-                                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-
-
-
-                                  <div>
-
-
-
-                                    <label className="block text-xs font-medium text-slate-600 mb-1">Latitude (optional)</label>
-
-
-
-                                    <input
-
-
-
-                                      type="number"
-
-
-
-                                      step="any"
-
-
-
-                                      value={form.addresses.tahsil.latitude}
-
-
-
-                                      onChange={(e) => handleAddressFieldChange('tahsil', 'latitude', e.target.value)}
-
-
-
-                                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-
-
-
-                                      placeholder="Enter latitude"
-
-
-
-                                    />
-
-
-
-                                  </div>
-
-
-
-                                  <div>
-
-
-
-                                    <label className="block text-xs font-medium text-slate-600 mb-1">Longitude (optional)</label>
-
-
-
-                                    <input
-
-
-
-                                      type="number"
-
-
-
-                                      step="any"
-
-
-
-                                      value={form.addresses.tahsil.longitude}
-
-
-
-                                      onChange={(e) => handleAddressFieldChange('tahsil', 'longitude', e.target.value)}
-
-
-
-                                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-
-
-
-                                      placeholder="Enter longitude"
-
-
-
-                                    />
-
-
-
-                                  </div>
-
-
-
-                                </div>
-
-
-
-                                <div className="flex items-center gap-2 mt-3">
-
-
-
-                                  <button
-
-
-
-                                    type="button"
-
-
-
-                                    onClick={() => handleAddressGeocode('tahsil')}
-
-
-
-                                    className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
-
-
-
-                                  >
-
-
-
-                                    <MapPin className="h-4 w-4" />
-
-
-
-                                    Auto-Geocode
-
-
-
-                                  </button>
-
-
-
-                                  <button
-
-
-
-                                    type="button"
-
-
-
-                                    onClick={() => handleReverseGeocode('tahsil')}
-
-
-
-                                    className="flex items-center gap-2 px-3 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors"
-
-
-
-                                    disabled={!form.addresses.tahsil.latitude || !form.addresses.tahsil.longitude}
-
-
-
-                                  >
-
-
-
-                                    <Map className="h-4 w-4" />
-
-
-
-                                    Reverse Geocode
-
-
-
-                                  </button>
-
-
-
-                                </div>
-
-
-
-                              </div>
-
-
-
-                            )}
-
-
-
-                          </div>
-
-
-
-                        </div>
-
-
-
-                      </div>
-
-
-
-                    </div>
-
-
-
-
-
-
-
-                    {/* Deal Information */}
-
-
-
-                    <div>
-
-
-
-                      <h3 className="text-base font-medium text-slate-900 mb-4 flex items-center gap-2">
-
-
-
-                        <DollarSign className="h-4 w-4" />
-
-
-
-                        Deal Information
-
-
-
-                      </h3>
-
-
-
-
-
-
-
-                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-
-
-
-                        {/* Department */}
-
-
-
-                        <div>
-
-
-
-                          <label className="block text-sm font-medium text-slate-700 mb-2">
-
-
-
-                            Department <span className="text-rose-500">*</span>
-
-
-
-                          </label>
-
-                          {/* Search input for department */}
-                          <input
-                            type="text"
-                            placeholder="Search department..."
-                            value={deptSearch}
-                            onChange={(e) => setDeptSearch(e.target.value)}
-                            className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 mb-1"
-                          />
-
-                          <select
-
-                            value={formDepartment}
-
-                            onChange={async (e) => {
-
-                              const dept = e.target.value;
-
-
-
-                              setFormDepartment(dept);
-                              setDeptSearch("");
-
-                              setForm(prev => ({ ...prev, stage: "" }));
-
-
-
-
-
-
-
-                              if (dept) {
-
-
-
-                                const stages = await fetchStagesForDepartment(dept);
-
-
-
-                                setAvailableStages(stages);
-
-
-
-                              } else {
-
-
-
-                                setAvailableStages([]);
-
-
-
-                              }
-
-
-
-                            }}
-
-
-
-                            className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
-
-
-
-                          >
-
-
-
-                            <option value="">Select Department</option>
-
-
-
-                            {Array.isArray(departments) && departments.length > 0 ? (
-
-                              departments
-                                .filter(dept => dept.toLowerCase().includes(deptSearch.toLowerCase()))
-                                .map(dept => (
-
-                                <option key={dept} value={dept}>{dept}</option>
-
-                              ))
-
-                            ) : (
-
-                              <option disabled>Loading departments...</option>
-
-                            )}
-
-
-
-                          </select>
-
-
-
-                        </div>
-
-
-
-
-
-
-
-                        {/* Deal Stage */}
-
-
-
-                        <div>
-
-
-
-                          <label className="block text-sm font-medium text-slate-700 mb-2">
-
-
-
-                            Deal Stage <span className="text-rose-500">*</span>
-
-
-
-                          </label>
-
-
-
-                          <select
-
-                            value={form.stage}
-
-                            disabled={!formDepartment}
-
-
-
-                            onChange={(e) => {
-
-                              const newStage = e.target.value;
-
-
-
-                              // 🎯 Show confirmation dialog if ACCOUNT stage is selected
-
-                              if (newStage === "ACCOUNT") {
-
-                                setPendingStageChange(newStage);
-
-                                setShowAccountTransferDialog(true);
-
-                                return;
-
-                              }
-
-
-
-                              setForm({ ...form, stage: newStage });
-
-                            }}
-
-
-
-                            className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm disabled:bg-slate-100 disabled:text-slate-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
-
-
-
-                          >
-
-
-
-                            <option value="">Select Stage</option>
-
-
-
-                            {availableStages && availableStages.length > 0 ? (
-
-
-
-                              availableStages.map(stage => (
-
-
-
-                                <option key={stage.stageCode} value={stage.stageCode}>
-
-
-
-                                  {stage.stageName}
-
-
-
-                                </option>
-
-
-
-                              ))
-
-
-
-                            ) : (
-
-
-
-                              formDepartment && <option disabled>(No stages available)</option>
-
-
-
-                            )}
-
-
-
-                          </select>
-
-
-
-                        </div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-                        <div>
-
-
-
-                          <label className="block text-sm font-medium text-slate-700 mb-2">
-                            Branch Name
-                          </label>
-                          <input
-                            type="text"
-                            placeholder="Search branch..."
-                            value={branchSearch}
-                            onChange={(e) => setBranchSearch(e.target.value)}
-                            className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 mb-1"
-                          />
-                          <select
-                            value={form.bankId || ""}
-                            onChange={(e) => {
-                              const bank = banks.find(b => String(b.id) === String(e.target.value));
-                              if (bank) {
-                                setForm(prev => ({
-                                  ...prev,
-                                  bankId: String(bank.id),
-                                  branchName: bank.branchName || "",
-                                  taluka: bank.taluka || "",
-                                  district: bank.district || ""
-                                }));
-                                setBranchSearch("");
-                              }
-                            }}
-                            className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                          >
-                            <option value="">Select branch</option>
-                            {banks
-                              .filter(b => {
-                                const q = branchSearch.toLowerCase();
-                                return !q ||
-                                  (b.branchName || "").toLowerCase().includes(q) ||
-                                  (b.name || "").toLowerCase().includes(q);
-                              })
-                              .map((bank) => (
-                                <option key={bank.id} value={String(bank.id)}>
-                                  {bank.branchName || bank.name}{bank.name && bank.branchName ? ` (${bank.name})` : ""}
-                                </option>
-                              ))}
-                          </select>
-
-
-
-                        </div>
-
-                        {/* Bank - auto-filled from branch */}
-                        <div>
-                          <label className="block text-sm font-medium text-slate-700 mb-2">Bank</label>
-                          <input
-                            type="text"
-                            value={banks.find(b => String(b.id) === String(form.bankId))?.name || ""}
-                            readOnly
-                            className="w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-700 cursor-default"
-                            placeholder="Auto-filled from branch"
-                          />
-                        </div>
-
-                        {/* Taluka - auto-filled from bank */}
-                        <div>
-                          <label className="block text-sm font-medium text-slate-700 mb-2">Taluka</label>
-                          <input
-                            type="text"
-                            value={form.taluka || ""}
-                            readOnly
-                            className="w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-700 cursor-default"
-                            placeholder="Auto-filled from bank"
-                          />
-                        </div>
-
-                        {/* District - auto-filled from bank */}
-                        <div>
-                          <label className="block text-sm font-medium text-slate-700 mb-2">District</label>
-                          <input
-                            type="text"
-                            value={form.district || ""}
-                            readOnly
-                            className="w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-700 cursor-default"
-                            placeholder="Auto-filled from bank"
-                          />
-                        </div>
-
-
-
-
-
-
-
-                        <div>
-
-
-
-                          <label className="block text-sm font-medium text-slate-700 mb-2">
-
-
-
-                            Deal Value
-
-
-
-                          </label>
-
-
-
-                          <input
-
-
-
-                            type="number"
-
-
-
-                            step="0.01"
-
-
-
-                            min="0"
-
-
-
-                            value={form.valueAmount}
-
-
-
-                            onChange={(e) => setForm({ ...form, valueAmount: e.target.value })}
-
-
-
-                            className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-
-
-
-                            placeholder="0.00"
-
-
-
-                          />
-
-
-
-                        </div>
-
-
-
-
-
-
-
-                        <div>
-
-
-
-                          <label className="block text-sm font-medium text-slate-700 mb-2">
-
-
-
-                            Closing Date
-
-
-
-                          </label>
-
-
-
-                          <input
-
-
-
-                            type="date"
-
-
-
-                            value={form.closingDate}
-
-
-
-                            onChange={(e) => setForm({ ...form, closingDate: e.target.value })}
-
-
-
-                            className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-
-
-
-                          />
-
-
-
-                        </div>
-
-
-
-                      </div>
-
-
-
-
-
-
-
-                      <div className="mt-4">
-
-
-
-                        <label className="block text-sm font-medium text-slate-700 mb-2">
-
-
-
-                          Description
-
-
-
-                        </label>
-
-
-
-                        <textarea
-
-
-
-                          value={form.description}
-
-
-
-                          onChange={(e) => setForm({ ...form, description: e.target.value })}
-
-
-
-                          rows={3}
-
-
-
-                          className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 resize-none"
-
-
-
-                          placeholder="Deal description and notes"
-
-
-
-                        />
-
-
-
-                      </div>
-
-
-
-                    </div>
-
-
-
-
-
-
-
-                    {/* Custom Fields */}
-
-
-
-                    <DynamicFieldsSection
-
-
-
-                      key={selectedCustomer?.id || "create"}
-
-
-
-                      entity="client"
-
-
-
-                      entityId={selectedCustomer?.id}
-
-
-
-                      definitions={clientFieldDefinitions}
-
-
-
-                      values={form.customFields}
-
-
-
-                      onChange={(values) => setForm({ ...form, customFields: values })}
-
-
-
-                    />
-
-
-
-                  </div>
-
-
-
-                </div>
-
-
-
-
-
-
-
-                {/* FOOTER fixed */}
-
-
-
-                <div className="border-t border-slate-200 px-6 py-4 shrink-0">
-
-
-
-                  <div className="flex items-center justify-between">
-
-
-
-                    <div className="text-sm text-slate-500">
-
-
-
-                      <span className="text-rose-500">*</span> Required fields
-
-
-
-                    </div>
-
-
-
-
-
-
-
-                    <div className="flex items-center gap-3">
-
-
-
-                      <button
-
-
-
-                        type="button"
-
-
-
-                        onClick={() => setShowCreateDrawer(false)}
-
-
-
-                        className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
-
-
-
-                      >
-
-
-
-                        Cancel
-
-
-
-                      </button>
-
-
-
-
-
-
-
-                      <button
-
-
-
-                        type="button"
-
-
-
-                        onClick={handleCreateOrUpdate}
-
-
-
-                        className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 transition-colors"
-
-
-
-                      >
-
-
-
-                        {selectedCustomer ? "Update Customer" : "Create Customer"}
-
-
-
-                      </button>
-
-
-
-                    </div>
-
-
-
-                  </div>
-
-
-
-                </div>
-
-
-
-              </div>
-
-
-
-            </div>
-
-
-
-          </>
-
-
-
+          <DrawerPortal
+            form={form}
+            setForm={setForm}
+            formDepartment={formDepartment}
+            setFormDepartment={setFormDepartment}
+            availableStages={availableStages}
+            setAvailableStages={setAvailableStages}
+            deptSearch={deptSearch}
+            setDeptSearch={setDeptSearch}
+            branchSearch={branchSearch}
+            setBranchSearch={setBranchSearch}
+            banks={banks}
+            departments={departments}
+            fetchStagesForDepartment={fetchStagesForDepartment}
+            selectedCustomer={selectedCustomer}
+            clientFieldDefinitions={clientFieldDefinitions}
+            pendingStageChange={pendingStageChange}
+            setPendingStageChange={setPendingStageChange}
+            showAccountTransferDialog={showAccountTransferDialog}
+            setShowAccountTransferDialog={setShowAccountTransferDialog}
+            onClose={() => setShowCreateDrawer(false)}
+            onSave={handleCreateOrUpdate}
+            addToast={addToast}
+          />
         )}
+
 
 
 
@@ -7257,6 +4147,260 @@ export default function CustomersPage() {
   );
 }
 
+
+function DrawerPortal({
+  form, setForm, formDepartment, setFormDepartment,
+  availableStages, setAvailableStages,
+  deptSearch, setDeptSearch, branchSearch, setBranchSearch,
+  banks, departments, fetchStagesForDepartment,
+  selectedCustomer, clientFieldDefinitions,
+  pendingStageChange, setPendingStageChange,
+  showAccountTransferDialog, setShowAccountTransferDialog,
+  onClose, onSave, addToast,
+}) {
+  // Icons are imported at the top of the file
+
+  const handleAddressToggle = (addressType, enabled) => {
+    setForm(prev => ({
+      ...prev,
+      addresses: {
+        ...prev.addresses,
+        [addressType]: {
+          ...prev.addresses[addressType],
+          enabled,
+          ...(enabled ? {} : { addressLine: '', city: '', pincode: '', latitude: '', longitude: '' })
+        }
+      }
+    }));
+  };
+
+  const handleAddressFieldChange = (addressType, field, value) => {
+    setForm(prev => ({
+      ...prev,
+      addresses: { ...prev.addresses, [addressType]: { ...prev.addresses[addressType], [field]: value } }
+    }));
+  };
+
+  const handleGeocode = async (addressType) => {
+    const addr = form.addresses[addressType];
+    if (!addr.addressLine?.trim()) { addToast('Enter address first', 'warning'); return; }
+    try {
+      const res = await fetch('https://api.yashrajent.com/api/clients/geocode', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ addressLine: addr.addressLine, city: addr.city, pincode: addr.pincode, state: addr.state, country: 'India' })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setForm(prev => ({ ...prev, addresses: { ...prev.addresses, [addressType]: { ...prev.addresses[addressType], latitude: String(data.latitude), longitude: String(data.longitude) } } }));
+        addToast('Geocoded successfully!', 'success');
+      } else { addToast(data.message || 'Could not geocode', 'warning'); }
+    } catch { addToast('Geocoding failed', 'error'); }
+  };
+
+  const AddressBlock = ({ type, label }) => (
+    <div className="p-4 border border-slate-200 rounded-lg">
+      <div className="flex items-center mb-3">
+        {type !== 'primary' && (
+          <input type="checkbox" checked={form.addresses[type]?.enabled || false}
+            onChange={e => handleAddressToggle(type, e.target.checked)} className="mr-2" />
+        )}
+        <label className="text-sm font-medium text-slate-700">{label}</label>
+      </div>
+      {(type === 'primary' || form.addresses[type]?.enabled) && (
+        <div className="space-y-3">
+          <textarea value={form.addresses[type]?.addressLine || ''} rows={2}
+            onChange={e => handleAddressFieldChange(type, 'addressLine', e.target.value)}
+            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none resize-none"
+            placeholder={`Enter ${label.toLowerCase()}`} />
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {['city','state','pincode'].map(f => (
+              <input key={f} type="text" value={form.addresses[type]?.[f] || ''}
+                onChange={e => handleAddressFieldChange(type, f, e.target.value)}
+                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                placeholder={f.charAt(0).toUpperCase()+f.slice(1)} />
+            ))}
+            <input type="number" step="any" value={form.addresses[type]?.latitude || ''}
+              onChange={e => handleAddressFieldChange(type, 'latitude', e.target.value)}
+              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+              placeholder="Latitude" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <input type="number" step="any" value={form.addresses[type]?.longitude || ''}
+              onChange={e => handleAddressFieldChange(type, 'longitude', e.target.value)}
+              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+              placeholder="Longitude" />
+            <button type="button" onClick={() => handleGeocode(type)}
+              className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">
+              <MapPin className="h-4 w-4" /> Auto-Geocode
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  return (
+    <>
+      <div className="fixed inset-0 z-[60] bg-slate-900/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="fixed inset-0 z-[70] flex items-center justify-center px-4 py-6">
+        <div className="relative w-full max-w-3xl h-[85vh] rounded-2xl bg-white shadow-2xl flex flex-col overflow-hidden">
+          <div className="flex items-start justify-between border-b border-slate-200 px-6 py-4 shrink-0">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-900">{selectedCustomer ? 'Edit Customer' : 'Create Customer'}</h2>
+              <p className="mt-1 text-sm text-slate-500">{selectedCustomer ? 'Update customer information' : 'Add a new customer and deal'}</p>
+            </div>
+            <button type="button" onClick={onClose} className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto px-6 py-4">
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-base font-medium text-slate-900 mb-4 flex items-center gap-2"><User className="h-4 w-4" /> Customer Information</h3>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  {[['name','text','Customer Name *'],['email','email','Email'],['phone','tel','Phone'],['contactName','text','Contact Person'],['contactNumber','tel','Contact Number']].map(([field, type, label]) => (
+                    <div key={field}>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">{label}</label>
+                      <input type={type} value={form[field] || ''} onChange={e => setForm(prev => ({ ...prev, [field]: e.target.value }))}
+                        className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                        placeholder={label.replace(' *','')} />
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-4 space-y-4">
+                  <AddressBlock type="primary" label="Primary Address (Default Tracking) *" />
+                  <AddressBlock type="police" label="Police Station Address" />
+                  <AddressBlock type="branch" label="Branch Address" />
+                  <AddressBlock type="tahsil" label="Tahsil Address" />
+                </div>
+              </div>
+
+              <div>
+                <h3 className="text-base font-medium text-slate-900 mb-4 flex items-center gap-2"><DollarSign className="h-4 w-4" /> Deal Information</h3>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Department <span className="text-rose-500">*</span></label>
+                    <input type="text" placeholder="Search department..." value={deptSearch}
+                      onChange={e => setDeptSearch(e.target.value)}
+                      className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none mb-1" />
+                    <select value={formDepartment} onChange={async e => {
+                      const dept = e.target.value; setFormDepartment(dept); setDeptSearch('');
+                      setForm(prev => ({ ...prev, stage: '' }));
+                      if (dept) { const s = await fetchStagesForDepartment(dept); setAvailableStages(s || []); } else setAvailableStages([]);
+                    }} className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20">
+                      <option value="">Select Department</option>
+                      {Array.isArray(departments) && departments.filter(d => d.toLowerCase().includes(deptSearch.toLowerCase())).map(d => <option key={d} value={d}>{d}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Deal Stage <span className="text-rose-500">*</span></label>
+                    <select value={form.stage} disabled={!formDepartment} onChange={e => {
+                      const s = e.target.value;
+                      if (s === 'ACCOUNT') { setPendingStageChange(s); setShowAccountTransferDialog(true); return; }
+                      setForm(prev => ({ ...prev, stage: s }));
+                    }} className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm disabled:bg-slate-100 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20">
+                      <option value="">Select Stage</option>
+                      {availableStages.map(s => <option key={s.stageCode} value={s.stageCode}>{s.stageName}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Branch Name</label>
+                    <input type="text" placeholder="Search branch..." value={branchSearch}
+                      onChange={e => setBranchSearch(e.target.value)}
+                      className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none mb-1" />
+                    <select value={form.bankId || ''} onChange={e => {
+                      const bank = banks.find(b => String(b.id) === String(e.target.value));
+                      if (bank) { setForm(prev => ({ ...prev, bankId: String(bank.id), branchName: bank.branchName || '', taluka: bank.taluka || '', district: bank.district || '' })); setBranchSearch(''); }
+                    }} className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none">
+                      <option value="">Select branch</option>
+                      {banks.filter(b => { const q = branchSearch.toLowerCase(); return !q || (b.branchName||'').toLowerCase().includes(q) || (b.name||'').toLowerCase().includes(q); })
+                        .map(b => <option key={b.id} value={String(b.id)}>{b.branchName || b.name}{b.name && b.branchName ? ` (${b.name})` : ''}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Bank</label>
+                    <input type="text" readOnly value={banks.find(b => String(b.id) === String(form.bankId))?.name || ''}
+                      className="w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-700 cursor-default" placeholder="Auto-filled from branch" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Deal Value</label>
+                    <input type="number" step="0.01" min="0" value={form.valueAmount || ''} onChange={e => setForm(prev => ({ ...prev, valueAmount: e.target.value }))}
+                      className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none" placeholder="0.00" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Closing Date</label>
+                    <input type="date" value={form.closingDate || ''} onChange={e => setForm(prev => ({ ...prev, closingDate: e.target.value }))}
+                      className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none" />
+                  </div>
+                </div>
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Description</label>
+                  <textarea value={form.description || ''} onChange={e => setForm(prev => ({ ...prev, description: e.target.value }))} rows={3}
+                    className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none resize-none" placeholder="Deal description and notes" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t border-slate-200 px-6 py-4 shrink-0">
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-slate-500"><span className="text-rose-500">*</span> Required fields</div>
+              <div className="flex items-center gap-3">
+                <button type="button" onClick={onClose} className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Cancel</button>
+                <button type="button" onClick={onSave} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">
+                  {selectedCustomer ? 'Update Customer' : 'Create Customer'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+
+// Memoized search bar  isolated so typing never re-renders the table
+const SearchBar = React.memo(function SearchBar({ value, onChange }) {
+  const [local, setLocal] = React.useState(value);
+  const timerRef = React.useRef(null);
+
+  // Keep local in sync when parent clears search
+  React.useEffect(() => { setLocal(value); }, [value]);
+
+  const handleChange = (e) => {
+    const v = e.target.value;
+    setLocal(v);
+    clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => onChange(v), 150);
+  };
+
+  const handleClear = () => {
+    setLocal('');
+    clearTimeout(timerRef.current);
+    onChange('');
+  };
+
+  return (
+    <div className="flex items-center gap-2 border border-slate-200 rounded-lg px-3 py-2 flex-1 max-w-md bg-white shadow-sm">
+      <Search size={16} className="text-slate-400 shrink-0" />
+      <input
+        type="text"
+        placeholder="Search by name or phone..."
+        value={local}
+        onChange={handleChange}
+        className="flex-1 outline-none text-sm bg-transparent text-slate-900 placeholder:text-slate-400"
+      />
+      {local && (
+        <button onClick={handleClear} className="text-slate-400 hover:text-slate-600">
+          <X className="h-3.5 w-3.5" />
+        </button>
+      )}
+    </div>
+  );
+});
+
 function ColFilterTh({
   label,
   colKey,
@@ -7308,7 +4452,7 @@ function ColFilterTh({
         >
           {label}
           <span style={{ fontSize: 10, opacity: 0.5 }}>
-            {isAsc ? "↑" : isDesc ? "↓" : "⇅"}
+            {isAsc ? "" : isDesc ? "" : ""}
           </span>
         </span>
         <span
@@ -7336,7 +4480,7 @@ function ColFilterTh({
             flexShrink: 0,
           }}
         >
-          ▼
+          
         </span>
         {isActive && (
           <span

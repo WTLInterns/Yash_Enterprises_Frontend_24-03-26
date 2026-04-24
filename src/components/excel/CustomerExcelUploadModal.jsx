@@ -41,7 +41,7 @@ const CustomerExcelUploadModal = ({ isOpen, onClose, onUploadSuccess }) => {
 
   const reactivateBanks = async () => {
     try {
-      const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api.yashrajent.com';
+      const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080';
       // Fetch inactive banks created by import service
       const res = await fetch(`${BASE_URL}/api/banks?size=9999&active=false`);
       if (!res.ok) return;
@@ -90,7 +90,7 @@ const CustomerExcelUploadModal = ({ isOpen, onClose, onUploadSuccess }) => {
 
   const handleDownloadTemplate = async () => {
     try {
-      const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api.yashrajent.com';
+      const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080';
       const res = await fetch(`${BASE_URL}/api/deals/download-template`);
       if (!res.ok) throw new Error(`Server error ${res.status}`);
       const blob = await res.blob();

@@ -19,7 +19,7 @@ import {
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 
-const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api.yashrajent.com';
+const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080';
 
 export default function ExpenseOverviewPage() {
 
@@ -804,7 +804,41 @@ export default function ExpenseOverviewPage() {
 
                     {/* CLIENT */}
                     <td className="p-3">
-                      <span className="text-xs text-gray-600">{e.clientName || '-'}</span>
+                      {(() => {
+                        const name = e.clientName || '-';
+                        if (name === '-') return <span className="text-xs text-gray-600">-</span>;
+                        return (
+                          <button
+                            type="button"
+                            className="text-xs text-indigo-600 hover:text-indigo-800 hover:underline font-medium text-left"
+                            title={`Go to customer: ${name}`}
+                            onClick={async () => {
+                              // Try to find current clientId by searching by name
+                              try {
+                                const res = await fetch(
+                                  `${BASE_URL}/api/clients?search=${encodeURIComponent(name)}`,
+                                  { headers: { 'Content-Type': 'application/json' } }
+                                );
+                                if (res.ok) {
+                                  const list = await res.json();
+                                  const arr = Array.isArray(list) ? list : (list?.content || []);
+                                  const found = arr.find(c =>
+                                    c.name?.toLowerCase().trim() === name.toLowerCase().trim()
+                                  ) || arr[0];
+                                  if (found?.id) {
+                                    window.location.href = `/customers/${found.id}`;
+                                    return;
+                                  }
+                                }
+                              } catch {}
+                              // Fallback: go to customers list with search
+                              window.location.href = `/customers?search=${encodeURIComponent(name)}`;
+                            }}
+                          >
+                            {name}
+                          </button>
+                        );
+                      })()}
                     </td>
 
                     {/* CLIENT DEPARTMENT */}

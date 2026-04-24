@@ -366,7 +366,7 @@ export default function CustomersPage() {
   useEffect(() => {
     setIsMounted(true); // Mark as mounted after hydration
     const _ud = (() => { try { return JSON.parse(sessionStorage.getItem('user_data') || localStorage.getItem('user_data') || '{}'); } catch { return {}; } })();
-    fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "https://api.yashrajent.com"}/api/stages/departments`, {
+    fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080"}/api/stages/departments`, {
       headers: { 'X-User-Id': String(_ud?.id ?? ''), 'X-User-Role': _ud?.role ?? '' }
     })
       .then(r => r.ok ? r.json() : [])
@@ -385,18 +385,23 @@ export default function CustomersPage() {
   const [formDepartment, setFormDepartment] = useState("");
   const [availableStages, setAvailableStages] = useState([]);
   const [deptSearch, setDeptSearch] = useState("");
-  const [branchSearch, setBranchSearch] = useState("");
-  const [form, setForm] = useState({
+
+  const EMPTY_ADDR = (enabled = false) => ({
+    enabled, id: null, addressLine: "", city: "", state: "", pincode: "",
+    taluka: "", district: "", latitude: "", longitude: "",
+  });
+  const makeEmptyForm = () => ({
     name: "", email: "", phone: "",
     addresses: {
-      primary: { enabled: true, id: null, addressLine: "", city: "", state: "", pincode: "", latitude: "", longitude: "" },
-      branch:  { enabled: false, id: null, addressLine: "", city: "", state: "", pincode: "", latitude: "", longitude: "" },
-      police:  { enabled: false, id: null, addressLine: "", city: "", state: "", pincode: "", latitude: "", longitude: "" },
-      tahsil:  { enabled: false, id: null, addressLine: "", city: "", state: "", pincode: "", latitude: "", longitude: "" },
+      primary: EMPTY_ADDR(true),
+      branch:  EMPTY_ADDR(false),
+      police:  EMPTY_ADDR(false),
+      tahsil:  EMPTY_ADDR(false),
     },
     contactName: "", contactNumber: "", bankId: "", branchName: "",
     stage: "", valueAmount: "", closingDate: "", description: "", customFields: {}
   });
+  const [form, setForm] = useState(makeEmptyForm);
 
   // Load stages for deal form when department changes (create/edit)
   useEffect(() => {
@@ -1124,7 +1129,7 @@ export default function CustomersPage() {
 
 
 
-      const response = await fetch('https://api.yashrajent.com/api/clients/geocode', {
+      const response = await fetch('http://localhost:8080/api/clients/geocode', {
 
 
 
@@ -1336,7 +1341,7 @@ export default function CustomersPage() {
 
 
 
-      const response = await fetch('https://api.yashrajent.com/api/clients/reverse-geocode', {
+      const response = await fetch('http://localhost:8080/api/clients/reverse-geocode', {
 
 
 
@@ -1451,13 +1456,13 @@ export default function CustomersPage() {
     };
   }, [banksMap]);
 
-  const getCustomerLocation = useCallback((customer, deal) => {
-    const bankObj = deal?.bankId ? banksMap[Number(deal.bankId)] : null;
+  const getCustomerLocation = useCallback((customer) => {
+    const primary = customer?.addresses?.find(a => a?.addressType === 'PRIMARY') || customer?.addresses?.[0];
     return {
-      taluka: bankObj?.taluka || "-",
-      district: bankObj?.district || "-",
+      taluka:   primary?.taluka   || "-",
+      district: primary?.district || "-",
     };
-  }, [banksMap]);
+  }, []);
 
   // Full address from customer PRIMARY address
   const getFullAddress = (customer) => {
@@ -1483,17 +1488,18 @@ export default function CustomersPage() {
     customers.forEach(customer => {
       const deal = latestDealByClient.get(Number(customer.id)) ?? null;
       const bankDetails = getBankDetails(deal);
+      const loc = getCustomerLocation(customer);
       const valueMap = {
-        name: customer.name || null,
-        bankName: bankDetails.name !== '-' ? bankDetails.name : null,
+        name:       customer.name || null,
+        bankName:   bankDetails.name !== '-' ? bankDetails.name : null,
         branchName: bankDetails.branch !== '-' ? bankDetails.branch : null,
-        taluka: deal?.taluka || null,
-        district: deal?.district || null,
-        stageCode: deal?.stageCode ? deal.stageCode.toUpperCase() : null,
+        taluka:     loc.taluka !== '-' ? loc.taluka : null,
+        district:   loc.district !== '-' ? loc.district : null,
+        stageCode:  deal?.stageCode ? deal.stageCode.toUpperCase() : null,
         department: deal?.department ? deal.department.trim() : null,
-        ownerName: customer.ownerName || null,
-        createdAt: customer.createdAt ? new Date(customer.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : null,
-        updatedAt: customer.updatedAt ? new Date(customer.updatedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : null,
+        ownerName:  customer.ownerName || null,
+        createdAt:  customer.createdAt ? new Date(customer.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : null,
+        updatedAt:  customer.updatedAt ? new Date(customer.updatedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : null,
       };
       const v = valueMap[colKey];
       if (v) vals.add(v);
@@ -1633,17 +1639,18 @@ export default function CustomersPage() {
       result = result.filter(customer => {
         const deal = latestDealByClient.get(Number(customer.id)) ?? null;
         const bankDetails = getBankDetails(deal);
+        const loc = getCustomerLocation(customer);
         const valueMap = {
-          name: customer.name || '',
-          bankName: bankDetails.name !== '-' ? bankDetails.name : '',
+          name:       customer.name || '',
+          bankName:   bankDetails.name !== '-' ? bankDetails.name : '',
           branchName: bankDetails.branch !== '-' ? bankDetails.branch : '',
-          taluka: deal?.taluka || '',
-          district: deal?.district || '',
-          stageCode: deal?.stageCode ? deal.stageCode.toUpperCase() : '',
+          taluka:     loc.taluka !== '-' ? loc.taluka : '',
+          district:   loc.district !== '-' ? loc.district : '',
+          stageCode:  deal?.stageCode ? deal.stageCode.toUpperCase() : '',
           department: deal?.department ? deal.department.trim() : '',
-          ownerName: customer.ownerName || '',
-          createdAt: customer.createdAt ? new Date(customer.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '',
-          updatedAt: customer.updatedAt ? new Date(customer.updatedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '',
+          ownerName:  customer.ownerName || '',
+          createdAt:  customer.createdAt ? new Date(customer.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '',
+          updatedAt:  customer.updatedAt ? new Date(customer.updatedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '',
         };
         const val = valueMap[colKey];
         return val ? allowedSet.has(val) : allowedSet.has('(Empty)');
@@ -1656,17 +1663,18 @@ export default function CustomersPage() {
         const getVal = (customer) => {
           const deal = latestDealByClient.get(Number(customer.id)) ?? null;
           const bd = getBankDetails(deal);
+          const loc = getCustomerLocation(customer);
           const vm = {
-            name: customer.name || '',
-            bankName: bd.name !== '-' ? bd.name : '',
+            name:       customer.name || '',
+            bankName:   bd.name !== '-' ? bd.name : '',
             branchName: bd.branch !== '-' ? bd.branch : '',
-            taluka: deal?.taluka || '',
-            district: deal?.district || '',
-            stageCode: deal?.stageCode || '',
+            taluka:     loc.taluka !== '-' ? loc.taluka : '',
+            district:   loc.district !== '-' ? loc.district : '',
+            stageCode:  deal?.stageCode || '',
             department: deal?.department || '',
-            ownerName: customer.ownerName || '',
-            createdAt: customer.createdAt || '',
-            updatedAt: customer.updatedAt || '',
+            ownerName:  customer.ownerName || '',
+            createdAt:  customer.createdAt || '',
+            updatedAt:  customer.updatedAt || '',
           };
           return vm[sortConfig.key] || '';
         };
@@ -1729,64 +1737,9 @@ export default function CustomersPage() {
   //  Reset modal and open create
   const openCreate = () => {
     setSelectedCustomer(null);
-
-    setForm({
-      name: "",
-      email: "",
-      phone: "",
-      addresses: {
-        primary: {
-          enabled: true,
-          id: null,
-          addressLine: "",
-          city: "",
-          state: "",
-          pincode: "",
-          latitude: "",
-          longitude: ""
-        },
-        branch: {
-          enabled: false,
-          addressLine: "",
-          city: "",
-          state: "",
-          pincode: "",
-          latitude: "",
-          longitude: ""
-        },
-        police: {
-          enabled: false,
-          addressLine: "",
-          city: "",
-          state: "",
-          pincode: "",
-          latitude: "",
-          longitude: ""
-        },
-        tahsil: {
-          enabled: false,
-          addressLine: "",
-          city: "",
-          state: "",
-          pincode: "",
-          latitude: "",
-          longitude: ""
-        }
-      },
-      contactName: "",
-      contactNumber: "",
-      bankId: "",
-      branchName: "",
-      stage: "",
-      valueAmount: "",
-      closingDate: "",
-      description: "",
-      customFields: {}
-    });
-
+    setForm(makeEmptyForm());
     setFormDepartment("");
     setAvailableStages([]);
-    setBranchSearch("");
     setShowCreateDrawer(true);
   };
 
@@ -1808,33 +1761,29 @@ export default function CustomersPage() {
    *                branch:  { enabled, id, addressLine, ... }, ... }
    */
   const mapAddressesToForm = (addresses = []) => {
-    // Safe defaults  primary always enabled, others off
     const result = {
-      primary: { enabled: true, id: null, addressLine: "", city: "", state: "", pincode: "", latitude: "", longitude: "" },
-      branch: { enabled: false, id: null, addressLine: "", city: "", state: "", pincode: "", latitude: "", longitude: "" },
-      police: { enabled: false, id: null, addressLine: "", city: "", state: "", pincode: "", latitude: "", longitude: "" },
-      tahsil: { enabled: false, id: null, addressLine: "", city: "", state: "", pincode: "", latitude: "", longitude: "" },
+      primary: { enabled: true,  id: null, addressLine: "", city: "", state: "", pincode: "", taluka: "", district: "", latitude: "", longitude: "" },
+      branch:  { enabled: false, id: null, addressLine: "", city: "", state: "", pincode: "", taluka: "", district: "", latitude: "", longitude: "" },
+      police:  { enabled: false, id: null, addressLine: "", city: "", state: "", pincode: "", taluka: "", district: "", latitude: "", longitude: "" },
+      tahsil:  { enabled: false, id: null, addressLine: "", city: "", state: "", pincode: "", taluka: "", district: "", latitude: "", longitude: "" },
     };
-
     if (!Array.isArray(addresses)) return result;
-
     addresses.forEach(addr => {
-      const key = (addr.addressType ?? "").toLowerCase(); // "PRIMARY"  "primary"
-      if (!(key in result)) return;                        // skip unknown types
-
+      const key = (addr.addressType ?? "").toLowerCase();
+      if (!(key in result)) return;
       result[key] = {
-        enabled: true,
-        id: addr.id ?? null,
+        enabled:     true,
+        id:          addr.id ?? null,
         addressLine: addr.addressLine ?? "",
-        city: addr.city ?? "",
-        state: addr.state ?? "",
-        pincode: addr.pincode ?? "",
-        // latitude / longitude come back as numbers  form expects strings
-        latitude: addr.latitude != null ? String(addr.latitude) : "",
-        longitude: addr.longitude != null ? String(addr.longitude) : "",
+        city:        addr.city        ?? "",
+        state:       addr.state       ?? "",
+        pincode:     addr.pincode     ?? "",
+        taluka:      addr.taluka      ?? "",
+        district:    addr.district    ?? "",
+        latitude:    addr.latitude  != null ? String(addr.latitude)  : "",
+        longitude:   addr.longitude != null ? String(addr.longitude) : "",
       };
     });
-
     return result;
   };
 
@@ -1867,7 +1816,7 @@ export default function CustomersPage() {
       // but backendApi.get("/api/clients/...") becomes /api/api/clients/...  500!
       const authUser = getTabSafeAuthUser();
       const addrResponse = await fetch(
-        `https://api.yashrajent.com/api/clients/${customer.id}/addresses`,
+        `http://localhost:8080/api/clients/${customer.id}/addresses`,
         {
           headers: {
             "X-User-Id": String(authUser?.id ?? ""),
@@ -1937,7 +1886,7 @@ export default function CustomersPage() {
     if (!customer.addresses || customer.addresses.length === 0) {
       try {
         const authUser = getTabSafeAuthUser();
-        const res = await fetch(`https://api.yashrajent.com/api/clients/${customer.id}/addresses`, {
+        const res = await fetch(`http://localhost:8080/api/clients/${customer.id}/addresses`, {
           headers: {
             "X-User-Id": String(authUser?.id ?? ""),
             "X-User-Role": authUser?.role ?? "",
@@ -2089,243 +2038,25 @@ export default function CustomersPage() {
 
 
 
-      // Prepare addresses array
-
-
+      const buildAddr = (type, typeConst, isPrimary) => ({
+        id:          form.addresses[type].id || null,
+        addressType: typeConst,
+        addressLine: form.addresses[type].addressLine.trim(),
+        city:        form.addresses[type].city?.trim()     || "",
+        state:       form.addresses[type].state?.trim()    || "",
+        pincode:     form.addresses[type].pincode?.trim()  || "",
+        taluka:      form.addresses[type].taluka?.trim()   || "",
+        district:    form.addresses[type].district?.trim() || "",
+        latitude:    parseFloat(form.addresses[type].latitude)  || null,
+        longitude:   parseFloat(form.addresses[type].longitude) || null,
+        isPrimary,
+      });
 
       const addresses = [];
-
-
-
-
-
-
-
-      // Add primary address (mandatory)
-
-
-
-      if (form.addresses.primary.enabled) {
-
-
-
-        addresses.push({
-
-
-
-          id: form.addresses.primary.id || null,
-
-
-
-          addressType: "PRIMARY",
-
-
-
-          addressLine: form.addresses.primary.addressLine.trim(),
-
-
-
-          city: form.addresses.primary.city.trim(),
-
-
-
-          state: form.addresses.primary.state?.trim() || "",        //  ADD STATE
-
-
-
-          pincode: form.addresses.primary.pincode?.trim() || "",
-
-
-
-          latitude: parseFloat(form.addresses.primary.latitude),
-
-
-
-          longitude: parseFloat(form.addresses.primary.longitude),
-
-
-
-          isPrimary: true
-
-
-
-        });
-
-
-
-      }
-
-
-
-
-
-
-
-      // Add optional addresses if they are enabled
-
-
-
-      if (form.addresses.branch.enabled) {
-
-
-
-        addresses.push({
-
-
-
-          id: form.addresses.branch.id || null,
-
-
-
-          addressType: "BRANCH",
-
-
-
-          addressLine: form.addresses.branch.addressLine.trim(),
-
-
-
-          city: form.addresses.branch.city?.trim() || "",
-
-
-
-          state: form.addresses.branch.state?.trim() || "",        //  ADD STATE
-
-
-
-          pincode: form.addresses.branch.pincode?.trim() || "",
-
-
-
-          latitude: parseFloat(form.addresses.branch.latitude) || null,
-
-
-
-          longitude: parseFloat(form.addresses.branch.longitude) || null,
-
-
-
-          isPrimary: false
-
-
-
-        });
-
-
-
-      }
-
-
-
-
-
-
-
-      if (form.addresses.police.enabled) {
-
-
-
-        addresses.push({
-
-
-
-          id: form.addresses.police.id || null,
-
-
-
-          addressType: "POLICE",
-
-
-
-          addressLine: form.addresses.police.addressLine.trim(),
-
-
-
-          city: form.addresses.police.city?.trim() || "",
-
-
-
-          state: form.addresses.police.state?.trim() || "",        //  ADD STATE
-
-
-
-          pincode: form.addresses.police.pincode?.trim() || "",
-
-
-
-          latitude: parseFloat(form.addresses.police.latitude) || null,
-
-
-
-          longitude: parseFloat(form.addresses.police.longitude) || null,
-
-
-
-          isPrimary: false
-
-
-
-        });
-
-
-
-      }
-
-
-
-
-
-
-
-      if (form.addresses.tahsil.enabled) {
-
-
-
-        addresses.push({
-
-
-
-          id: form.addresses.tahsil.id || null,
-
-
-
-          addressType: "TAHSIL",
-
-
-
-          addressLine: form.addresses.tahsil.addressLine.trim(),
-
-
-
-          city: form.addresses.tahsil.city?.trim() || "",
-
-
-
-          state: form.addresses.tahsil.state?.trim() || "",        //  ADD STATE
-
-
-
-          pincode: form.addresses.tahsil.pincode?.trim() || "",
-
-
-
-          latitude: parseFloat(form.addresses.tahsil.latitude) || null,
-
-
-
-          longitude: parseFloat(form.addresses.tahsil.longitude) || null,
-
-
-
-          isPrimary: false
-
-
-
-        });
-
-
-
-      }
+      if (form.addresses.primary.enabled) addresses.push(buildAddr("primary", "PRIMARY", true));
+      if (form.addresses.branch.enabled)  addresses.push(buildAddr("branch",  "BRANCH",  false));
+      if (form.addresses.police.enabled)  addresses.push(buildAddr("police",  "POLICE",  false));
+      if (form.addresses.tahsil.enabled)  addresses.push(buildAddr("tahsil",  "TAHSIL",  false));
 
 
 
@@ -2415,7 +2146,7 @@ export default function CustomersPage() {
 
 
 
-        await fetch(`https://api.yashrajent.com/api/clients/${savedCustomer.id}/addresses`, {
+        await fetch(`http://localhost:8080/api/clients/${savedCustomer.id}/addresses`, {
 
 
 
@@ -2469,7 +2200,7 @@ export default function CustomersPage() {
 
 
 
-        await fetch(`https://api.yashrajent.com/api/clients/${savedCustomer.id}/addresses`, {
+        await fetch(`http://localhost:8080/api/clients/${savedCustomer.id}/addresses`, {
 
 
 
@@ -2734,151 +2465,7 @@ export default function CustomersPage() {
 
 
 
-      // Reset form
-
-
-
-      setForm({
-
-
-
-        name: "",
-
-
-
-        email: "",
-
-
-
-        phone: "",
-
-
-
-        addresses: {
-
-
-
-          primary: {
-
-
-
-            addressLine: "",
-
-
-
-            city: "",
-
-
-
-            pincode: "",
-
-
-
-            latitude: "",
-
-
-
-            longitude: ""
-
-
-
-          },
-
-
-
-          branch: {
-
-
-
-            addressLine: "",
-
-
-
-            city: "",
-
-
-
-            pincode: ""
-
-
-
-          },
-
-
-
-          police: {
-
-
-
-            addressLine: "",
-
-
-
-            city: ""
-
-
-
-          },
-
-
-
-          tahsil: {
-
-
-
-            addressLine: "",
-
-
-
-            city: ""
-
-
-
-          }
-
-
-
-        },
-
-
-
-        contactName: "",
-
-
-
-        contactNumber: "",
-
-
-
-        bankId: "",
-
-
-
-        branchName: "",
-
-
-
-        stage: "",
-
-
-
-        valueAmount: "",
-
-
-
-        closingDate: "",
-
-
-
-        description: "",
-
-
-
-        customFields: {}
-
-
-
-      });
+      setForm(makeEmptyForm());
 
 
 
@@ -2973,7 +2560,7 @@ export default function CustomersPage() {
     setBulkDeleting(true);
     try {
       const authUser = getTabSafeAuthUser();
-      const res = await fetch('https://api.yashrajent.com/api/clients/bulk', {
+      const res = await fetch('http://localhost:8080/api/clients/bulk', {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
@@ -3019,17 +2606,17 @@ export default function CustomersPage() {
 
       // Bank details
       const bankObj = deal?.bankId ? banks.find(b => Number(b.id) === Number(deal.bankId)) : null;
-      const bankName = deal?.bankName || deal?.relatedBankName || bankObj?.name || '';
+      const bankName   = deal?.bankName || deal?.relatedBankName || bankObj?.name || '';
       const branchName = deal?.branchName || bankObj?.branchName || '';
-      const taluka = bankObj?.taluka || '';
-      const district = bankObj?.district || '';
 
-      // Primary address
+      // Primary address (taluka + district now live here)
       const primaryAddr = customer.addresses?.find(a => a.addressType === 'PRIMARY') || customer.addresses?.[0];
       const addressLine = primaryAddr?.addressLine || '';
-      const city = primaryAddr?.city || '';
-      const state = primaryAddr?.state || '';
-      const pincode = primaryAddr?.pincode || '';
+      const city        = primaryAddr?.city        || '';
+      const state       = primaryAddr?.state       || '';
+      const pincode     = primaryAddr?.pincode     || '';
+      const taluka      = primaryAddr?.taluka      || '';
+      const district    = primaryAddr?.district    || '';
 
       // Stage display name
       const dept = (deal?.department || '').trim();
@@ -3578,8 +3165,8 @@ export default function CustomersPage() {
                       const dealDepartment = (customerDeal?.department ?? "").trim();
 
                       // FIX 2  Resolve bank details from the deal object (not bankId alone)
-                      const bankDetails = getBankDetails(customerDeal);
-                      const customerLocation = getCustomerLocation(customer, customerDeal);
+                      const bankDetails     = getBankDetails(customerDeal);
+                      const customerLocation = getCustomerLocation(customer);
 
 
                       return (
@@ -3888,8 +3475,6 @@ export default function CustomersPage() {
             setAvailableStages={setAvailableStages}
             deptSearch={deptSearch}
             setDeptSearch={setDeptSearch}
-            branchSearch={branchSearch}
-            setBranchSearch={setBranchSearch}
             banks={banks}
             departments={departments}
             fetchStagesForDepartment={fetchStagesForDepartment}
@@ -4151,14 +3736,36 @@ export default function CustomersPage() {
 function DrawerPortal({
   form, setForm, formDepartment, setFormDepartment,
   availableStages, setAvailableStages,
-  deptSearch, setDeptSearch, branchSearch, setBranchSearch,
+  deptSearch, setDeptSearch,
   banks, departments, fetchStagesForDepartment,
   selectedCustomer, clientFieldDefinitions,
   pendingStageChange, setPendingStageChange,
   showAccountTransferDialog, setShowAccountTransferDialog,
   onClose, onSave, addToast,
 }) {
-  // Icons are imported at the top of the file
+  // ── Bank / Branch two-level state (managed internally) ───────────────────
+  const [bankNameSearch, setBankNameSearch] = useState("");
+  const [branchSearch,   setBranchSearch]   = useState("");
+  const [selectedBankName, setSelectedBankName] = useState("");
+
+  // Unique bank names
+  const uniqueBankNames = useMemo(() => {
+    return [...new Set(banks.map(b => b.name).filter(Boolean))].sort();
+  }, [banks]);
+
+  // Branches for selected bank
+  const branchesForBank = useMemo(() => {
+    if (!selectedBankName) return [];
+    return banks.filter(b => b.name === selectedBankName);
+  }, [banks, selectedBankName]);
+
+  // When editing, init selectedBankName from form.bankId
+  useEffect(() => {
+    if (form.bankId && banks.length > 0) {
+      const found = banks.find(b => String(b.id) === String(form.bankId));
+      if (found && found.name) setSelectedBankName(found.name);
+    }
+  }, [form.bankId, banks]);
 
   const handleAddressToggle = (addressType, enabled) => {
     setForm(prev => ({
@@ -4168,7 +3775,7 @@ function DrawerPortal({
         [addressType]: {
           ...prev.addresses[addressType],
           enabled,
-          ...(enabled ? {} : { addressLine: '', city: '', pincode: '', latitude: '', longitude: '' })
+          ...(enabled ? {} : { addressLine: '', city: '', state: '', pincode: '', taluka: '', district: '', latitude: '', longitude: '' })
         }
       }
     }));
@@ -4185,7 +3792,7 @@ function DrawerPortal({
     const addr = form.addresses[addressType];
     if (!addr.addressLine?.trim()) { addToast('Enter address first', 'warning'); return; }
     try {
-      const res = await fetch('https://api.yashrajent.com/api/clients/geocode', {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api.yashrajent.com'}/api/clients/geocode`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ addressLine: addr.addressLine, city: addr.city, pincode: addr.pincode, state: addr.state, country: 'India' })
       });
@@ -4198,7 +3805,7 @@ function DrawerPortal({
   };
 
   const AddressBlock = ({ type, label }) => (
-    <div className="p-4 border border-slate-200 rounded-lg">
+    <div className="p-4 border border-slate-200 rounded-lg bg-slate-50/50">
       <div className="flex items-center mb-3">
         {type !== 'primary' && (
           <input type="checkbox" checked={form.addresses[type]?.enabled || false}
@@ -4211,27 +3818,39 @@ function DrawerPortal({
           <textarea value={form.addresses[type]?.addressLine || ''} rows={2}
             onChange={e => handleAddressFieldChange(type, 'addressLine', e.target.value)}
             className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none resize-none"
-            placeholder={`Enter ${label.toLowerCase()}`} />
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {['city','state','pincode'].map(f => (
+            placeholder="Address line" />
+          <div className="grid grid-cols-3 gap-2">
+            {['city', 'state', 'pincode'].map(f => (
               <input key={f} type="text" value={form.addresses[type]?.[f] || ''}
                 onChange={e => handleAddressFieldChange(type, f, e.target.value)}
                 className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
-                placeholder={f.charAt(0).toUpperCase()+f.slice(1)} />
+                placeholder={f.charAt(0).toUpperCase() + f.slice(1)} />
             ))}
+          </div>
+          {/* Taluka + District */}
+          <div className="grid grid-cols-2 gap-2">
+            <input type="text" value={form.addresses[type]?.taluka || ''}
+              onChange={e => handleAddressFieldChange(type, 'taluka', e.target.value)}
+              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+              placeholder="Taluka" />
+            <input type="text" value={form.addresses[type]?.district || ''}
+              onChange={e => handleAddressFieldChange(type, 'district', e.target.value)}
+              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+              placeholder="District" />
+          </div>
+          {/* Lat / Lng / Geocode */}
+          <div className="grid grid-cols-3 gap-2">
             <input type="number" step="any" value={form.addresses[type]?.latitude || ''}
               onChange={e => handleAddressFieldChange(type, 'latitude', e.target.value)}
               className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
               placeholder="Latitude" />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
             <input type="number" step="any" value={form.addresses[type]?.longitude || ''}
               onChange={e => handleAddressFieldChange(type, 'longitude', e.target.value)}
               className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
               placeholder="Longitude" />
             <button type="button" onClick={() => handleGeocode(type)}
-              className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">
-              <MapPin className="h-4 w-4" /> Auto-Geocode
+              className="flex items-center justify-center gap-1 px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">
+              <MapPin className="h-3.5 w-3.5" /> Geocode
             </button>
           </div>
         </div>
@@ -4304,24 +3923,49 @@ function DrawerPortal({
                       {availableStages.map(s => <option key={s.stageCode} value={s.stageCode}>{s.stageName}</option>)}
                     </select>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Branch Name</label>
-                    <input type="text" placeholder="Search branch..." value={branchSearch}
-                      onChange={e => setBranchSearch(e.target.value)}
-                      className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none mb-1" />
-                    <select value={form.bankId || ''} onChange={e => {
-                      const bank = banks.find(b => String(b.id) === String(e.target.value));
-                      if (bank) { setForm(prev => ({ ...prev, bankId: String(bank.id), branchName: bank.branchName || '', taluka: bank.taluka || '', district: bank.district || '' })); setBranchSearch(''); }
-                    }} className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none">
-                      <option value="">Select branch</option>
-                      {banks.filter(b => { const q = branchSearch.toLowerCase(); return !q || (b.branchName||'').toLowerCase().includes(q) || (b.name||'').toLowerCase().includes(q); })
-                        .map(b => <option key={b.id} value={String(b.id)}>{b.branchName || b.name}{b.name && b.branchName ? ` (${b.name})` : ''}</option>)}
-                    </select>
-                  </div>
+                  {/* Bank (unique names) */}
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-2">Bank</label>
-                    <input type="text" readOnly value={banks.find(b => String(b.id) === String(form.bankId))?.name || ''}
-                      className="w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-700 cursor-default" placeholder="Auto-filled from branch" />
+                    <input type="text" placeholder="Search bank..." value={bankNameSearch}
+                      onChange={e => setBankNameSearch(e.target.value)}
+                      className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none mb-1" />
+                    <select value={selectedBankName}
+                      onChange={e => {
+                        const name = e.target.value;
+                        setSelectedBankName(name);
+                        setBankNameSearch('');
+                        setForm(prev => ({ ...prev, bankId: '', branchName: '' }));
+                      }}
+                      className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none">
+                      <option value="">Select Bank</option>
+                      {uniqueBankNames
+                        .filter(n => !bankNameSearch || n.toLowerCase().includes(bankNameSearch.toLowerCase()))
+                        .map(n => <option key={n} value={n}>{n}</option>)}
+                    </select>
+                  </div>
+
+                  {/* Branch (filtered by selected bank) */}
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Branch</label>
+                    <input type="text" placeholder="Search branch..." value={branchSearch}
+                      onChange={e => setBranchSearch(e.target.value)}
+                      disabled={!selectedBankName}
+                      className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none mb-1 disabled:bg-slate-100" />
+                    <select value={form.bankId || ''}
+                      disabled={!selectedBankName}
+                      onChange={e => {
+                        const bank = banks.find(b => String(b.id) === String(e.target.value));
+                        if (bank) {
+                          setForm(prev => ({ ...prev, bankId: String(bank.id), branchName: bank.branchName || '' }));
+                          setBranchSearch('');
+                        }
+                      }}
+                      className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none disabled:bg-slate-100">
+                      <option value="">{selectedBankName ? 'Select Branch' : 'Select a bank first'}</option>
+                      {branchesForBank
+                        .filter(b => !branchSearch || (b.branchName || '').toLowerCase().includes(branchSearch.toLowerCase()))
+                        .map(b => <option key={b.id} value={String(b.id)}>{b.branchName || b.name || `Branch #${b.id}`}</option>)}
+                    </select>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-2">Deal Value</label>

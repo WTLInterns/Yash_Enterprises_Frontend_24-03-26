@@ -366,7 +366,7 @@ export default function CustomersPage() {
   useEffect(() => {
     setIsMounted(true); // Mark as mounted after hydration
     const _ud = (() => { try { return JSON.parse(sessionStorage.getItem('user_data') || localStorage.getItem('user_data') || '{}'); } catch { return {}; } })();
-    fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080"}/api/stages/departments`, {
+    fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "https://api.yashrajent.com"}/api/stages/departments`, {
       headers: { 'X-User-Id': String(_ud?.id ?? ''), 'X-User-Role': _ud?.role ?? '' }
     })
       .then(r => r.ok ? r.json() : [])
@@ -1129,7 +1129,7 @@ export default function CustomersPage() {
 
 
 
-      const response = await fetch('http://localhost:8080/api/clients/geocode', {
+      const response = await fetch('https://api.yashrajent.com/api/clients/geocode', {
 
 
 
@@ -1341,7 +1341,7 @@ export default function CustomersPage() {
 
 
 
-      const response = await fetch('http://localhost:8080/api/clients/reverse-geocode', {
+      const response = await fetch('https://api.yashrajent.com/api/clients/reverse-geocode', {
 
 
 
@@ -1816,7 +1816,7 @@ export default function CustomersPage() {
       // but backendApi.get("/api/clients/...") becomes /api/api/clients/...  500!
       const authUser = getTabSafeAuthUser();
       const addrResponse = await fetch(
-        `http://localhost:8080/api/clients/${customer.id}/addresses`,
+        `https://api.yashrajent.com/api/clients/${customer.id}/addresses`,
         {
           headers: {
             "X-User-Id": String(authUser?.id ?? ""),
@@ -1886,7 +1886,7 @@ export default function CustomersPage() {
     if (!customer.addresses || customer.addresses.length === 0) {
       try {
         const authUser = getTabSafeAuthUser();
-        const res = await fetch(`http://localhost:8080/api/clients/${customer.id}/addresses`, {
+        const res = await fetch(`https://api.yashrajent.com/api/clients/${customer.id}/addresses`, {
           headers: {
             "X-User-Id": String(authUser?.id ?? ""),
             "X-User-Role": authUser?.role ?? "",
@@ -2146,7 +2146,7 @@ export default function CustomersPage() {
 
 
 
-        await fetch(`http://localhost:8080/api/clients/${savedCustomer.id}/addresses`, {
+        await fetch(`https://api.yashrajent.com/api/clients/${savedCustomer.id}/addresses`, {
 
 
 
@@ -2200,7 +2200,7 @@ export default function CustomersPage() {
 
 
 
-        await fetch(`http://localhost:8080/api/clients/${savedCustomer.id}/addresses`, {
+        await fetch(`https://api.yashrajent.com/api/clients/${savedCustomer.id}/addresses`, {
 
 
 
@@ -2560,7 +2560,7 @@ export default function CustomersPage() {
     setBulkDeleting(true);
     try {
       const authUser = getTabSafeAuthUser();
-      const res = await fetch('http://localhost:8080/api/clients/bulk', {
+      const res = await fetch('https://api.yashrajent.com/api/clients/bulk', {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',

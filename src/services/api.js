@@ -45,6 +45,6 @@ export function createApiClient({ baseUrl = "" } = {}) {
   };
 }
 
-export const backendApi = createApiClient({ baseUrl: (process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080") + "/api" });
+export const backendApi = createApiClient({ baseUrl: (process.env.NEXT_PUBLIC_BACKEND_URL || "https://api.yashrajent.com") + "/api" });
 
 export function delay(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }

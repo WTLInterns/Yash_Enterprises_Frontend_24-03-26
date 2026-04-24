@@ -9,7 +9,6 @@ export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [organization, setOrganization] = useState("");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -28,14 +27,12 @@ export default function LoginPage() {
     if (!email)        { toast.error("Email is required"); return; }
     if (!email.includes("@")) { toast.error("Enter a valid email"); return; }
     if (!password)     { toast.error("Password is required"); return; }
-    if (!organization) { toast.error("Organization is required"); return; }
 
     setLoading(true);
     try {
       const data = await backendApi.post("/auth/login", {
         email: email.trim(),
         password,
-        organization: organization.trim(),
       });
 
       if (data?.role && data?.user) {
@@ -93,19 +90,6 @@ export default function LoginPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="bg-slate-800/90 rounded-3xl shadow-2xl p-8 border border-slate-600 space-y-6">
-          {/* Organization */}
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">Organization</label>
-            <select
-              className="w-full bg-slate-700 border border-slate-600 rounded-xl px-4 py-4 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              value={organization}
-              onChange={e => setOrganization(e.target.value)}
-            >
-              <option value="" disabled className="text-slate-400 bg-slate-800">Select organization</option>
-              <option value="Yash Enterprises" className="bg-slate-800 text-white">Yash Enterprises</option>
-            </select>
-          </div>
-
           {/* Email */}
           <div>
             <label className="block text-sm font-medium text-slate-300 mb-2">Email Address</label>

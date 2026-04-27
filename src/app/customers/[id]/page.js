@@ -229,7 +229,7 @@ export default function CustomerDetailPage() {
         stages = await fetchStagesForDepartment(dept).catch(() => []);
       }
 
-      // ── Fetch fresh addresses ──
+      //  Fetch fresh addresses 
       const authUser = loggedInUser;
       const addrResponse = await fetch(
         `${process.env.NEXT_PUBLIC_BACKEND_URL || "https://api.yashrajent.com"}/api/clients/${customerId}/addresses`,
@@ -260,6 +260,10 @@ export default function CustomerDetailPage() {
         closingDate: latestDeal?.closingDate || "",
         description: latestDeal?.description || "",
       });
+      // Init bank name for the unique-bank dropdown
+      const initBankId = String(bank?.id || latestDeal?.bankId || "");
+      const initBank = banks.find(b => String(b.id) === initBankId);
+      setEditSelectedBankName(initBank?.name || "");
       setShowCustomerEditModal(true);
     } catch (err) {
       console.error("Failed to open edit:", err);
@@ -297,7 +301,7 @@ export default function CustomerDetailPage() {
 
     try {
 
-      // sessionStorage ONLY — no localStorage fallback (prevents cross-tab logout loop)
+      // sessionStorage ONLY  no localStorage fallback (prevents cross-tab logout loop)
       const rawUserData = sessionStorage.getItem("user_data");
       const user = rawUserData ? JSON.parse(rawUserData) : null;
       return user;
@@ -314,7 +318,7 @@ export default function CustomerDetailPage() {
 
 
 
-  // 🔥 CRITICAL: Cross-tab communication for real-time updates
+  //  CRITICAL: Cross-tab communication for real-time updates
 
   useEffect(() => {
 
@@ -322,9 +326,9 @@ export default function CustomerDetailPage() {
 
 
 
-    // Listen for storage changes from other tabs — ONLY reload if auth token changed
+    // Listen for storage changes from other tabs  ONLY reload if auth token changed
     const handleStorageChange = (e) => {
-      // DO NOT reload on user_data changes — causes infinite loop
+      // DO NOT reload on user_data changes  causes infinite loop
       if (e.key === 'auth_token' && !e.newValue) {
         router.push('/login');
       }
@@ -366,7 +370,7 @@ export default function CustomerDetailPage() {
 
       }
 
-      // 🔥 FIX: Listen for expense updates from /expenses page
+      //  FIX: Listen for expense updates from /expenses page
       if (e.detail?.type === 'EXPENSE_UPDATED' && Number(e.detail?.clientId) === Number(customerId)) {
         fetchExpenses(customerId);
       }
@@ -473,7 +477,7 @@ export default function CustomerDetailPage() {
 
 
 
-  // ✅ FIX 2: Resolve ACTUAL USER NAME everywhere (Timeline, History, etc.)
+  //  FIX 2: Resolve ACTUAL USER NAME everywhere (Timeline, History, etc.)
 
   const resolveUserName = (value) => {
 
@@ -524,7 +528,7 @@ export default function CustomerDetailPage() {
 
 
 
-  // ✅ FIX 1: NEVER allow .map() on non-array
+  //  FIX 1: NEVER allow .map() on non-array
 
   const safeArray = (v) => Array.isArray(v) ? v : [];
 
@@ -654,7 +658,7 @@ export default function CustomerDetailPage() {
 
 
 
-  const [sites, setSites] = useState([]); // ✅ NEW: Sites state
+  const [sites, setSites] = useState([]); //  NEW: Sites state
 
 
 
@@ -694,6 +698,7 @@ export default function CustomerDetailPage() {
 
   const [editDepartment, setEditDepartment] = useState("");
   const [editAvailableStages, setEditAvailableStages] = useState([]);
+  const [editSelectedBankName, setEditSelectedBankName] = useState("");
   const [editForm, setEditForm] = useState({
     id: null,
     name: "",
@@ -811,7 +816,7 @@ export default function CustomerDetailPage() {
     } catch { addToast('Failed to reverse geocode', "error"); }
   };
 
-  // Helper: convert backend addresses array → editAddresses object
+  // Helper: convert backend addresses array  editAddresses object
   const mapAddressesToEditForm = (addresses = []) => {
     const result = {
       primary: { enabled: true,  id: null, addressLine: "", city: "", state: "", pincode: "", latitude: "", longitude: "" },
@@ -891,7 +896,7 @@ export default function CustomerDetailPage() {
 
 
 
-  // 🎯 Fetch deal data separately for re-use after stage changes
+  //  Fetch deal data separately for re-use after stage changes
 
   const fetchDeal = async () => {
 
@@ -929,7 +934,7 @@ export default function CustomerDetailPage() {
 
 
 
-  // 🎯 Fetch timeline data separately for cross-tab updates
+  //  Fetch timeline data separately for cross-tab updates
 
   const fetchTimeline = async () => {
 
@@ -953,7 +958,7 @@ export default function CustomerDetailPage() {
 
 
 
-  // 🎯 Load customer data (moved outside useEffect for cross-tab access)
+  //  Load customer data (moved outside useEffect for cross-tab access)
 
   const loadCustomer = async () => {
 
@@ -1099,10 +1104,10 @@ export default function CustomerDetailPage() {
 
   const [products, setProducts] = useState([]);
 
-  // 🔥 NEW: Expenses state for CRM accounting
+  //  NEW: Expenses state for CRM accounting
   const [expenses, setExpenses] = useState([]);
 
-  // 🔥 FINAL AMOUNT CALCULATION (Product - Expense)
+  //  FINAL AMOUNT CALCULATION (Product - Expense)
   const finalAmount = useMemo(() => {
     const productTotal = products.reduce(
       (sum, p) => sum + (p.price * p.qty - (p.discount || 0) + (p.tax || 0)),
@@ -1201,7 +1206,7 @@ export default function CustomerDetailPage() {
 
 
 
-  // ✅ FIXED: Get dynamic user data for component
+  //  FIXED: Get dynamic user data for component
 
 
 
@@ -1279,7 +1284,7 @@ export default function CustomerDetailPage() {
 
 
 
-        // ✅ FIX 3: Timeline actor fix
+        //  FIX 3: Timeline actor fix
 
         const actorRaw = it.actor || it.by || it.user || it.createdByName || it.createdBy;
 
@@ -1339,13 +1344,13 @@ export default function CustomerDetailPage() {
 
 
 
-      // 🔥 ISSUE 4 FIX: Ensure timestamp is correctly mapped from changedAt
+      //  ISSUE 4 FIX: Ensure timestamp is correctly mapped from changedAt
 
       const timestamp = it.changedAt || it.timestamp || it.at || it.createdAt || it.date;
 
 
 
-      // 🔥 ISSUE 2 FIX: Stage History "Modified By" - resolve user name from changedBy ID
+      //  ISSUE 2 FIX: Stage History "Modified By" - resolve user name from changedBy ID
 
       const modifiedByRaw = it.modifiedByName || it.changedByName || it.modifiedBy || it.changedBy;
 
@@ -1539,7 +1544,7 @@ export default function CustomerDetailPage() {
 
 
 
-      // ✅ FIX: Ensure all numeric fields have valid defaults
+      //  FIX: Ensure all numeric fields have valid defaults
 
       const price = Number(ln.price ?? ln.unitPrice ?? 0) || 0;
 
@@ -1557,7 +1562,7 @@ export default function CustomerDetailPage() {
 
 
 
-      // 🔥 ISSUE 1 FIX: Calculate finalAmount for Products table
+      //  ISSUE 1 FIX: Calculate finalAmount for Products table
 
       const finalAmount = price * qty - discount + tax;
 
@@ -1703,12 +1708,12 @@ export default function CustomerDetailPage() {
     }
   }
 
-  // 🔥 NEW: Fetch expenses by clientId for CRM accounting
+  //  NEW: Fetch expenses by clientId for CRM accounting
   async function fetchExpenses(clientIdOverride) {
     try {
       const cid = clientIdOverride ?? customerId;
       if (!cid) return;
-      // Fetch by clientId — covers expenses added from both /customers/[id] and /expenses page
+      // Fetch by clientId  covers expenses added from both /customers/[id] and /expenses page
       const res = await backendApi.get(`/expenses?clientId=${cid}`);
       const list = Array.isArray(res) ? res : (res?.content || []);
       setExpenses(list);
@@ -2196,7 +2201,7 @@ export default function CustomerDetailPage() {
 
 
 
-    // ✅ NEW: Load sites for client
+    //  NEW: Load sites for client
 
 
 
@@ -2463,7 +2468,7 @@ export default function CustomerDetailPage() {
 
         
 
-        // 🔥 PATCH 1: NORMALIZE DEAL IMMEDIATELY AFTER FETCH
+        //  PATCH 1: NORMALIZE DEAL IMMEDIATELY AFTER FETCH
 
         const normalizedDeal = dealRes
 
@@ -2645,7 +2650,7 @@ export default function CustomerDetailPage() {
 
 
 
-          console.warn("⚠️ No department in deal:", dealRes);
+          console.warn(" No department in deal:", dealRes);
 
 
 
@@ -2674,7 +2679,7 @@ export default function CustomerDetailPage() {
 
 
 
-        // ✅ FIX 1: NEVER allow .map() on non-array
+        //  FIX 1: NEVER allow .map() on non-array
 
         const notesArray = safeArray(notesRes?.content || notesRes);
 
@@ -2685,7 +2690,7 @@ export default function CustomerDetailPage() {
 
         setTasks((() => {
           const dealTasks = tasksSettled.status === "fulfilled" ? adaptActivities(tasksSettled.value) : [];
-          // Client tasks from /api/tasks?clientId= — adapt to same shape
+          // Client tasks from /api/tasks?clientId=  adapt to same shape
           const rawClientTasks = clientTasksSettled.status === "fulfilled" ? (Array.isArray(clientTasksSettled.value) ? clientTasksSettled.value : (clientTasksSettled.value?.content || [])) : [];
           const clientTasksMapped = rawClientTasks.map(t => ({
             id: `ct-${t.id}`,
@@ -2842,7 +2847,7 @@ export default function CustomerDetailPage() {
 
 
 
-    loadSites(); // ✅ NEW: Load sites
+    loadSites(); //  NEW: Load sites
 
 
 
@@ -2870,7 +2875,7 @@ export default function CustomerDetailPage() {
 
 
 
-  // 🔥 REMOVED: Tab switching should NOT refetch data - data is already loaded on mount
+  //  REMOVED: Tab switching should NOT refetch data - data is already loaded on mount
 
   // The race condition was causing "flash then blank" because setState([]) was called during fetch
 
@@ -2916,7 +2921,7 @@ export default function CustomerDetailPage() {
 
 
 
-  // ✅ FIX: Single source of truth for drawer state (only ONE can be open)
+  //  FIX: Single source of truth for drawer state (only ONE can be open)
 
   const [activeDrawer, setActiveDrawer] = useState(null); // values: null | "task" | "event" | "call"
 
@@ -2928,9 +2933,9 @@ export default function CustomerDetailPage() {
 
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
 
-  // 🔥 NEW: Expense modal state
+  //  NEW: Expense modal state
   const [showExpenseModal, setShowExpenseModal] = useState(false);
-  // 🔥 Email modal + history state
+  //  Email modal + history state
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [emailForm, setEmailForm] = useState({ to: '', cc: '', subject: '', body: '' });
   const [emailFile, setEmailFile] = useState(null);
@@ -3517,7 +3522,7 @@ export default function CustomerDetailPage() {
 
 
 
-      // 🔥 PATCH 1: NORMALIZE DEAL IMMEDIATELY AFTER FETCH
+      //  PATCH 1: NORMALIZE DEAL IMMEDIATELY AFTER FETCH
 
       const normalizedDeal = dealRes
 
@@ -3913,7 +3918,7 @@ export default function CustomerDetailPage() {
             onClick={() => router.push('/customers')}
             className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
           >
-            ← Back to Customers
+             Back to Customers
           </button>
         </div>
       </DashboardLayout>
@@ -3960,7 +3965,7 @@ export default function CustomerDetailPage() {
 
 
 
-  // 🔥 PATCH 5: STAGE NAME MUST NEVER BE BLANK
+  //  PATCH 5: STAGE NAME MUST NEVER BE BLANK
 
   const resolveStageName = (department, stageCode) => {
 
@@ -3984,8 +3989,8 @@ export default function CustomerDetailPage() {
     if (!toCrmId(dealId)) return;
     if (stageChangeInFlight.current) return;
 
-    // 🎯 ACCOUNT stage: always request approval (ANY department)
-    // Don't directly execute — must go through Manager/Admin approval
+    //  ACCOUNT stage: always request approval (ANY department)
+    // Don't directly execute  must go through Manager/Admin approval
     if (newStage === "ACCOUNT") {
       setApprovalModal({
         isOpen: true,
@@ -4004,7 +4009,7 @@ Your request will be reviewed by the Manager/Admin before transfer.`,
       return;
     }
 
-    // 🎯 CLOSE_WON / CLOSE_LOST: approval workflow (for ACCOUNT dept)
+    //  CLOSE_WON / CLOSE_LOST: approval workflow (for ACCOUNT dept)
     if (
       newStage === "CLOSE_WON" || newStage === "CLOSE_LOST" ||
       newStage === "CLOSE_WIN"
@@ -4114,7 +4119,7 @@ Your request will be reviewed by the Manager/Admin before transfer.`,
 
 
 
-      // ✅ FIX: Send logged-in user ID in request body
+      //  FIX: Send logged-in user ID in request body
 
       const response = await backendApi.post(`/deals/${dealId}/stages`, { 
 
@@ -4139,7 +4144,7 @@ Your request will be reviewed by the Manager/Admin before transfer.`,
 
 
 
-      // ✅ Only show success after API succeeds
+      //  Only show success after API succeeds
 
       showSuccess(`Stage changed to ${newStage}`);
 
@@ -4197,13 +4202,13 @@ Your request will be reviewed by the Manager/Admin before transfer.`,
 
 
 
-      // 🎯 IMPORTANT: Re-fetch deal data to get updated department and stage
+      //  IMPORTANT: Re-fetch deal data to get updated department and stage
 
       await fetchDeal();
 
 
 
-      // 🎯 CRITICAL: Update current stage state for immediate UI update
+      //  CRITICAL: Update current stage state for immediate UI update
 
       setCurrentStage(newStage);
 
@@ -4211,7 +4216,7 @@ Your request will be reviewed by the Manager/Admin before transfer.`,
 
 
 
-      // 🎯 Broadcast stage change to other tabs
+      //  Broadcast stage change to other tabs
 
       if (typeof BroadcastChannel !== 'undefined') {
 
@@ -4908,7 +4913,7 @@ Your request will be reviewed by the Manager/Admin before transfer.`,
 
 
 
-        stageCode: deal?.stageCode,   // 🔥 PATCH 2: PRESERVE STAGE
+        stageCode: deal?.stageCode,   //  PATCH 2: PRESERVE STAGE
 
 
 
@@ -4932,7 +4937,7 @@ Your request will be reviewed by the Manager/Admin before transfer.`,
 
 
 
-      // 🔥 PATCH 1: NORMALIZE DEAL IMMEDIATELY AFTER FETCH
+      //  PATCH 1: NORMALIZE DEAL IMMEDIATELY AFTER FETCH
 
       const normalizedDeal = dealRes
 
@@ -6131,7 +6136,7 @@ async function ensureDealId() {
 
 
 
-      // 🔥 PATCH 1: NORMALIZE DEAL IMMEDIATELY AFTER FETCH
+      //  PATCH 1: NORMALIZE DEAL IMMEDIATELY AFTER FETCH
 
       const normalizedDeal = dealRes
 
@@ -6242,7 +6247,7 @@ async function ensureDealId() {
 
 
 
-      // ✅ FIX 1: NEVER allow .map() on non-array
+      //  FIX 1: NEVER allow .map() on non-array
 
       const notesArray = safeArray(notesRes?.content || notesRes);
 
@@ -6458,7 +6463,7 @@ async function ensureDealId() {
 
 
 
-                  Closing Date • {deal?.closingDate || "—"}
+                  Closing Date  {deal?.closingDate || ""}
 
 
 
@@ -6482,7 +6487,7 @@ async function ensureDealId() {
 
 
 
-                  <span className="font-medium text-slate-700">{deal?.ownerName || deal?.owner || "—"}</span>
+                  <span className="font-medium text-slate-700">{deal?.ownerName || deal?.owner || ""}</span>
 
 
 
@@ -6598,14 +6603,14 @@ async function ensureDealId() {
 
                 const isTerminal = stageData?.isTerminal || false;
                 
-                // 🔥 Define variables first (before using them)
+                //  Define variables first (before using them)
                 const isAccountDepartment = loggedInUser?.department === "ACCOUNT";
                 const isBillPassStage = currentStage === "BILL_PASS" || currentStage === "BILL PASS";
                 const isCloseStage = s === "CLOSE_WON" || s === "CLOSE_LOST" || s === "CLOSE_WIN" || s === "CLOSE_LOST";
                 
-                // 🔍 COMPREHENSIVE DEBUG LOGGING
+                //  COMPREHENSIVE DEBUG LOGGING
                 
-                // 🔥 For ACCOUNT department at BILL PASS, allow terminal close stages
+                //  For ACCOUNT department at BILL PASS, allow terminal close stages
                 let allowTerminalStage = isTerminal;
                 if (isAccountDepartment && isBillPassStage && isCloseStage) {
                   allowTerminalStage = false; // Don't treat as disabled terminal
@@ -6832,10 +6837,6 @@ async function ensureDealId() {
 
 
 
-                        <Edit3 className="h-4 w-4 text-slate-400" />
-
-
-
                       </div>
 
 
@@ -6932,7 +6933,7 @@ async function ensureDealId() {
 
                         <div className="text-sm text-slate-900">
 
-                          {deal?.valueAmount ? `₹${Number(deal.valueAmount).toLocaleString()}` : "-"}
+                          {deal?.valueAmount ? `${Number(deal.valueAmount).toLocaleString()}` : "-"}
 
                         </div>
 
@@ -7185,7 +7186,7 @@ async function ensureDealId() {
 
 
 
-                    { key: "products", label: "Products", count: products.length },
+                    { key: "products", label: "Account", count: products.length },
 
 
 
@@ -7423,9 +7424,9 @@ async function ensureDealId() {
 
                                       <div className="text-sm font-medium text-slate-900">
                                       {item.message.includes("Expense") ? (
-                                        <span className="text-red-600">🔴 {item.message}</span>
+                                        <span className="text-red-600"> {item.message}</span>
                                       ) : item.message.includes("Product") ? (
-                                        <span className="text-green-600">🟢 {item.message}</span>
+                                        <span className="text-green-600"> {item.message}</span>
                                       ) : (
                                         item.message
                                       )}
@@ -7709,7 +7710,7 @@ async function ensureDealId() {
 
 
 
-                        {/* ✅ FIX 1: Safe array check */}
+                        {/*  FIX 1: Safe array check */}
 
                         {(Array.isArray(notes) ? notes : []).length === 0 ? (
 
@@ -7763,7 +7764,7 @@ async function ensureDealId() {
 
 
 
-                                  {(n.createdByName || n.createdBy || "System")}{n.createdAt ? ` • ${new Date(n.createdAt).toLocaleString()}` : ""}
+                                  {(n.createdByName || n.createdBy || "System")}{n.createdAt ? `  ${new Date(n.createdAt).toLocaleString()}` : ""}
 
 
 
@@ -8195,7 +8196,7 @@ async function ensureDealId() {
 
 
 
-                                  {t.description || "—"}
+                                  {t.description || ""}
 
 
 
@@ -8207,7 +8208,7 @@ async function ensureDealId() {
 
 
 
-                                  <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">{t.priority || "—"}</td>
+                                  <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">{t.priority || ""}</td>
 
 
 
@@ -8219,7 +8220,7 @@ async function ensureDealId() {
 
 
 
-                                  <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">{t.expenseAmount || "—"}</td>
+                                  <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">{t.expenseAmount || ""}</td>
 
 
 
@@ -8451,7 +8452,7 @@ async function ensureDealId() {
 
 
 
-                                —
+                                
 
 
 
@@ -8523,11 +8524,11 @@ async function ensureDealId() {
 
 
 
-                                  <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">{e.to || "—"}</td>
+                                  <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">{e.to || ""}</td>
 
 
 
-                                  <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">{e.owner || e.host || "—"}</td>
+                                  <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">{e.owner || e.host || ""}</td>
 
 
 
@@ -8535,7 +8536,7 @@ async function ensureDealId() {
 
 
 
-                                    <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">{e.location || "—"}</td>
+                                    <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">{e.location || ""}</td>
 
 
 
@@ -8627,7 +8628,7 @@ async function ensureDealId() {
 
 
 
-                                  <td className="whitespace-nowrap px-4 py-3 text-right text-xs text-slate-400">—</td>
+                                  <td className="whitespace-nowrap px-4 py-3 text-right text-xs text-slate-400"></td>
 
 
 
@@ -8843,15 +8844,15 @@ async function ensureDealId() {
 
 
 
-                                  <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">{c.modifiedTime || "—"}</td>
+                                  <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">{c.modifiedTime || ""}</td>
 
 
 
-                                  <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">{c.owner || "—"}</td>
+                                  <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">{c.owner || ""}</td>
 
 
 
-                                  <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">{c.duration || "—"}</td>
+                                  <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">{c.duration || ""}</td>
 
 
 
@@ -8939,7 +8940,7 @@ async function ensureDealId() {
 
 
 
-                                  <td className="whitespace-nowrap px-4 py-3 text-right text-xs text-slate-400">—</td>
+                                  <td className="whitespace-nowrap px-4 py-3 text-right text-xs text-slate-400"></td>
 
 
 
@@ -10315,7 +10316,7 @@ async function ensureDealId() {
 
 
 
-                    <div className="text-sm font-semibold text-slate-900">Products</div>
+                    <div className="text-sm font-semibold text-slate-900">Account</div>
 
 
 
@@ -10363,7 +10364,7 @@ async function ensureDealId() {
 
 
 
-                            List Price (₹)
+                            List Price ()
 
 
 
@@ -10431,7 +10432,7 @@ async function ensureDealId() {
 
 
 
-                            Final Amount (₹)
+                            Final Amount ()
 
 
 
@@ -10459,7 +10460,7 @@ async function ensureDealId() {
 
 
 
-                        {/* 🔥 COMBINED ACCOUNTS TABLE (Products + Expenses) */}
+                        {/*  COMBINED ACCOUNTS TABLE (Products + Expenses) */}
                         <tbody className="divide-y divide-slate-100 bg-white/90">
                         
                         {/* Combine products and expenses */}
@@ -10479,9 +10480,9 @@ async function ensureDealId() {
                             <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-900">
                               <span className="inline-flex items-center gap-2">
                                 {item.type === "product" ? (
-                                  <span className="text-green-600">🟢</span>
+                                  <span className="text-green-600"></span>
                                 ) : (
-                                  <span className="text-red-600">🔴</span>
+                                  <span className="text-red-600"></span>
                                 )}
                                 {item.name}
                               </span>
@@ -10675,7 +10676,7 @@ async function ensureDealId() {
 
               )}
 
-              {/* 🔥 EXPENSE MODAL - Full form matching /expenses page */}
+              {/*  EXPENSE MODAL - Full form matching /expenses page */}
               {showExpenseModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
                   <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowExpenseModal(false)} />
@@ -10703,7 +10704,7 @@ async function ensureDealId() {
                           <option value="">Select Employee</option>
                           {expenseEmployees.map(emp => (
                             <option key={emp.id} value={emp.id}>
-                              {emp.firstName} {emp.lastName} — {emp.departmentName || emp.tlDepartmentName || 'No Dept'} ({emp.roleName})
+                              {emp.firstName} {emp.lastName}  {emp.departmentName || emp.tlDepartmentName || 'No Dept'} ({emp.roleName})
                             </option>
                           ))}
                         </select>
@@ -10722,7 +10723,7 @@ async function ensureDealId() {
                           />
                         </div>
                         <div>
-                          <label className="block text-xs text-slate-500 mb-1">Amount (₹) *</label>
+                          <label className="block text-xs text-slate-500 mb-1">Amount () *</label>
                           <input
                             type="number"
                             min="0"
@@ -10799,7 +10800,7 @@ async function ensureDealId() {
                             )
                           ) : (
                             <>
-                              <span className="text-2xl text-slate-400">📎</span>
+                              <span className="text-2xl text-slate-400"></span>
                               <span className="text-xs text-slate-500 mt-1">Click to upload image or PDF (max 5MB)</span>
                             </>
                           )}
@@ -10915,13 +10916,13 @@ async function ensureDealId() {
                               </div>
                               <div className="mt-1 text-[11px] text-slate-500">
                                 To: <span className="font-medium text-slate-700">{em.toAddress}</span>
-                                {em.ccAddress && <span> Â· CC: {em.ccAddress}</span>}
+                                {em.ccAddress && <span>  CC: {em.ccAddress}</span>}
                               </div>
                               {em.body && (
                                 <div className="mt-2 text-xs text-slate-600 line-clamp-2 whitespace-pre-wrap">{em.body}</div>
                               )}
                               {em.attachmentName && (
-                                <div className="mt-1 text-[11px] text-indigo-600">ðŸ“Ž {em.attachmentName}</div>
+                                <div className="mt-1 text-[11px] text-indigo-600"> {em.attachmentName}</div>
                               )}
                             </div>
                             <div className="text-[11px] text-slate-400 whitespace-nowrap">
@@ -11016,7 +11017,7 @@ async function ensureDealId() {
                       className="hidden"
                       onChange={e => setEmailFile(e.target.files?.[0] || null)}
                     />
-                    <span className="text-slate-400 text-lg">ðŸ“Ž</span>
+                    <span className="text-slate-400 text-lg"></span>
                     <span className="text-xs text-slate-500">
                       {emailFile ? emailFile.name : 'Click to attach a file'}
                     </span>
@@ -11371,7 +11372,7 @@ async function ensureDealId() {
 
 
 
-                        <label className="block text-xs font-medium text-slate-700">Base Price (₹)</label>
+                        <label className="block text-xs font-medium text-slate-700">Base Price ()</label>
 
 
 
@@ -11459,7 +11460,7 @@ async function ensureDealId() {
 
 
 
-                        <label className="block text-xs font-medium text-slate-700">List Price (₹)</label>
+                        <label className="block text-xs font-medium text-slate-700">List Price ()</label>
 
 
 
@@ -11587,7 +11588,7 @@ async function ensureDealId() {
 
 
 
-                        <label className="block text-xs font-medium text-slate-700">Discount (₹)</label>
+                        <label className="block text-xs font-medium text-slate-700">Discount ()</label>
 
 
 
@@ -11631,7 +11632,7 @@ async function ensureDealId() {
 
 
 
-                        <label className="block text-xs font-medium text-slate-700">Tax (₹, optional)</label>
+                        <label className="block text-xs font-medium text-slate-700">Tax (, optional)</label>
 
 
 
@@ -11747,7 +11748,7 @@ async function ensureDealId() {
 
 
 
-                      <label className="block text-xs font-medium text-slate-700">Final Amount (₹)</label>
+                      <label className="block text-xs font-medium text-slate-700">Final Amount ()</label>
 
 
 
@@ -11891,7 +11892,7 @@ async function ensureDealId() {
 
 
 
-        {/* ✅ FIX: Single backdrop for any open drawer */}
+        {/*  FIX: Single backdrop for any open drawer */}
 
         {activeDrawer && (
 
@@ -11919,7 +11920,7 @@ async function ensureDealId() {
 
 
 
-        {/* ✅ FIX: Task drawer - only renders when activeDrawer === 'task' */}
+        {/*  FIX: Task drawer - only renders when activeDrawer === 'task' */}
 
         {activeDrawer === "task" && (
 
@@ -12589,7 +12590,7 @@ async function ensureDealId() {
 
 
 
-        {/* ✅ FIX: Event drawer - only renders when activeDrawer === 'event' */}
+        {/*  FIX: Event drawer - only renders when activeDrawer === 'event' */}
 
         {activeDrawer === "event" && (
 
@@ -13201,7 +13202,7 @@ async function ensureDealId() {
 
 
 
-        {/* ✅ FIX: Call drawer - only renders when activeDrawer === 'call' */}
+        {/*  FIX: Call drawer - only renders when activeDrawer === 'call' */}
 
         {activeDrawer === "call" && (
 
@@ -13805,7 +13806,7 @@ async function ensureDealId() {
 
 
 
-                  ✕
+                  
 
 
 
@@ -14268,7 +14269,7 @@ async function ensureDealId() {
 
 
 
-                            {bankItem.branch} • {bankItem.owner}
+                            {bankItem.branch}  {bankItem.owner}
 
 
 
@@ -14445,7 +14446,7 @@ async function ensureDealId() {
 
             <div className="p-6 space-y-6">
 
-              {/* ── Customer Information ── */}
+              {/*  Customer Information  */}
               <div>
                 <h3 className="text-sm font-semibold text-slate-800 mb-3 flex items-center gap-2">
                   <User className="h-4 w-4 text-slate-500" /> Customer Information
@@ -14479,7 +14480,7 @@ async function ensureDealId() {
                 </div>
               </div>
 
-              {/* ── Primary Address ── */}
+              {/*  Primary Address  */}
               <div className="border-t pt-5">
                 <h3 className="text-sm font-semibold text-slate-800 mb-3 flex items-center gap-2">
                   <Home className="h-4 w-4 text-slate-500" /> Primary Address (Required)
@@ -14547,7 +14548,7 @@ async function ensureDealId() {
                 </div>
               </div>
 
-              {/* ── Additional Addresses ── */}
+              {/*  Additional Addresses  */}
               <div>
                 <h3 className="text-sm font-semibold text-slate-800 mb-3">Additional Addresses (Optional)</h3>
                 <div className="space-y-3">
@@ -14764,7 +14765,7 @@ async function ensureDealId() {
                 </div>
               </div>
 
-              {/* ── Deal Information ── */}
+              {/*  Deal Information  */}
               <div className="border-t pt-5">
                 <h3 className="text-sm font-semibold text-slate-800 mb-3 flex items-center gap-2">
                   <DollarSign className="h-4 w-4 text-slate-500" /> Deal Information
@@ -14802,17 +14803,36 @@ async function ensureDealId() {
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-slate-700 mb-1">Bank</label>
-                    <select value={editForm.bankId || ""}
-                      onChange={(e) => setEditForm({...editForm, bankId: e.target.value})}
+                    <select
+                      value={editSelectedBankName}
+                      onChange={(e) => {
+                        setEditSelectedBankName(e.target.value);
+                        setEditForm(prev => ({ ...prev, bankId: "", branchName: "" }));
+                      }}
                       className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20">
                       <option value="">Select Bank</option>
-                      {banks.map(b => (
-                        <option key={b.id} value={String(b.id)}>{b.name}</option>
+                      {[...new Set(banks.map(b => b.name).filter(Boolean))].sort().map(name => (
+                        <option key={name} value={name}>{name}</option>
                       ))}
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">Deal Value (₹)</label>
+                    <label className="block text-xs font-medium text-slate-700 mb-1">Branch</label>
+                    <select
+                      value={editForm.bankId || ""}
+                      onChange={(e) => {
+                        const b = banks.find(bk => String(bk.id) === String(e.target.value));
+                        setEditForm(prev => ({ ...prev, bankId: String(e.target.value), branchName: b?.branchName || "" }));
+                      }}
+                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20">
+                      <option value="">{editSelectedBankName ? "Select Branch" : "Select a bank first"}</option>
+                      {banks.filter(b => b.name === editSelectedBankName).map(b => (
+                        <option key={b.id} value={String(b.id)}>{b.branchName || b.branch || b.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700 mb-1">Deal Value ()</label>
                     <input type="number" min="0" value={editForm.valueAmount || ""}
                       onChange={(e) => setEditForm({...editForm, valueAmount: e.target.value})}
                       className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
@@ -14857,7 +14877,7 @@ async function ensureDealId() {
 
 
 
-    {/* 🎯 Account Transfer Confirmation Dialog */}
+    {/*  Account Transfer Confirmation Dialog */}
 
     <AccountTransferDialog
 
@@ -14875,7 +14895,7 @@ async function ensureDealId() {
 
       customerProducts={products || []}
 
-      dealValue={finalAmount} // ✅ FIXED: Use calculated finalAmount instead of dealValue
+      dealValue={finalAmount} //  FIXED: Use calculated finalAmount instead of dealValue
 
       onConfirm={async () => {
 
@@ -14885,7 +14905,7 @@ async function ensureDealId() {
 
         setPendingStageChange(null);
 
-        // ✅ FIXED: Show success message
+        //  FIXED: Show success message
 
         showSuccess("Deal successfully sent to Accounts. Accounts team has been notified.");
 
@@ -14903,7 +14923,7 @@ async function ensureDealId() {
 
 
 
-    {/* 🔥 NEW: Approval Modal */}
+    {/*  NEW: Approval Modal */}
 
     <ApprovalModal
 

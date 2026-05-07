@@ -56,12 +56,119 @@ import CustomerExcelUploadModal from "@/components/excel/CustomerExcelUploadModa
 
 import AccountTransferDialog from "@/components/common/AccountTransferDialog";
 
+const __DEBUG_CUSTOMER_ADDRESS_BLOCK = false;
 
+const AddressBlock = React.memo(function AddressBlock({
+  type,
+  label,
+  address,
+  isPrimary,
+  onToggle,
+  onFieldChange,
+  onGeocode,
+}) {
+  if (__DEBUG_CUSTOMER_ADDRESS_BLOCK) {
+    // eslint-disable-next-line no-console
+    console.log("[AddressBlock] render", { type, enabled: Boolean(address?.enabled) });
+  }
+
+  useEffect(() => {
+    if (!__DEBUG_CUSTOMER_ADDRESS_BLOCK) return;
+    // eslint-disable-next-line no-console
+    console.log("[AddressBlock] mount", { type });
+    return () => {
+      // eslint-disable-next-line no-console
+      console.log("[AddressBlock] unmount", { type });
+    };
+  }, [type]);
+
+  const enabled = Boolean(address?.enabled);
+  const showFields = isPrimary || enabled;
+
+  return (
+    <div className="p-4 border border-slate-200 rounded-lg bg-slate-50/50">
+      <div className="flex items-center mb-3">
+        {!isPrimary && (
+          <input
+            type="checkbox"
+            checked={enabled}
+            onChange={e => onToggle?.(type, e.target.checked)}
+            className="mr-2"
+          />
+        )}
+        <label className="text-sm font-medium text-slate-700">{label}</label>
+      </div>
+      {showFields && (
+        <div className="space-y-3">
+          <textarea
+            value={address?.addressLine || ""}
+            rows={2}
+            onChange={e => onFieldChange(type, "addressLine", e.target.value)}
+            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none resize-none"
+            placeholder="Address line"
+          />
+          <div className="grid grid-cols-3 gap-2">
+            {["city", "state", "pincode"].map(f => (
+              <input
+                key={f}
+                type="text"
+                value={address?.[f] || ""}
+                onChange={e => onFieldChange(type, f, e.target.value)}
+                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                placeholder={f.charAt(0).toUpperCase() + f.slice(1)}
+              />
+            ))}
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <input
+              type="text"
+              value={address?.taluka || ""}
+              onChange={e => onFieldChange(type, "taluka", e.target.value)}
+              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+              placeholder="Taluka"
+            />
+            <input
+              type="text"
+              value={address?.district || ""}
+              onChange={e => onFieldChange(type, "district", e.target.value)}
+              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+              placeholder="District"
+            />
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            <input
+              type="number"
+              step="any"
+              value={address?.latitude || ""}
+              onChange={e => onFieldChange(type, "latitude", e.target.value)}
+              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+              placeholder="Latitude"
+            />
+            <input
+              type="number"
+              step="any"
+              value={address?.longitude || ""}
+              onChange={e => onFieldChange(type, "longitude", e.target.value)}
+              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+              placeholder="Longitude"
+            />
+            <button
+              type="button"
+              onClick={() => onGeocode(type)}
+              className="flex items-center justify-center gap-1 px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700"
+            >
+              <MapPin className="h-3.5 w-3.5" /> Geocode
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+});
 
 export default function CustomersPage() {
 
   const { addToast } = useToast();
-
 
 
   const { version } = useCustomerAddressSync();
@@ -3743,6 +3850,16 @@ function DrawerPortal({
   showAccountTransferDialog, setShowAccountTransferDialog,
   onClose, onSave, addToast,
 }) {
+  if (__DEBUG_CUSTOMER_ADDRESS_BLOCK) {
+    // eslint-disable-next-line no-console
+    console.log("[DrawerPortal] render");
+  }
+
+  const formRef = useRef(form);
+  useEffect(() => {
+    formRef.current = form;
+  }, [form]);
+
   // ── Bank / Branch two-level state (managed internally) ───────────────────
   const [bankNameSearch, setBankNameSearch] = useState("");
   const [branchSearch,   setBranchSearch]   = useState("");
@@ -3767,7 +3884,7 @@ function DrawerPortal({
     }
   }, [form.bankId, banks]);
 
-  const handleAddressToggle = (addressType, enabled) => {
+  const handleAddressToggle = useCallback((addressType, enabled) => {
     setForm(prev => ({
       ...prev,
       addresses: {
@@ -3779,17 +3896,17 @@ function DrawerPortal({
         }
       }
     }));
-  };
+  }, [setForm]);
 
-  const handleAddressFieldChange = (addressType, field, value) => {
+  const handleAddressFieldChange = useCallback((addressType, field, value) => {
     setForm(prev => ({
       ...prev,
       addresses: { ...prev.addresses, [addressType]: { ...prev.addresses[addressType], [field]: value } }
     }));
-  };
+  }, [setForm]);
 
-  const handleGeocode = async (addressType) => {
-    const addr = form.addresses[addressType];
+  const handleGeocode = useCallback(async (addressType) => {
+    const addr = formRef.current.addresses[addressType];
     if (!addr.addressLine?.trim()) { addToast('Enter address first', 'warning'); return; }
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api.yashrajent.com'}/api/clients/geocode`, {
@@ -3802,61 +3919,7 @@ function DrawerPortal({
         addToast('Geocoded successfully!', 'success');
       } else { addToast(data.message || 'Could not geocode', 'warning'); }
     } catch { addToast('Geocoding failed', 'error'); }
-  };
-
-  const AddressBlock = ({ type, label }) => (
-    <div className="p-4 border border-slate-200 rounded-lg bg-slate-50/50">
-      <div className="flex items-center mb-3">
-        {type !== 'primary' && (
-          <input type="checkbox" checked={form.addresses[type]?.enabled || false}
-            onChange={e => handleAddressToggle(type, e.target.checked)} className="mr-2" />
-        )}
-        <label className="text-sm font-medium text-slate-700">{label}</label>
-      </div>
-      {(type === 'primary' || form.addresses[type]?.enabled) && (
-        <div className="space-y-3">
-          <textarea value={form.addresses[type]?.addressLine || ''} rows={2}
-            onChange={e => handleAddressFieldChange(type, 'addressLine', e.target.value)}
-            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none resize-none"
-            placeholder="Address line" />
-          <div className="grid grid-cols-3 gap-2">
-            {['city', 'state', 'pincode'].map(f => (
-              <input key={f} type="text" value={form.addresses[type]?.[f] || ''}
-                onChange={e => handleAddressFieldChange(type, f, e.target.value)}
-                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
-                placeholder={f.charAt(0).toUpperCase() + f.slice(1)} />
-            ))}
-          </div>
-          {/* Taluka + District */}
-          <div className="grid grid-cols-2 gap-2">
-            <input type="text" value={form.addresses[type]?.taluka || ''}
-              onChange={e => handleAddressFieldChange(type, 'taluka', e.target.value)}
-              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
-              placeholder="Taluka" />
-            <input type="text" value={form.addresses[type]?.district || ''}
-              onChange={e => handleAddressFieldChange(type, 'district', e.target.value)}
-              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
-              placeholder="District" />
-          </div>
-          {/* Lat / Lng / Geocode */}
-          <div className="grid grid-cols-3 gap-2">
-            <input type="number" step="any" value={form.addresses[type]?.latitude || ''}
-              onChange={e => handleAddressFieldChange(type, 'latitude', e.target.value)}
-              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
-              placeholder="Latitude" />
-            <input type="number" step="any" value={form.addresses[type]?.longitude || ''}
-              onChange={e => handleAddressFieldChange(type, 'longitude', e.target.value)}
-              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
-              placeholder="Longitude" />
-            <button type="button" onClick={() => handleGeocode(type)}
-              className="flex items-center justify-center gap-1 px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">
-              <MapPin className="h-3.5 w-3.5" /> Geocode
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
+  }, [addToast, setForm]);
 
   return (
     <>
@@ -3888,10 +3951,42 @@ function DrawerPortal({
                   ))}
                 </div>
                 <div className="mt-4 space-y-4">
-                  <AddressBlock type="primary" label="Primary Address (Default Tracking) *" />
-                  <AddressBlock type="police" label="Police Station Address" />
-                  <AddressBlock type="branch" label="Branch Address" />
-                  <AddressBlock type="tahsil" label="Tahsil Address" />
+                  <AddressBlock
+                    type="primary"
+                    label="Primary Address (Default Tracking) *"
+                    address={form.addresses.primary}
+                    isPrimary
+                    onToggle={handleAddressToggle}
+                    onFieldChange={handleAddressFieldChange}
+                    onGeocode={handleGeocode}
+                  />
+                  <AddressBlock
+                    type="police"
+                    label="Police Station Address"
+                    address={form.addresses.police}
+                    isPrimary={false}
+                    onToggle={handleAddressToggle}
+                    onFieldChange={handleAddressFieldChange}
+                    onGeocode={handleGeocode}
+                  />
+                  <AddressBlock
+                    type="branch"
+                    label="Branch Address"
+                    address={form.addresses.branch}
+                    isPrimary={false}
+                    onToggle={handleAddressToggle}
+                    onFieldChange={handleAddressFieldChange}
+                    onGeocode={handleGeocode}
+                  />
+                  <AddressBlock
+                    type="tahsil"
+                    label="Tahsil Address"
+                    address={form.addresses.tahsil}
+                    isPrimary={false}
+                    onToggle={handleAddressToggle}
+                    onFieldChange={handleAddressFieldChange}
+                    onGeocode={handleGeocode}
+                  />
                 </div>
               </div>
 

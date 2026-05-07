@@ -811,6 +811,12 @@ function TaskModal({ task, employees, customFields, departments, currentUser, on
     try {
       const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api.yashrajent.com';
 
+      console.log('[TaskEdit] submit:start', {
+        mode: task ? 'edit' : 'create',
+        taskId: task?.id,
+        formData,
+      });
+
       if (!formData.customerAddressId && !formData.clientId) {
         toast.error("Please select a client and customer location.");
         return;
@@ -819,6 +825,14 @@ function TaskModal({ task, employees, customFields, departments, currentUser, on
       // Debug: Log the customFields and payload
       console.log("Custom Fields available:", modalCustomFields);
       console.log("Form data custom fields:", formData.customFields);
+
+      const withSeconds = (raw) => {
+        if (!raw) return null;
+        const s = String(raw);
+        // Typical <input type="datetime-local"> value: "YYYY-MM-DDTHH:mm" (length 16)
+        if (s.length === 16) return `${s}:00`;
+        return s;
+      };
       
       const payload = {
         id: task?.id,
@@ -829,8 +843,8 @@ function TaskModal({ task, employees, customFields, departments, currentUser, on
         assignedToEmployeeId: formData.assignedToEmployeeId ? Number(formData.assignedToEmployeeId) : null,
         startDate: formData.startDate || null,
         endDate: formData.endDate || null,
-        scheduledStartTime: formData.scheduledStartTime || null,
-        scheduledEndTime: formData.scheduledEndTime || null,
+        scheduledStartTime: withSeconds(formData.scheduledStartTime),
+        scheduledEndTime: withSeconds(formData.scheduledEndTime),
         repeatTask: formData.repeatTask,
         status: formData.status,
         clientId: formData.clientId ? Number(formData.clientId) : null,
@@ -845,7 +859,7 @@ function TaskModal({ task, employees, customFields, departments, currentUser, on
       };
 
       // Debug: Log the final payload
-      console.log("Final payload:", JSON.stringify(payload, null, 2));
+      console.log("[TaskPayload]", JSON.stringify(payload, null, 2));
 
       const url = task 
         ? `${API_BASE_URL}/api/tasks/${task.id}` 
@@ -872,10 +886,18 @@ function TaskModal({ task, employees, customFields, departments, currentUser, on
 
       if (response.ok) {
         const savedTask = await response.json();
-        console.log("✅ Saved task response:", savedTask);
+        console.log("[TaskEdit] response:ok", savedTask);
         toast.success(task ? "Task updated successfully" : "Task created successfully");
         onSave(savedTask);
       } else {
+        let errBody = null;
+        try {
+          errBody = await response.text();
+        } catch {}
+        console.error('[TaskEdit] response:error', {
+          status: response.status,
+          body: errBody,
+        });
         throw new Error('Failed to save task');
       }
     } catch (error) {

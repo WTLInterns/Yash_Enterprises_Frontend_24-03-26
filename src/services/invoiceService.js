@@ -127,7 +127,7 @@ export const invoiceService = {
   // Generate PDF for invoice
   async generateInvoicePdf(id) {
     try {
-      const response = await fetch(`https://api.yashrajent.com/api/invoices/${id}/pdf`, {
+      const response = await fetch(`http://localhost:8080/api/invoices/${id}/pdf`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('jwt_token')}`,

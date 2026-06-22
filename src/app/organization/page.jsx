@@ -138,7 +138,7 @@ export default function OrganizationPage() {
         if (!confirm(`Permanently delete ${selectedIds.length} employee(s)? This cannot be undone.`)) return;
         setBulkDeleting(true);
         try {
-            const res = await fetch('https://api.yashrajent.com/api/employees/bulk', {
+            const res = await fetch('http://localhost:8080/api/employees/bulk', {
                 method: 'DELETE',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(selectedIds),
@@ -158,7 +158,7 @@ export default function OrganizationPage() {
     const handleExport = async () => {
         try {
             console.log('Exporting employees...');
-            const response = await fetch('https://api.yashrajent.com/api/employees/export/excel', {
+            const response = await fetch('http://localhost:8080/api/employees/export/excel', {
                 method: 'GET',
                 headers: {
                     'Authorization': `Bearer ${localStorage.getItem('token') || 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhZG1pbkB5YXNoZW50ZXJwcmlzZXMuY29tIiwiaWF0IjoxNzM1ODk2NzQ0LCJleHAiOjE3MzU5ODAzNDR9.test'}`
@@ -445,7 +445,7 @@ export default function OrganizationPage() {
                                             <div className="flex items-center gap-3">
                                                 {employee.profileImageUrl ? (
                                                     <img
-                                                        src={employee.profileImageUrl.startsWith('http') ? employee.profileImageUrl : `https://api.yashrajent.com${employee.profileImageUrl}`}
+                                                        src={employee.profileImageUrl.startsWith('http') ? employee.profileImageUrl : `http://localhost:8080${employee.profileImageUrl}`}
                                                         alt={employee.name}
                                                         className="w-9 h-9 rounded-full object-cover border border-gray-200"
                                                         onError={e => { e.target.style.display='none'; }}

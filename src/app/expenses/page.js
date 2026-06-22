@@ -19,7 +19,7 @@ import {
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 
-const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api.yashrajent.com';
+const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080';
 
 export default function ExpenseOverviewPage() {
 

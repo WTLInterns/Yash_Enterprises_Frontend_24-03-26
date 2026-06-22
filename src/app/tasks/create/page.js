@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { taskApi, taskEmployeesApi, taskCustomFieldsApi } from "@/services/taskApi";
 import { ArrowLeft, Save, X } from "lucide-react";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api.yashrajent.com';
+const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080';
 
 const apiRequest = async (endpoint, options = {}) => {
   const url = `${API_BASE_URL}${endpoint}`;
@@ -104,7 +104,7 @@ export default function CreateTask() {
       console.error("Failed to load data:", error);
       
       // Show error message to user
-      alert("Failed to load data. Please check if the backend server is running on https://api.yashrajent.com");
+      alert("Failed to load data. Please check if the backend server is running on http://localhost:8080");
       
       // Set empty arrays to prevent infinite loading
       setEmployees([]);

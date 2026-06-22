@@ -28,6 +28,15 @@ export default function AddressEditRequestsPage() {
       
       // 🔐 CRITICAL: Send user headers for backend authorization
       const user = getAuthUser();
+      
+      // ======================================== FRONTEND DEBUG START
+      console.log("======================================== FRONTEND DEBUG START");
+      console.log("Current User:", user);
+      console.log("User Role:", user?.role);
+      console.log("User Department:", user?.department);
+      console.log("API URL:", url);
+      console.log("========================================");
+      
       const response = await fetch(url, {
         headers: {
           "X-User-Id": user?.id,
@@ -38,15 +47,25 @@ export default function AddressEditRequestsPage() {
       
       const data = await response.json();
       
+      console.log("Raw API Response:", data);
+      console.log("Total records returned:", Array.isArray(data) ? data.length : 0);
+      
       let filteredData = Array.isArray(data) ? data : [];
       
-      // 🔐 DEPARTMENT FILTERING: Apply role-based data filtering
-      if (user.role === "TL" && user.department) {
-        filteredData = filteredData.filter(request => 
-          request.department === user.department
-        );
-      }
-      // ADMIN & MANAGER see all requests (no filtering)
+      console.log("Records count BEFORE frontend filter:", filteredData.length);
+      
+      // ✅ NO FILTERING: TL, MANAGER, and ADMIN all see all requests
+      // Frontend displays whatever backend returns
+      
+      console.log("Records count AFTER frontend filter:", filteredData.length);
+      
+      // Log each request
+      console.log("========================================");
+      console.log("Filtered Requests:");
+      filteredData.forEach(req => {
+        console.log(`Request ID: ${req.id}, Department: ${req.department}, Status: ${req.status}`);
+      });
+      console.log("======================================== FRONTEND DEBUG END");
       
       setRequests(filteredData);
     } catch (error) {

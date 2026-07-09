@@ -5,7 +5,6 @@ import { Search, Edit2, Trash2, Eye, Settings, X } from "lucide-react";
 import { backendApi } from "@/services/api";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import DynamicFieldsSection from "@/components/DynamicFieldsSection";
-import CreatableCategorySelect from "@/components/CreatableCategorySelect";
 import { getCurrentUserName, getCurrentUserRole, getCurrentUserId } from "@/utils/userUtils";
 import {
   fetchFieldDefinitions,
@@ -24,7 +23,6 @@ export default function ProductsPage() {
   
   const [userData, setUserData] = useState(null);
   const [products, setProducts] = useState([]);
-  const [categories, setCategories] = useState([]);
 
   useEffect(() => {
     // ✅ FIXED: Use dynamic user data
@@ -36,6 +34,7 @@ export default function ProductsPage() {
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showDetailsDrawer, setShowDetailsDrawer] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   const [selectedProduct, setSelectedProduct] = useState(null);
 
@@ -43,7 +42,7 @@ export default function ProductsPage() {
     name: "",
     code: "",
     description: "",
-    categoryId: "",
+    category: "",  // Changed from categoryId to category (text input)
     price: "",
     active: true,
     customFields: {},
@@ -137,20 +136,9 @@ export default function ProductsPage() {
     }
   };
 
-  const fetchCategories = async () => {
-    try {
-      const res = await backendApi.get("/categories");
-      const cats = normalizeList(res);
-      setCategories(cats);
-    } catch (err) {
-      console.error("Failed to fetch categories:", err);
-    }
-  };
-
   useEffect(() => {
     fetchProductFieldDefinitions();
     fetchProducts();
-    fetchCategories();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -175,7 +163,7 @@ export default function ProductsPage() {
       name: "",
       code: "",
       description: "",
-      categoryId: "",
+      category: "",  // Changed from categoryId
       price: "",
       active: true,
     });
@@ -188,7 +176,7 @@ export default function ProductsPage() {
     try {
       const [freshProduct, fieldValues] = await Promise.all([
         backendApi.get(`/products/${product.id}`),
-        fetch(`https://api.yashrajent.com/api/field-values?entity=product&entityId=${product.id}`).then(r => r.json()).catch(() => [])
+        fetch(`http://localhost:8080/api/field-values?entity=product&entityId=${product.id}`).then(r => r.json()).catch(() => [])
       ]);
 
       // Convert field values to object
@@ -209,7 +197,7 @@ export default function ProductsPage() {
         name: freshProduct.name || "",
         code: freshProduct.code || "",
         description: freshProduct.description || "",
-        categoryId: freshProduct.categoryId || "",
+        category: freshProduct.category || freshProduct.categoryName || "",  // Changed: use category text
         price:
           freshProduct.price !== null && freshProduct.price !== undefined
             ? String(freshProduct.price)
@@ -251,7 +239,7 @@ export default function ProductsPage() {
         name: form.name?.trim(),
         code: form.code?.trim() || null,
         description: form.description || "",
-        categoryId: form.categoryId || null,
+        category: form.category?.trim() || null,  // Changed from categoryId to category
         price: Number(form.price) || 0,
         active: true,
         customFields: JSON.stringify(form.customFields || {}),
@@ -269,7 +257,7 @@ export default function ProductsPage() {
 
       // Save custom field values
       if (form.customFields && Object.keys(form.customFields).length > 0) {
-        await fetch(`https://api.yashrajent.com/api/field-values/batch?entity=product&entityId=${savedId}`, {
+        await fetch(`http://localhost:8080/api/field-values/batch?entity=product&entityId=${savedId}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(form.customFields)
@@ -293,7 +281,7 @@ export default function ProductsPage() {
         name: "",
         code: "",
         description: "",
-        categoryId: "",
+        category: "",  // Changed from categoryId
         price: "",
         active: true,
         customFields: {},
@@ -355,6 +343,100 @@ export default function ProductsPage() {
     }
   };
 
+  // ═══════════════════════════════════════════════════════════════════════
+  // EXCEL IMPORT / EXPORT HANDLERS
+  // ═══════════════════════════════════════════════════════════════════════
+
+  const handleDownloadTemplate = async () => {
+    try {
+      const response = await fetch("http://localhost:8080/api/products/template/download");
+      if (!response.ok) {
+        throw new Error("Failed to download template");
+      }
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "products_template.xlsx";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      toast.success("Template downloaded successfully");
+    } catch (err) {
+      console.error("Template download failed:", err);
+      toast.error("Failed to download template");
+    }
+  };
+
+  const handleFileSelect = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    // Validate file type
+    const validTypes = [
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "application/vnd.ms-excel"
+    ];
+    if (!validTypes.includes(file.type) && !file.name.endsWith(".xlsx") && !file.name.endsWith(".xls")) {
+      toast.error("Invalid file format. Please upload .xlsx or .xls file");
+      event.target.value = "";
+      return;
+    }
+
+    // Validate file size (max 10MB)
+    const maxSize = 10 * 1024 * 1024;
+    if (file.size > maxSize) {
+      toast.error("File size exceeds 10MB limit");
+      event.target.value = "";
+      return;
+    }
+
+    handleUploadExcel(file);
+    event.target.value = "";
+  };
+
+  const handleUploadExcel = async (file) => {
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await fetch("http://localhost:8080/api/products/import", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Upload failed");
+      }
+
+      const result = await response.json();
+
+      // Show success toast with upload count
+      if (result.uploaded > 0) {
+        toast.success(`✅ ${result.uploaded} Products uploaded successfully`);
+      }
+
+      // Show errors if any
+      if (result.errors && result.errors.length > 0) {
+        const errorMsg = result.errors.join("\n");
+        toast.error(`❌ ${result.skipped} rows skipped:\n${errorMsg}`, {
+          autoClose: 8000,
+        });
+      }
+
+      // Refresh product list
+      await fetchProducts();
+    } catch (err) {
+      console.error("Upload failed:", err);
+      toast.error(err.message || "Failed to upload products");
+    } finally {
+      setUploading(false);
+    }
+  };
+
   return (
     <DashboardLayout
       header={{
@@ -372,6 +454,42 @@ export default function ProductsPage() {
           </div>
           
           <div className="flex items-center gap-3">
+            <input
+              type="file"
+              id="excel-upload"
+              accept=".xlsx,.xls"
+              onChange={handleFileSelect}
+              className="hidden"
+            />
+            
+            <button
+              onClick={() => document.getElementById("excel-upload").click()}
+              disabled={uploading}
+              className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+                uploading
+                  ? "bg-slate-400 text-white cursor-not-allowed"
+                  : "bg-emerald-600 text-white hover:bg-emerald-700"
+              }`}
+            >
+              {uploading ? (
+                <>
+                  <span className="animate-spin">⏳</span>
+                  <span>Uploading...</span>
+                </>
+              ) : (
+                <>
+                  <span>Upload Excel</span>
+                </>
+              )}
+            </button>
+
+            <button
+              onClick={handleDownloadTemplate}
+              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
+            >
+                <span>Sample CSV</span>
+            </button>
+
             <button
               onClick={openCreate}
               className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 transition-colors"
@@ -460,9 +578,7 @@ export default function ProductsPage() {
 
                       {/* Category */}
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700">
-                        {product.categoryName ||
-                          categories.find((c) => c.id === product.categoryId)?.name ||
-                          "-"}
+                        {product.categoryName || product.category || "-"}
                       </td>
 
                       {/* Price */}
@@ -636,14 +752,18 @@ export default function ProductsPage() {
                         <label className="block text-sm font-medium text-slate-700 mb-2">
                           Category
                         </label>
-                        <CreatableCategorySelect
-                          value={form.categoryId}
-                          onChange={(value) =>
-                            setForm({ ...form, categoryId: value })
+                        <input
+                          type="text"
+                          value={form.category || ""}
+                          onChange={(e) =>
+                            setForm({ ...form, category: e.target.value })
                           }
-                          isAdmin={userData?.role === "Administrator"}
-                          className="w-full"
+                          className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-colors"
+                          placeholder="Enter category (e.g., Electronics, Motor, Furniture)"
                         />
+                        <p className="mt-1 text-xs text-slate-500">
+                          Type any category. New categories will be created automatically.
+                        </p>
                       </div>
 
                       <div>
@@ -794,9 +914,7 @@ export default function ProductsPage() {
                 </div>
                 <div>
                   <strong>Category:</strong>{" "}
-                  {selectedProduct.categoryName ||
-                    categories.find((c) => c.id === selectedProduct.categoryId)?.name ||
-                    "-"}
+                  {selectedProduct.categoryName || selectedProduct.category || "-"}
                 </div>
                 <div>
                   <strong>Price:</strong> ₹{selectedProduct.price ?? 0}

@@ -232,12 +232,12 @@ export default function CustomerDetailPage() {
       //  Fetch fresh addresses 
       const authUser = loggedInUser;
       const addrResponse = await fetch(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL || "https://api.yashrajent.com"}/api/clients/${customerId}/addresses`,
+        `${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080"}/api/clients/${customerId}/addresses`,
         {
           headers: {
-            "X-User-Id":         authUser?.id         ?? "",
-            "X-User-Role":       authUser?.role        ?? "",
-            "X-User-Department": authUser?.department  ?? "",
+            "X-User-Id": authUser?.id ?? "",
+            "X-User-Role": authUser?.role ?? "",
+            "X-User-Department": authUser?.department ?? "",
           },
         }
       ).catch(() => null);
@@ -361,7 +361,7 @@ export default function CustomerDetailPage() {
 
       }
 
-      
+
 
       if (e.detail?.type === 'CUSTOMER_UPDATED') {
 
@@ -482,7 +482,7 @@ export default function CustomerDetailPage() {
   const resolveUserName = (value) => {
 
 
-    
+
 
     if (!value) {
 
@@ -761,7 +761,7 @@ export default function CustomerDetailPage() {
       return;
     }
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "https://api.yashrajent.com"}/api/clients/geocode`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080"}/api/clients/geocode`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -797,7 +797,7 @@ export default function CustomerDetailPage() {
     const lng = parseFloat(address.longitude);
     if (!lat || !lng) { addToast("Enter latitude and longitude first", "warning"); return; }
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "https://api.yashrajent.com"}/api/clients/reverse-geocode`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080"}/api/clients/reverse-geocode`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ latitude: lat, longitude: lng })
@@ -819,10 +819,10 @@ export default function CustomerDetailPage() {
   // Helper: convert backend addresses array  editAddresses object
   const mapAddressesToEditForm = (addresses = []) => {
     const result = {
-      primary: { enabled: true,  id: null, addressLine: "", city: "", state: "", pincode: "", latitude: "", longitude: "" },
-      branch:  { enabled: false, id: null, addressLine: "", city: "", state: "", pincode: "", latitude: "", longitude: "" },
-      police:  { enabled: false, id: null, addressLine: "", city: "", state: "", pincode: "", latitude: "", longitude: "" },
-      tahsil:  { enabled: false, id: null, addressLine: "", city: "", state: "", pincode: "", latitude: "", longitude: "" },
+      primary: { enabled: true, id: null, addressLine: "", city: "", state: "", pincode: "", latitude: "", longitude: "" },
+      branch: { enabled: false, id: null, addressLine: "", city: "", state: "", pincode: "", latitude: "", longitude: "" },
+      police: { enabled: false, id: null, addressLine: "", city: "", state: "", pincode: "", latitude: "", longitude: "" },
+      tahsil: { enabled: false, id: null, addressLine: "", city: "", state: "", pincode: "", latitude: "", longitude: "" },
     };
     if (!Array.isArray(addresses)) return result;
     addresses.forEach(addr => {
@@ -832,11 +832,11 @@ export default function CustomerDetailPage() {
         enabled: true,
         id: addr.id ?? null,
         addressLine: addr.addressLine ?? "",
-        city:        addr.city        ?? "",
-        state:       addr.state       ?? "",
-        pincode:     addr.pincode     ?? "",
-        latitude:    addr.latitude  != null ? String(addr.latitude)  : "",
-        longitude:   addr.longitude != null ? String(addr.longitude) : "",
+        city: addr.city ?? "",
+        state: addr.state ?? "",
+        pincode: addr.pincode ?? "",
+        latitude: addr.latitude != null ? String(addr.latitude) : "",
+        longitude: addr.longitude != null ? String(addr.longitude) : "",
       };
     });
     return result;
@@ -902,7 +902,7 @@ export default function CustomerDetailPage() {
 
     if (!dealId) return;
 
-    
+
 
     try {
 
@@ -912,13 +912,13 @@ export default function CustomerDetailPage() {
 
         ? {
 
-            ...dealRes,
+          ...dealRes,
 
-            stageCode: dealRes.stageCode || dealRes.stage || "",
+          stageCode: dealRes.stageCode || dealRes.stage || "",
 
-            valueAmount: dealRes.valueAmount ?? dealRes.value_amount ?? 0
+          valueAmount: dealRes.valueAmount ?? dealRes.value_amount ?? 0
 
-          }
+        }
 
         : null;
 
@@ -940,7 +940,7 @@ export default function CustomerDetailPage() {
 
     if (!dealId) return;
 
-    
+
 
     try {
 
@@ -964,7 +964,7 @@ export default function CustomerDetailPage() {
 
     if (!customerId) return;
 
-    
+
 
     try {
 
@@ -972,7 +972,7 @@ export default function CustomerDetailPage() {
 
       setError(null);
 
-      
+
 
       const data = await backendApi.get(`/clients/${customerId}`);
 
@@ -984,7 +984,7 @@ export default function CustomerDetailPage() {
       (async () => {
         try {
           const authUser = loggedInUser;
-          const addressesResponse = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "https://api.yashrajent.com"}/api/clients/${customerId}/addresses`, {
+          const addressesResponse = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080"}/api/clients/${customerId}/addresses`, {
             headers: {
               "X-User-Id": authUser?.id || "",
               "X-User-Role": authUser?.role || "",
@@ -1008,7 +1008,7 @@ export default function CustomerDetailPage() {
 
       });
 
-      
+
 
     } catch (err) {
 
@@ -1311,7 +1311,7 @@ export default function CustomerDetailPage() {
 
       .sort((a, b) => new Date(b.time) - new Date(a.time));
 
-    
+
 
 
     return result;
@@ -1393,7 +1393,7 @@ export default function CustomerDetailPage() {
 
     });
 
-    
+
 
 
     return result;
@@ -1544,79 +1544,79 @@ export default function CustomerDetailPage() {
 
 
 
-      //  FIX: Ensure all numeric fields have valid defaults
+        //  FIX: Ensure all numeric fields have valid defaults
 
-      const price = Number(ln.price ?? ln.unitPrice ?? 0) || 0;
-
-
-
-      const qty = Number(ln.qty ?? ln.quantity ?? 1) || 1;
+        const price = Number(ln.price ?? ln.unitPrice ?? 0) || 0;
 
 
 
-      const discount = Number(ln.discount ?? ln.discountAmount ?? 0) || 0;
+        const qty = Number(ln.qty ?? ln.quantity ?? 1) || 1;
 
 
 
-      const tax = Number(ln.tax ?? ln.taxAmount ?? 0) || 0;
+        const discount = Number(ln.discount ?? ln.discountAmount ?? 0) || 0;
 
 
 
-      //  ISSUE 1 FIX: Calculate finalAmount for Products table
-
-      const finalAmount = price * qty - discount + tax;
+        const tax = Number(ln.tax ?? ln.taxAmount ?? 0) || 0;
 
 
 
-      return {
+        //  ISSUE 1 FIX: Calculate finalAmount for Products table
+
+        const finalAmount = price * qty - discount + tax;
 
 
 
-        id: ln.id,
+        return {
 
 
 
-        dealProductId: ln.id,
+          id: ln.id,
 
 
 
-        productId: ln.productId ?? null,
+          dealProductId: ln.id,
 
 
 
-        name: ln.productName || ln.name || "Unknown Product",
+          productId: ln.productId ?? null,
 
 
 
-        code: ln.code || "N/A",
+          name: ln.productName || ln.name || "Unknown Product",
 
 
 
-        price,
+          code: ln.code || "N/A",
 
 
 
-        qty,
+          price,
 
 
 
-        discount,
+          qty,
 
 
 
-        tax,
+          discount,
 
 
 
-        finalAmount,
+          tax,
 
 
 
-        createdAt: ln.createdAt || ln.created_at || null,
+          finalAmount,
 
 
 
-      };
+          createdAt: ln.createdAt || ln.created_at || null,
+
+
+
+        };
 
 
 
@@ -1748,7 +1748,7 @@ export default function CustomerDetailPage() {
       fd.append('body', emailForm.body || '');
       if (emailFile) fd.append('attachment', emailFile);
       const userId = loggedInUser?.id ?? '';
-      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "https://api.yashrajent.com"}/api/deals/${dealId}/emails/send`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080"}/api/deals/${dealId}/emails/send`, {
         method: 'POST',
         headers: { 'X-User-Id': String(userId) },
         body: fd,
@@ -1791,7 +1791,7 @@ export default function CustomerDetailPage() {
   async function handleDeleteExpense(expenseId) {
     if (!confirm('Delete this expense?')) return;
     try {
-      await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "https://api.yashrajent.com"}/api/expenses/${expenseId}`, { method: 'DELETE' });
+      await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080"}/api/expenses/${expenseId}`, { method: 'DELETE' });
       await fetchExpenses(customerId);
       addToast('Expense deleted', 'success');
       window.dispatchEvent(new CustomEvent('crm-data-update', {
@@ -2466,7 +2466,7 @@ export default function CustomerDetailPage() {
 
         if (!isMounted) return;
 
-        
+
 
         //  PATCH 1: NORMALIZE DEAL IMMEDIATELY AFTER FETCH
 
@@ -2474,11 +2474,11 @@ export default function CustomerDetailPage() {
 
           ? {
 
-              ...dealRes,
+            ...dealRes,
 
-              stageCode: dealRes.stageCode || dealRes.stage || "",
+            stageCode: dealRes.stageCode || dealRes.stage || "",
 
-            }
+          }
 
           : null;
 
@@ -2549,7 +2549,7 @@ export default function CustomerDetailPage() {
 
 
           backendApi.get(`/deals/${resolvedDealId}/products`),
-          fetch(`https://api.yashrajent.com/api/tasks?clientId=${customerId}`).then(r => r.ok ? r.json() : []).catch(() => []),
+          fetch(`http://localhost:8080/api/tasks?clientId=${customerId}`).then(r => r.ok ? r.json() : []).catch(() => []),
 
 
 
@@ -2606,7 +2606,7 @@ export default function CustomerDetailPage() {
 
 
 
-            
+
 
 
 
@@ -2758,23 +2758,23 @@ export default function CustomerDetailPage() {
 
         // Load product catalog and field definitions
         const backgroundDealTasks = [
-                  loadCatalogProducts(),
-                            loadProductFieldDefs(),
-                                      fetchExpenses(customerId),
-                                                loadExpenseEmployees(),
-                                                          (async () => {
-                                                                      try {
-                                                                                    const emailRes = await backendApi.get(`/deals/${resolvedDealId}/emails`);
-                                                                                                  if (isMounted) setEmailHistory(Array.isArray(emailRes) ? emailRes : []);
-                                                                                                              } catch (_e) {
-                                                                                                                            if (isMounted) setEmailHistory([]);
-                                                                                                                                        }
-                                                                                                                                                  })(),
-                                                                                                                                                          ];
-                                                                                                                                                                  Promise.allSettled(backgroundDealTasks).catch((err) => {
-                                                                                                                                                                            console.error('Background deal load failed', err);
-                                                                                                                                                                                    });
-                                                                                                                                                                                    
+          loadCatalogProducts(),
+          loadProductFieldDefs(),
+          fetchExpenses(customerId),
+          loadExpenseEmployees(),
+          (async () => {
+            try {
+              const emailRes = await backendApi.get(`/deals/${resolvedDealId}/emails`);
+              if (isMounted) setEmailHistory(Array.isArray(emailRes) ? emailRes : []);
+            } catch (_e) {
+              if (isMounted) setEmailHistory([]);
+            }
+          })(),
+        ];
+        Promise.allSettled(backgroundDealTasks).catch((err) => {
+          console.error('Background deal load failed', err);
+        });
+
         if (dealRes?.bankId) {
 
 
@@ -3528,17 +3528,17 @@ export default function CustomerDetailPage() {
 
         ? {
 
-            ...dealRes,
+          ...dealRes,
 
-            stageCode: dealRes.stageCode || dealRes.stage || "",
+          stageCode: dealRes.stageCode || dealRes.stage || "",
 
-            valueAmount: dealRes.valueAmount ?? dealRes.value_amount ?? 0
+          valueAmount: dealRes.valueAmount ?? dealRes.value_amount ?? 0
 
-          }
+        }
 
         : null;
 
-      
+
 
       setDeal(normalizedDeal);
 
@@ -3598,7 +3598,7 @@ export default function CustomerDetailPage() {
     setViewingDoc(doc);
     setViewingDocBlobUrl(null);
     try {
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "https://api.yashrajent.com";
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080";
       const res = await fetch(`${backendUrl}/api/case-documents/view/${doc.id}`, {
         headers: {
           "X-User-Id": String(loggedInUser?.id || ""),
@@ -3613,7 +3613,7 @@ export default function CustomerDetailPage() {
     }
   }
 
-  
+
 
 
 
@@ -3661,7 +3661,7 @@ export default function CustomerDetailPage() {
 
 
 
-      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "https://api.yashrajent.com"}/api/case-documents/upload`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080"}/api/case-documents/upload`, {
 
 
 
@@ -3793,7 +3793,7 @@ export default function CustomerDetailPage() {
 
 
 
-    window.open(`${process.env.NEXT_PUBLIC_BACKEND_URL || "https://api.yashrajent.com"}/api/case-documents/download/${doc.id}`, "_blank");
+    window.open(`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080"}/api/case-documents/download/${doc.id}`, "_blank");
 
 
 
@@ -3918,7 +3918,7 @@ export default function CustomerDetailPage() {
             onClick={() => router.push('/customers')}
             className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
           >
-             Back to Customers
+            Back to Customers
           </button>
         </div>
       </DashboardLayout>
@@ -4035,67 +4035,67 @@ Your request will be reviewed by the Manager/Admin before transfer.`,
   }
 
   async function requestClosureApproval(stage) {
-  if (!toCrmId(dealId)) return;
+    if (!toCrmId(dealId)) return;
 
-  try {
-    stageChangeInFlight.current = true;
-
-    let response;
     try {
-      response = await backendApi.post(
-        `/approvals/deals/${toCrmId(dealId)}/request-close`,
-        { stage: stage }
-      );
-    } catch (apiError) {
-      throw apiError;
-    }
+      stageChangeInFlight.current = true;
 
-    // Show success toast
-    addToast(
-      response?.message ||
-      "Transfer request submitted! Waiting for Manager/Admin approval.",
-      "success"
-    );
-
-  } catch (error) {
-    let errorMessage = "Failed to request approval";
-    try {
-      if (error.message) {
-        const errorData = JSON.parse(error.message);
-        if (errorData.error) errorMessage = errorData.error;
+      let response;
+      try {
+        response = await backendApi.post(
+          `/approvals/deals/${toCrmId(dealId)}/request-close`,
+          { stage: stage }
+        );
+      } catch (apiError) {
+        throw apiError;
       }
-    } catch {
-      errorMessage = error.message || "Failed to request approval";
-    }
 
-    if (errorMessage.includes("Approval request already pending")) {
-      setApprovalModal({
-        isOpen: true,
-        type: "error",
-        title: "Request Already Pending",
-        message:
-          "An approval request for this deal is already pending. Please wait for the manager to respond before submitting a new one.",
-        confirmText: "OK",
-        cancelText: "OK",
-        onConfirm: () => setApprovalModal(prev => ({ ...prev, isOpen: false })),
-        onCancel:  () => setApprovalModal(prev => ({ ...prev, isOpen: false })),
-      });
-    } else {
-      setApprovalModal({
-        isOpen: true,
-        type: "error",
-        title: "Request Failed",
-        message: errorMessage,
-        confirmText: "OK",
-        cancelText: "OK",
-        onConfirm: () => setApprovalModal(prev => ({ ...prev, isOpen: false })),
-        onCancel:  () => setApprovalModal(prev => ({ ...prev, isOpen: false })),
-      });
+      // Show success toast
+      addToast(
+        response?.message ||
+        "Transfer request submitted! Waiting for Manager/Admin approval.",
+        "success"
+      );
+
+    } catch (error) {
+      let errorMessage = "Failed to request approval";
+      try {
+        if (error.message) {
+          const errorData = JSON.parse(error.message);
+          if (errorData.error) errorMessage = errorData.error;
+        }
+      } catch {
+        errorMessage = error.message || "Failed to request approval";
+      }
+
+      if (errorMessage.includes("Approval request already pending")) {
+        setApprovalModal({
+          isOpen: true,
+          type: "error",
+          title: "Request Already Pending",
+          message:
+            "An approval request for this deal is already pending. Please wait for the manager to respond before submitting a new one.",
+          confirmText: "OK",
+          cancelText: "OK",
+          onConfirm: () => setApprovalModal(prev => ({ ...prev, isOpen: false })),
+          onCancel: () => setApprovalModal(prev => ({ ...prev, isOpen: false })),
+        });
+      } else {
+        setApprovalModal({
+          isOpen: true,
+          type: "error",
+          title: "Request Failed",
+          message: errorMessage,
+          confirmText: "OK",
+          cancelText: "OK",
+          onConfirm: () => setApprovalModal(prev => ({ ...prev, isOpen: false })),
+          onCancel: () => setApprovalModal(prev => ({ ...prev, isOpen: false })),
+        });
+      }
+    } finally {
+      stageChangeInFlight.current = false;
     }
-  } finally {
-    stageChangeInFlight.current = false;
   }
-}
 
 
 
@@ -4121,7 +4121,7 @@ Your request will be reviewed by the Manager/Admin before transfer.`,
 
       //  FIX: Send logged-in user ID in request body
 
-      const response = await backendApi.post(`/deals/${dealId}/stages`, { 
+      const response = await backendApi.post(`/deals/${dealId}/stages`, {
 
 
 
@@ -4180,7 +4180,7 @@ Your request will be reviewed by the Manager/Admin before transfer.`,
 
 
 
-      
+
 
 
 
@@ -4943,13 +4943,13 @@ Your request will be reviewed by the Manager/Admin before transfer.`,
 
         ? {
 
-            ...dealRes,
+          ...dealRes,
 
-            stageCode: dealRes.stageCode || dealRes.stage || "",
+          stageCode: dealRes.stageCode || dealRes.stage || "",
 
-            valueAmount: dealRes.valueAmount ?? dealRes.value_amount ?? 0
+          valueAmount: dealRes.valueAmount ?? dealRes.value_amount ?? 0
 
-          }
+        }
 
         : null;
 
@@ -5019,7 +5019,7 @@ Your request will be reviewed by the Manager/Admin before transfer.`,
 
 
 
-async function ensureDealId() {
+  async function ensureDealId() {
 
 
 
@@ -5031,7 +5031,7 @@ async function ensureDealId() {
 
 
 
-    
+
 
 
 
@@ -5087,11 +5087,11 @@ async function ensureDealId() {
           id: editAddresses.primary.id || null,
           addressType: "PRIMARY",
           addressLine: editAddresses.primary.addressLine.trim(),
-          city:        editAddresses.primary.city.trim(),
-          state:       editAddresses.primary.state?.trim() || "",
-          pincode:     editAddresses.primary.pincode?.trim() || "",
-          latitude:    parseFloat(editAddresses.primary.latitude),
-          longitude:   parseFloat(editAddresses.primary.longitude),
+          city: editAddresses.primary.city.trim(),
+          state: editAddresses.primary.state?.trim() || "",
+          pincode: editAddresses.primary.pincode?.trim() || "",
+          latitude: parseFloat(editAddresses.primary.latitude),
+          longitude: parseFloat(editAddresses.primary.longitude),
           isPrimary: true,
         });
       }
@@ -5100,11 +5100,11 @@ async function ensureDealId() {
           id: editAddresses.branch.id || null,
           addressType: "BRANCH",
           addressLine: editAddresses.branch.addressLine.trim(),
-          city:        editAddresses.branch.city?.trim() || "",
-          state:       editAddresses.branch.state?.trim() || "",
-          pincode:     editAddresses.branch.pincode?.trim() || "",
-          latitude:    parseFloat(editAddresses.branch.latitude) || null,
-          longitude:   parseFloat(editAddresses.branch.longitude) || null,
+          city: editAddresses.branch.city?.trim() || "",
+          state: editAddresses.branch.state?.trim() || "",
+          pincode: editAddresses.branch.pincode?.trim() || "",
+          latitude: parseFloat(editAddresses.branch.latitude) || null,
+          longitude: parseFloat(editAddresses.branch.longitude) || null,
           isPrimary: false,
         });
       }
@@ -5113,11 +5113,11 @@ async function ensureDealId() {
           id: editAddresses.police.id || null,
           addressType: "POLICE",
           addressLine: editAddresses.police.addressLine.trim(),
-          city:        editAddresses.police.city?.trim() || "",
-          state:       editAddresses.police.state?.trim() || "",
-          pincode:     editAddresses.police.pincode?.trim() || "",
-          latitude:    parseFloat(editAddresses.police.latitude) || null,
-          longitude:   parseFloat(editAddresses.police.longitude) || null,
+          city: editAddresses.police.city?.trim() || "",
+          state: editAddresses.police.state?.trim() || "",
+          pincode: editAddresses.police.pincode?.trim() || "",
+          latitude: parseFloat(editAddresses.police.latitude) || null,
+          longitude: parseFloat(editAddresses.police.longitude) || null,
           isPrimary: false,
         });
       }
@@ -5126,27 +5126,27 @@ async function ensureDealId() {
           id: editAddresses.tahsil.id || null,
           addressType: "TAHSIL",
           addressLine: editAddresses.tahsil.addressLine.trim(),
-          city:        editAddresses.tahsil.city?.trim() || "",
-          state:       editAddresses.tahsil.state?.trim() || "",
-          pincode:     editAddresses.tahsil.pincode?.trim() || "",
-          latitude:    parseFloat(editAddresses.tahsil.latitude) || null,
-          longitude:   parseFloat(editAddresses.tahsil.longitude) || null,
+          city: editAddresses.tahsil.city?.trim() || "",
+          state: editAddresses.tahsil.state?.trim() || "",
+          pincode: editAddresses.tahsil.pincode?.trim() || "",
+          latitude: parseFloat(editAddresses.tahsil.latitude) || null,
+          longitude: parseFloat(editAddresses.tahsil.longitude) || null,
           isPrimary: false,
         });
       }
 
       // Save customer
       const customerPayload = {
-        name:          editForm.name.trim(),
-        email:         editForm.email?.trim() || null,
-        contactPhone:  editForm.phone?.trim() || null,
-        contactName:   editForm.contactName || "",
+        name: editForm.name.trim(),
+        email: editForm.email?.trim() || null,
+        contactPhone: editForm.phone?.trim() || null,
+        contactName: editForm.contactName || "",
         contactNumber: editForm.contactNumber?.trim() || null,
       };
       await clientApi.update(editForm.id, customerPayload);
 
       // Save addresses
-      await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "https://api.yashrajent.com"}/api/clients/${editForm.id}/addresses`, {
+      await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080"}/api/clients/${editForm.id}/addresses`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(addresses),
@@ -5165,11 +5165,11 @@ async function ensureDealId() {
           })[0] ?? null;
         if (latestDeal?.id) {
           const dealPayload = {
-            name:        editForm.name.trim(),
-            clientId:    customerId,
-            bankId:      editForm.bankId ? Number(editForm.bankId) : null,
-            stageCode:   editForm.stage,
-            department:  editDepartment,
+            name: editForm.name.trim(),
+            clientId: customerId,
+            bankId: editForm.bankId ? Number(editForm.bankId) : null,
+            stageCode: editForm.stage,
+            department: editDepartment,
             valueAmount: Number(editForm.valueAmount) || 0,
             closingDate: editForm.closingDate || null,
             description: editForm.description || "",
@@ -5183,10 +5183,10 @@ async function ensureDealId() {
       // Refresh local state
       setCustomer(prev => ({
         ...prev,
-        name:          customerPayload.name,
-        email:         customerPayload.email,
-        contactPhone:  customerPayload.contactPhone,
-        contactName:   customerPayload.contactName,
+        name: customerPayload.name,
+        email: customerPayload.email,
+        contactPhone: customerPayload.contactPhone,
+        contactName: customerPayload.contactName,
         contactNumber: customerPayload.contactNumber,
         addresses,
       }));
@@ -6142,13 +6142,13 @@ async function ensureDealId() {
 
         ? {
 
-            ...dealRes,
+          ...dealRes,
 
-            stageCode: dealRes.stageCode || dealRes.stage || "",
+          stageCode: dealRes.stageCode || dealRes.stage || "",
 
-            valueAmount: dealRes.valueAmount ?? dealRes.value_amount ?? 0
+          valueAmount: dealRes.valueAmount ?? dealRes.value_amount ?? 0
 
-          }
+        }
 
         : null;
 
@@ -6344,17 +6344,15 @@ async function ensureDealId() {
 
       {toast.show && (
 
-        <div className={`fixed top-4 right-4 z-50 px-6 py-3 rounded-lg shadow-lg text-white transition-all duration-300 ${
+        <div className={`fixed top-4 right-4 z-50 px-6 py-3 rounded-lg shadow-lg text-white transition-all duration-300 ${toast.type === 'success' ? 'bg-green-500' :
 
-          toast.type === 'success' ? 'bg-green-500' :
+            toast.type === 'error' ? 'bg-red-500' :
 
-          toast.type === 'error' ? 'bg-red-500' :
+              toast.type === 'warning' ? 'bg-yellow-500' :
 
-          toast.type === 'warning' ? 'bg-yellow-500' :
+                'bg-blue-500'
 
-          'bg-blue-500'
-
-        }`}>
+          }`}>
 
           {toast.message}
 
@@ -6373,113 +6371,57 @@ async function ensureDealId() {
 
 
           <div className="sticky top-0 z-20 space-y-3 -mx-4 sm:-mx-6 px-4 sm:px-6 bg-gradient-to-br from-slate-50 via-slate-100 to-slate-50/70 pb-3">
-          <div className="flex flex-col gap-4 rounded-2xl border border-slate-200/70 bg-white/70 p-5 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-sm transition-shadow duration-300 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-col gap-4 rounded-2xl border border-slate-200/70 bg-white/70 p-5 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-sm transition-shadow duration-300 lg:flex-row lg:items-center lg:justify-between">
 
 
 
-            <div className="space-y-2">
+              <div className="space-y-2">
 
 
 
-              <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
+                <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
 
 
 
-                <Link
+                 <Link
+  href="/customers"
+  className="inline-flex items-center gap-1 rounded-full bg-slate-100/70 px-3 py-1 text-xs font-medium text-slate-600 shadow-sm transition hover:bg-slate-200"
+>
+  <span className="h-1.5 w-1.5 rounded-full bg-indigo-500" />
+  Customers
+</Link>
 
-                  href="/customers"
+<span className="text-slate-400">/</span>
 
-                  className="inline-flex items-center gap-1 rounded-full bg-slate-100/70 px-3 py-1 text-xs font-medium text-slate-600 shadow-sm transition hover:bg-slate-200"
+<span className="text-sm font-semibold text-slate-500">
+  {deal?.dealCode}
+</span>
 
-                >
+<span className="text-slate-400">/</span>
 
+<button
+  onClick={navigateToDealsPage}
+  className="text-lg font-bold text-slate-900 hover:text-indigo-600 transition-colors cursor-pointer"
+>
+  {safeCustomer.name}
+</button>
+                  <span className="inline-flex items-center rounded-full bg-gradient-to-r from-indigo-600 via-sky-600 to-emerald-500 px-4 py-1.5 text-sm font-semibold text-slate-50 shadow-md shadow-indigo-500/30">
+                    {formatCurrency(finalAmount)}
+                  </span>
+                </div>
+                <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-slate-600">
 
 
-                  <span className="h-1.5 w-1.5 rounded-full bg-indigo-500" />
 
+                  <span className="inline-flex items-center gap-1 rounded-full bg-slate-100/70 px-3 py-1">
 
 
-                  Customers
 
+                    <Calendar className="h-3.5 w-3.5 text-indigo-500" />
 
 
-                </Link>
 
-
-
-                <span className="text-slate-400">/</span>
-
-
-
-                <button
-
-
-
-                  onClick={navigateToDealsPage}
-
-
-
-                  className="text-lg font-bold text-slate-900 hover:text-indigo-600 transition-colors cursor-pointer"
-
-
-
-                >
-
-
-
-                  {safeCustomer.name}
-
-
-
-                </button>
-
-
-
-                <span className="inline-flex items-center rounded-full bg-gradient-to-r from-indigo-600 via-sky-600 to-emerald-500 px-4 py-1.5 text-sm font-semibold text-slate-50 shadow-md shadow-indigo-500/30">
-
-
-
-                  {formatCurrency(finalAmount)}
-
-
-
-                </span>
-
-
-
-              </div>
-
-
-
-              <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-slate-600">
-
-
-
-                <span className="inline-flex items-center gap-1 rounded-full bg-slate-100/70 px-3 py-1">
-
-
-
-                  <Calendar className="h-3.5 w-3.5 text-indigo-500" />
-
-
-
-                  Closing Date  {deal?.closingDate || ""}
-
-
-
-                </span>
-
-
-
-                <span className="inline-flex items-center gap-1 rounded-full bg-slate-100/70 px-3 py-1">
-
-
-
-                  <span className="h-5 w-5 rounded-full bg-gradient-to-br from-indigo-500 to-sky-500 text-[10px] font-semibold text-white flex items-center justify-center">
-
-
-
-                    {(deal?.ownerName || deal?.owner || "--").slice(0, 2).toUpperCase()}
+                    Closing Date  {deal?.closingDate || ""}
 
 
 
@@ -6487,19 +6429,74 @@ async function ensureDealId() {
 
 
 
-                  <span className="font-medium text-slate-700">{deal?.ownerName || deal?.owner || ""}</span>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-slate-100/70 px-3 py-1">
 
 
 
-                  <span className="text-slate-400">Owner</span>
+                    <span className="h-5 w-5 rounded-full bg-gradient-to-br from-indigo-500 to-sky-500 text-[10px] font-semibold text-white flex items-center justify-center">
 
 
 
-                </span>
+                      {(deal?.ownerName || deal?.owner || "--").slice(0, 2).toUpperCase()}
 
 
 
-                {/* Removed: Follow record button per design request */}
+                    </span>
+
+
+
+                    <span className="font-medium text-slate-700">{deal?.ownerName || deal?.owner || ""}</span>
+
+
+
+                    <span className="text-slate-400">Owner</span>
+
+
+
+                  </span>
+
+
+
+                  {/* Removed: Follow record button per design request */}
+
+                </div>
+
+
+
+              </div>
+
+
+
+
+
+
+
+              <div className="flex flex-wrap items-center gap-2">
+
+
+
+                <button onClick={() => { setEmailForm({ to: customer?.email || '', cc: '', subject: '', body: '' }); setEmailFile(null); setShowEmailModal(true); }} className="inline-flex items-center gap-2 rounded-full border border-sky-500/80 bg-sky-50/80 px-4 py-2 text-sm font-medium text-sky-900 shadow-sm shadow-sky-500/20 transition duration-150 hover:bg-sky-100 hover:shadow-md">
+                  <Mail className="h-4 w-4" />
+                  Send Mail
+                </button>
+
+
+
+                {!isAccountDept && (
+                  <button
+                    onClick={() => openCustomerEdit()}
+                    className="inline-flex items-center gap-2 rounded-full border border-slate-300/80 bg-white/70 px-3 py-2 text-xs font-medium text-slate-800 shadow-sm transition duration-150 hover:border-indigo-400 hover:text-indigo-700"
+                  >
+                    <Edit3 className="h-4 w-4" />
+                    Edit
+                  </button>
+                )}
+
+
+
+
+
+
 
               </div>
 
@@ -6507,160 +6504,237 @@ async function ensureDealId() {
 
             </div>
 
+            <div className="rounded-2xl border border-slate-200/80 bg-white/80 p-5 shadow-[0_18px_50px_rgba(15,23,42,0.06)] backdrop-blur">
 
 
 
+              <div className="mb-4 flex items-center justify-between gap-4">
 
 
 
-            <div className="flex flex-wrap items-center gap-2">
+                {/* Removed: badges and tracking text per design request */}
 
+                <div className="relative flex items-center gap-4 overflow-x-auto pb-2 scrollbar-hide">
 
 
-              <button onClick={() => { setEmailForm({ to: customer?.email || '', cc: '', subject: '', body: '' }); setEmailFile(null); setShowEmailModal(true); }} className="inline-flex items-center gap-2 rounded-full border border-sky-500/80 bg-sky-50/80 px-4 py-2 text-sm font-medium text-sky-900 shadow-sm shadow-sky-500/20 transition duration-150 hover:bg-sky-100 hover:shadow-md">
 
+                  <div className="absolute inset-x-10 top-1/2 -z-10 h-[2px] translate-y-[-50%] rounded-full bg-gradient-to-r from-slate-200 via-slate-100 to-slate-200" />
 
 
-                <Mail className="h-4 w-4" />
 
+                  {statuses.map((s, i) => {
 
 
-                Send Mail
 
+                    const currentStageData = stagesFromBackend.find(stage => stage.stageCode === currentStage);
 
 
-              </button>
 
+                    const currentIndex = currentStageData ? stagesFromBackend.findIndex(stage => stage.stageCode === currentStage) : -1;
 
 
-              {!isAccountDept && (
-              <button 
-                onClick={() => openCustomerEdit()}
-                className="inline-flex items-center gap-2 rounded-full border border-slate-300/80 bg-white/70 px-3 py-2 text-xs font-medium text-slate-800 shadow-sm transition duration-150 hover:border-indigo-400 hover:text-indigo-700"
-              >
-                <Edit3 className="h-4 w-4" />
-                Edit
-              </button>
-              )}
 
+                    const stageData = stagesFromBackend.find(stage => stage.stageCode === s);
 
 
 
+                    const stageOrder = stageData?.stageOrder || i;
 
 
 
-            </div>
+                    const completed = currentIndex > -1 && stageOrder < (currentStageData?.stageOrder || 0);
 
 
 
-          </div>
+                    const isCurrent = s === currentStage;
 
-          <div className="rounded-2xl border border-slate-200/80 bg-white/80 p-5 shadow-[0_18px_50px_rgba(15,23,42,0.06)] backdrop-blur">
 
 
+                    const isTerminal = stageData?.isTerminal || false;
 
-            <div className="mb-4 flex items-center justify-between gap-4">
+                    //  Define variables first (before using them)
+                    const isAccountDepartment = loggedInUser?.department === "ACCOUNT";
+                    const isBillPassStage = currentStage === "BILL_PASS" || currentStage === "BILL PASS";
+                    const isCloseStage = s === "CLOSE_WON" || s === "CLOSE_LOST" || s === "CLOSE_WIN" || s === "CLOSE_LOST";
 
+                    //  COMPREHENSIVE DEBUG LOGGING
 
+                    //  For ACCOUNT department at BILL PASS, allow terminal close stages
+                    let allowTerminalStage = isTerminal;
+                    if (isAccountDepartment && isBillPassStage && isCloseStage) {
+                      allowTerminalStage = false; // Don't treat as disabled terminal
+                    } else {
+                    }
 
-              {/* Removed: badges and tracking text per design request */}
+                    const currentStageOrder = currentStageData?.stageOrder || 0;
+                    const thisStageOrder = stageData?.stageOrder || 0;
+                    // Allow direct stage change to ANY stage (no one-by-one restriction)
+                    const canProgress = true;
 
-              <div className="relative flex items-center gap-4 overflow-x-auto pb-2 scrollbar-hide">
+                    // Final comprehensive state
 
 
 
-              <div className="absolute inset-x-10 top-1/2 -z-10 h-[2px] translate-y-[-50%] rounded-full bg-gradient-to-r from-slate-200 via-slate-100 to-slate-200" />
+                    return (
 
 
 
-              {statuses.map((s, i) => {
+                      <div key={s} className="relative flex items-center gap-3 pr-4">
 
 
 
-                const currentStageData = stagesFromBackend.find(stage => stage.stageCode === currentStage);
+                        <div
 
+                          onClick={() => canProgress && handleStageChange(s)}
 
+                          title={stageData?.stageName || s}
 
-                const currentIndex = currentStageData ? stagesFromBackend.findIndex(stage => stage.stageCode === currentStage) : -1;
+                          className={`flex h-9 items-center gap-2 rounded-full border px-3.5 py-1.5 text-xs font-medium shadow-sm transition-all duration-200 ${canProgress ? "cursor-pointer" : "cursor-not-allowed"
 
+                            } ${completed
 
+                              ? "border-emerald-400 bg-gradient-to-r from-emerald-500/90 to-teal-500/90 text-emerald-50 shadow-emerald-500/30"
 
-                const stageData = stagesFromBackend.find(stage => stage.stageCode === s);
+                              : isCurrent
 
+                                ? "border-indigo-400 bg-gradient-to-r from-indigo-600 to-sky-600 text-slate-50 shadow-indigo-500/40 ring-2 ring-indigo-400/40"
 
+                                : allowTerminalStage && !canProgress
 
-                const stageOrder = stageData?.stageOrder || i;
+                                  ? "border-slate-300 bg-slate-100 text-slate-600"
 
+                                  : "border-slate-200 bg-white/80 text-slate-600 hover:border-slate-300 hover:bg-slate-50"
 
+                            }`}
 
-                const completed = currentIndex > -1 && stageOrder < (currentStageData?.stageOrder || 0);
 
 
+                        >
 
-                const isCurrent = s === currentStage;
 
 
+                          <div
 
-                const isTerminal = stageData?.isTerminal || false;
-                
-                //  Define variables first (before using them)
-                const isAccountDepartment = loggedInUser?.department === "ACCOUNT";
-                const isBillPassStage = currentStage === "BILL_PASS" || currentStage === "BILL PASS";
-                const isCloseStage = s === "CLOSE_WON" || s === "CLOSE_LOST" || s === "CLOSE_WIN" || s === "CLOSE_LOST";
-                
-                //  COMPREHENSIVE DEBUG LOGGING
-                
-                //  For ACCOUNT department at BILL PASS, allow terminal close stages
-                let allowTerminalStage = isTerminal;
-                if (isAccountDepartment && isBillPassStage && isCloseStage) {
-                  allowTerminalStage = false; // Don't treat as disabled terminal
-                } else {
-                }
 
-                const currentStageOrder = currentStageData?.stageOrder || 0;
-                const thisStageOrder = stageData?.stageOrder || 0;
-                // Allow direct stage change to ANY stage (no one-by-one restriction)
-                const canProgress = true;
-                
-                // Final comprehensive state
 
-                
+                            className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold ${completed
 
-                return (
 
 
+                                ? "bg-emerald-50 text-emerald-700"
 
-                  <div key={s} className="relative flex items-center gap-3 pr-4">
 
 
+                                : isCurrent
 
-                    <div
 
-                      onClick={() => canProgress && handleStageChange(s)}
 
-                      title={stageData?.stageName || s}
+                                  ? "bg-white/20 text-slate-50 ring-1 ring-white/40"
 
-                      className={`flex h-9 items-center gap-2 rounded-full border px-3.5 py-1.5 text-xs font-medium shadow-sm transition-all duration-200 ${
 
-                        canProgress ? "cursor-pointer" : "cursor-not-allowed"
 
-                      } ${
+                                  : isTerminal
 
-                        completed
 
-                          ? "border-emerald-400 bg-gradient-to-r from-emerald-500/90 to-teal-500/90 text-emerald-50 shadow-emerald-500/30"
 
-                          : isCurrent
+                                    ? "bg-slate-200 text-slate-600"
 
-                          ? "border-indigo-400 bg-gradient-to-r from-indigo-600 to-sky-600 text-slate-50 shadow-indigo-500/40 ring-2 ring-indigo-400/40"
 
-                          : allowTerminalStage && !canProgress
 
-                          ? "border-slate-300 bg-slate-100 text-slate-600"
+                                    : "bg-slate-100 text-slate-500"
 
-                          : "border-slate-200 bg-white/80 text-slate-600 hover:border-slate-300 hover:bg-slate-50"
 
-                      }`}
+
+                              }`}
+
+
+
+                          >
+
+
+
+                            {completed ? <CheckCircle2 className="h-3.5 w-3.5" /> : i + 1}
+
+
+
+                          </div>
+
+
+
+                          <span className="whitespace-nowrap">{stageData?.stageName || s}</span>
+
+
+
+                        </div>
+
+
+
+                      </div>
+
+
+
+                    );
+
+
+
+                  })}
+
+
+
+                </div>
+
+
+
+              </div>
+            </div>{/* end sticky wrapper */}
+
+
+
+
+
+
+
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-4">
+
+
+
+              <div className="lg:col-span-1 lg:sticky lg:top-24 self-start">
+
+
+
+                <div className="rounded-2xl border border-slate-200/80 bg-white/80 p-5 shadow-[0_18px_45px_rgba(15,23,42,0.06)] backdrop-blur">
+
+
+
+                  <div className="mb-5 space-y-3">
+
+
+
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+
+
+
+                      Related Bank
+
+
+
+                    </div>
+
+
+
+                    <button
+
+
+
+                      type="button"
+
+
+
+                      onClick={openBankPicker}
+
+
+
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-left transition hover:border-indigo-300 hover:bg-indigo-50"
 
 
 
@@ -6668,367 +6742,204 @@ async function ensureDealId() {
 
 
 
-                      <div
+                      {bank ? (
 
 
 
-                        className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold ${
+                        <div className="flex items-center gap-3">
 
 
 
-                          completed
+                          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 text-xs font-semibold text-white shadow-md shadow-emerald-500/30">
 
 
 
-                            ? "bg-emerald-50 text-emerald-700"
+                            {(bank.name || "BK").slice(0, 2).toUpperCase()}
 
 
-
-                            : isCurrent
-
-
-
-                            ? "bg-white/20 text-slate-50 ring-1 ring-white/40"
-
-
-
-                            : isTerminal
-
-
-
-                            ? "bg-slate-200 text-slate-600"
-
-
-
-                            : "bg-slate-100 text-slate-500"
-
-
-
-                        }`}
-
-
-
-                      >
-
-
-
-                        {completed ? <CheckCircle2 className="h-3.5 w-3.5" /> : i + 1}
-
-
-
-                      </div>
-
-
-
-                      <span className="whitespace-nowrap">{stageData?.stageName || s}</span>
-
-
-
-                    </div>
-
-
-
-                  </div>
-
-
-
-                );
-
-
-
-              })}
-
-
-
-            </div>
-
-
-
-          </div>
-          </div>{/* end sticky wrapper */}
-
-
-
-
-
-
-
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-4">
-
-
-
-            <div className="lg:col-span-1 lg:sticky lg:top-24 self-start">
-
-
-
-              <div className="rounded-2xl border border-slate-200/80 bg-white/80 p-5 shadow-[0_18px_45px_rgba(15,23,42,0.06)] backdrop-blur">
-
-
-
-                <div className="mb-5 space-y-3">
-
-
-
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-
-
-
-                    Related Bank
-
-
-
-                  </div>
-
-
-
-                  <button
-
-
-
-                    type="button"
-
-
-
-                    onClick={openBankPicker}
-
-
-
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-left transition hover:border-indigo-300 hover:bg-indigo-50"
-
-
-
-                  >
-
-
-
-                    {bank ? (
-
-
-
-                      <div className="flex items-center gap-3">
-
-
-
-                        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 text-xs font-semibold text-white shadow-md shadow-emerald-500/30">
-
-
-
-                          {(bank.name || "BK").slice(0, 2).toUpperCase()}
-
-
-
-                        </div>
-
-
-
-                        <div className="flex-1">
-
-
-
-                          <div className="text-sm font-semibold text-slate-900">{bank.name}</div>
-
-
-
-                          <div className="text-xs text-slate-500">{deal?.branchName || bank.branchName || bank.branch || "-"}</div>
-
-
-
-                        </div>
-
-
-
-                      </div>
-
-
-
-                    ) : (
-
-
-
-                      <div className="flex items-center gap-2 text-slate-500">
-
-
-
-                        <Plus className="h-4 w-4" />
-
-
-
-                        <span className="text-sm">Select Bank</span>
-
-
-
-                      </div>
-
-
-
-                    )}
-
-
-
-                  </button>
-
-
-
-                </div>
-
-
-
-                {/* Customer Details Section */}
-
-                <div className="mb-5 space-y-3">
-
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-
-                    Customer Details
-
-                  </div>
-
-                  
-
-                  <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
-
-                    {/* Email */}
-
-                    <div className="flex items-start gap-3">
-
-                      <Mail className="h-4 w-4 text-slate-400 mt-0.5" />
-
-                      <div className="flex-1">
-
-                        <div className="text-xs font-medium text-slate-500">Email</div>
-
-                        <div className="text-sm text-slate-900">{customer?.email || "-"}</div>
-
-                      </div>
-
-                    </div>
-
-
-
-                    <div className="flex items-start gap-3">
-
-                      <Phone className="h-4 w-4 text-slate-400 mt-0.5" />
-
-                      <div className="flex-1">
-
-                        <div className="text-xs font-medium text-slate-500">Phone</div>
-
-                        <div className="text-sm text-slate-900">{customer?.contactPhone || "-"}</div>
-
-                      </div>
-
-                    </div>
-
-
-
-                    {/* Deal Amount */}
-
-                    <div className="flex items-start gap-3">
-
-                      <DollarSign className="h-4 w-4 text-slate-400 mt-0.5" />
-
-                      <div className="flex-1">
-
-                        <div className="text-xs font-medium text-slate-500">Deal Amount</div>
-
-                        <div className="text-sm text-slate-900">
-
-                          {deal?.valueAmount ? `${Number(deal.valueAmount).toLocaleString()}` : "-"}
-
-                        </div>
-
-                      </div>
-
-                    </div>
-
-                    {/* Department */}
-                    {deal?.department && (
-                      <div className="flex items-start gap-3">
-                        <Building2 className="h-4 w-4 text-slate-400 mt-0.5" />
-                        <div className="flex-1">
-                          <div className="text-xs font-medium text-slate-500">Department</div>
-                          <div className="text-sm text-slate-900 font-semibold">{deal.department}</div>
-                        </div>
-                      </div>
-                    )}
-
-
-
-                    {/* Addresses */}
-
-                    <div className="flex items-start gap-3">
-
-                      <MapPin className="h-4 w-4 text-slate-400 mt-0.5" />
-
-                      <div className="flex-1">
-
-                        <div className="text-xs font-medium text-slate-500 mb-2">Addresses</div>
-
-                        {customer?.addresses && customer.addresses.length > 0 ? (
-
-                          <div className="space-y-2">
-
-                            {customer.addresses.map((address, index) => (
-
-                              <div key={address.id || index} className="text-xs text-slate-700 bg-slate-50 rounded-lg p-2">
-
-                                <div className="font-medium text-slate-900 capitalize mb-1">
-
-                                  {address.addressType?.toLowerCase() || 'Unknown'}
-
-                                </div>
-
-                                <div className="text-slate-600">
-
-                                  {address.addressLine && <div>{address.addressLine}</div>}
-
-                                  {address.city && <div>{address.city}</div>}
-
-                                  {address.pincode && <div>{address.pincode}</div>}
-
-                                  {address.state && <div>{address.state}</div>}
-
-                                </div>
-
-                              </div>
-
-                            ))}
 
                           </div>
 
-                        ) : (
 
-                          <div className="text-xs text-slate-500">No addresses available</div>
 
-                        )}
+                          <div className="flex-1">
 
-                      </div>
+
+
+                            <div className="text-sm font-semibold text-slate-900">{bank.name}</div>
+
+
+
+                            <div className="text-xs text-slate-500">{deal?.branchName || bank.branchName || bank.branch || "-"}</div>
+
+
+
+                          </div>
+
+
+
+                        </div>
+
+
+
+                      ) : (
+
+
+
+                        <div className="flex items-center gap-2 text-slate-500">
+
+
+
+                          <Plus className="h-4 w-4" />
+
+
+
+                          <span className="text-sm">Select Bank</span>
+
+
+
+                        </div>
+
+
+
+                      )}
+
+
+
+                    </button>
+
+
+
+                  </div>
+
+
+
+                  {/* Customer Details Section */}
+
+                  <div className="mb-5 space-y-3">
+
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+
+                      Customer Details
 
                     </div>
 
 
 
-                    {/* Contact Person */}
+                    <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
 
-                    {(customer?.contactName || customer?.contactNumber) && (
+                      {/* Email */}
 
                       <div className="flex items-start gap-3">
 
-                        <Building className="h-4 w-4 text-slate-400 mt-0.5" />
+                        <Mail className="h-4 w-4 text-slate-400 mt-0.5" />
 
                         <div className="flex-1">
 
-                          <div className="text-xs font-medium text-slate-500">Contact Person</div>
+                          <div className="text-xs font-medium text-slate-500">Email</div>
 
-                          {customer?.contactName && (
+                          <div className="text-sm text-slate-900">{customer?.email || "-"}</div>
 
-                            <div className="text-sm text-slate-900">{customer.contactName}</div>
+                        </div>
 
-                          )}
+                      </div>
 
-                          {customer?.contactNumber && (
 
-                            <div className="text-xs text-slate-600">{customer.contactNumber}</div>
+
+                      <div className="flex items-start gap-3">
+
+                        <Phone className="h-4 w-4 text-slate-400 mt-0.5" />
+
+                        <div className="flex-1">
+
+                          <div className="text-xs font-medium text-slate-500">Phone</div>
+
+                          <div className="text-sm text-slate-900">{customer?.contactPhone || "-"}</div>
+
+                        </div>
+
+                      </div>
+
+
+
+                      {/* Deal Amount */}
+
+                      <div className="flex items-start gap-3">
+
+                        <DollarSign className="h-4 w-4 text-slate-400 mt-0.5" />
+
+                        <div className="flex-1">
+
+                          <div className="text-xs font-medium text-slate-500">Deal Amount</div>
+
+                          <div className="text-sm text-slate-900">
+
+                            {deal?.valueAmount ? `${Number(deal.valueAmount).toLocaleString()}` : "-"}
+
+                          </div>
+
+                        </div>
+
+                      </div>
+
+                      {/* Department */}
+                      {deal?.department && (
+                        <div className="flex items-start gap-3">
+                          <Building2 className="h-4 w-4 text-slate-400 mt-0.5" />
+                          <div className="flex-1">
+                            <div className="text-xs font-medium text-slate-500">Department</div>
+                            <div className="text-sm text-slate-900 font-semibold">{deal.department}</div>
+                          </div>
+                        </div>
+                      )}
+
+
+
+                      {/* Addresses */}
+
+                      <div className="flex items-start gap-3">
+
+                        <MapPin className="h-4 w-4 text-slate-400 mt-0.5" />
+
+                        <div className="flex-1">
+
+                          <div className="text-xs font-medium text-slate-500 mb-2">Addresses</div>
+
+                          {customer?.addresses && customer.addresses.length > 0 ? (
+
+                            <div className="space-y-2">
+
+                              {customer.addresses.map((address, index) => (
+
+                                <div key={address.id || index} className="text-xs text-slate-700 bg-slate-50 rounded-lg p-2">
+
+                                  <div className="font-medium text-slate-900 capitalize mb-1">
+
+                                    {address.addressType?.toLowerCase() || 'Unknown'}
+
+                                  </div>
+
+                                  <div className="text-slate-600">
+
+                                    {address.addressLine && <div>{address.addressLine}</div>}
+
+                                    {address.city && <div>{address.city}</div>}
+
+                                    {address.pincode && <div>{address.pincode}</div>}
+
+                                    {address.state && <div>{address.state}</div>}
+
+                                  </div>
+
+                                </div>
+
+                              ))}
+
+                            </div>
+
+                          ) : (
+
+                            <div className="text-xs text-slate-500">No addresses available</div>
 
                           )}
 
@@ -7036,21 +6947,51 @@ async function ensureDealId() {
 
                       </div>
 
-                    )}
+
+
+                      {/* Contact Person */}
+
+                      {(customer?.contactName || customer?.contactNumber) && (
+
+                        <div className="flex items-start gap-3">
+
+                          <Building className="h-4 w-4 text-slate-400 mt-0.5" />
+
+                          <div className="flex-1">
+
+                            <div className="text-xs font-medium text-slate-500">Contact Person</div>
+
+                            {customer?.contactName && (
+
+                              <div className="text-sm text-slate-900">{customer.contactName}</div>
+
+                            )}
+
+                            {customer?.contactNumber && (
+
+                              <div className="text-xs text-slate-600">{customer.contactNumber}</div>
+
+                            )}
+
+                          </div>
+
+                        </div>
+
+                      )}
+
+                    </div>
 
                   </div>
 
-                </div>
 
 
 
 
 
-                
 
-                
 
-                {/* <div className="space-y-3">
+
+                  {/* <div className="space-y-3">
 
 
 
@@ -7110,27 +7051,31 @@ async function ensureDealId() {
 
 
 
-                {lastModified && (
+                  {lastModified && (
 
 
 
-                  <div className="mt-5 border-t border-dashed border-slate-200 pt-3 text-[11px] text-slate-500">
+                    <div className="mt-5 border-t border-dashed border-slate-200 pt-3 text-[11px] text-slate-500">
 
 
 
-                    Last modified on {lastModified.toLocaleDateString(undefined, { weekday: "long" })},{" "}
+                      Last modified on {lastModified.toLocaleDateString(undefined, { weekday: "long" })},{" "}
 
 
 
-                    {lastModified.toLocaleTimeString()}
+                      {lastModified.toLocaleTimeString()}
 
 
 
-                  </div>
+                    </div>
 
 
 
-                )}
+                  )}
+
+
+
+                </div>
 
 
 
@@ -7138,729 +7083,83 @@ async function ensureDealId() {
 
 
 
-            </div>
 
 
 
 
+              <div className="lg:col-span-3">
 
 
 
-            <div className="lg:col-span-3">
+                <div className="rounded-2xl border border-slate-200/80 bg-white/80 p-5 shadow-[0_18px_45px_rgba(15,23,42,0.06)] backdrop-blur">
 
 
 
-              <div className="rounded-2xl border border-slate-200/80 bg-white/80 p-5 shadow-[0_18px_45px_rgba(15,23,42,0.06)] backdrop-blur">
+                  <div className="flex items-center gap-3 border-b border-slate-200/80 pb-3 text-xs font-medium text-slate-600">
 
 
 
-                <div className="flex items-center gap-3 border-b border-slate-200/80 pb-3 text-xs font-medium text-slate-600">
+                    {[
 
 
 
-                  {[
+                      { key: "timeline", label: "Timeline" },
 
 
 
-                    { key: "timeline", label: "Timeline" },
+                      { key: "notes", label: "Notes" },
 
 
 
-                    { key: "notes", label: "Notes" },
+                      { key: "activities", label: "Activities", count: tasks.length },
 
 
 
-                    { key: "activities", label: "Activities", count: tasks.length },
+                      { key: "stageHistory", label: "Stage History", count: stageHistory.length },
 
 
 
-                    { key: "stageHistory", label: "Stage History", count: stageHistory.length },
+                      { key: "sites", label: "Sites", count: sites.length },
 
 
 
-                    { key: "sites", label: "Sites", count: sites.length },
+                      { key: "files", label: "Files", count: docs.length },
 
 
 
-                    { key: "files", label: "Files", count: docs.length },
+                      { key: "products", label: "Account", count: products.length },
 
 
 
-                    { key: "products", label: "Account", count: products.length },
+                      { key: "emails", label: "Emails" },
 
 
 
-                    { key: "emails", label: "Emails" },
+                    ].map((t) => (
 
 
 
-                  ].map((t) => (
+                      <button
 
 
 
-                    <button
+                        key={t.key}
 
 
 
-                      key={t.key}
+                        onClick={() => setActiveTab(t.key)}
 
 
 
-                      onClick={() => setActiveTab(t.key)}
+                        className={`relative rounded-full px-3 py-1.5 transition-all duration-150 ${activeTab === t.key
 
 
 
-                      className={`relative rounded-full px-3 py-1.5 transition-all duration-150 ${
+                            ? "bg-slate-900 text-slate-50 shadow-sm shadow-slate-900/30"
 
 
 
-                        activeTab === t.key
-
-
-
-                          ? "bg-slate-900 text-slate-50 shadow-sm shadow-slate-900/30"
-
-
-
-                          : "text-slate-600 hover:bg-slate-100"
-
-
-
-                      }`}
-
-
-
-                    >
-
-
-
-                      <span className="flex items-center gap-1.5">
-
-
-
-                        <span>{t.label}</span>
-
-
-
-                        {t.count ? (
-
-
-
-                          <span
-
-
-
-                            className={`inline-flex h-4 min-w-[1.25rem] items-center justify-center rounded-full border px-1 text-[10px] ${
-
-
-
-                              activeTab === t.key
-
-
-
-                                ? "border-slate-500/70 bg-slate-800 text-slate-100"
-
-
-
-                                : "border-slate-200 bg-slate-50 text-slate-500"
-
-
-
-                            }`}
-
-
-
-                          >
-
-
-
-                            {t.count}
-
-
-
-                          </span>
-
-
-
-                        ) : null}
-
-
-
-                      </span>
-
-
-
-                    </button>
-
-
-
-                  ))}
-
-
-
-                </div>
-
-
-
-
-
-
-
-              {activeTab === "timeline" && (
-
-
-
-                <div className="mt-5 animate-[fadeIn_0.25s_ease-out]">
-
-
-
-                  <div className="mb-3 flex items-center justify-between">
-
-
-
-                    <div className="text-sm font-semibold text-slate-900">Activity Timeline</div>
-
-
-
-                    <div className="text-xs text-slate-500">Most recent stage changes appear on top</div>
-
-
-
-                  </div>
-
-
-
-                  <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-slate-950/[0.01] shadow-sm">
-
-
-
-                    <div className="max-h-[290px] overflow-auto p-4">
-
-
-
-                      <div className="space-y-6">
-
-
-
-                        {timelineGroups.map((group) => (
-
-
-
-                          <div key={group.key} className="relative pl-4">
-
-
-
-                            <div className="absolute left-1.5 top-2 bottom-0 w-px bg-gradient-to-b from-emerald-400/40 via-slate-200 to-transparent" />
-
-
-
-                            <div className="mb-3 flex items-center gap-2 text-[11px] font-medium text-slate-500">
-
-
-
-                              <div className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
-
-
-
-                                <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-
-
-
-                              </div>
-
-
-
-                              <span>{group.key}</span>
-
-
-
-                            </div>
-
-
-
-                            <div className="space-y-3">
-
-
-
-                              {group.items.map((item) => (
-
-
-
-                                <div
-
-
-
-                                  key={item.id}
-
-
-
-                                  className="group flex items-start gap-3 rounded-xl border border-slate-200/80 bg-white/80 px-4 py-3 shadow-sm transition hover:-translate-y-[1px] hover:border-emerald-400/70 hover:shadow-md"
-
-
-
-                                >
-
-
-
-                                  <div className="mt-0.5 w-16 text-[11px] tabular-nums text-slate-400">
-
-
-
-                                    {new Date(item.time).toLocaleTimeString()}
-
-
-
-                                  </div>
-
-
-
-                                  <div className="flex-1">
-
-
-
-                                    <div className="flex items-center justify-between gap-2">
-
-
-
-                                      <div className="text-sm font-medium text-slate-900">
-                                      {item.message.includes("Expense") ? (
-                                        <span className="text-red-600"> {item.message}</span>
-                                      ) : item.message.includes("Product") ? (
-                                        <span className="text-green-600"> {item.message}</span>
-                                      ) : (
-                                        item.message
-                                      )}
-                                    </div>
-
-
-
-                                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
-
-
-
-                                        Stage update
-
-
-
-                                      </span>
-
-
-
-                                    </div>
-
-
-
-                                    <div className="mt-1 text-[11px] text-slate-500">
-
-
-
-                                      by <span className="font-medium text-slate-700">{item.actor}</span>
-
-
-
-                                    </div>
-
-
-
-                                  </div>
-
-
-
-                                </div>
-
-
-
-                              ))}
-
-
-
-                            </div>
-
-
-
-                          </div>
-
-
-
-                        ))}
-
-
-
-                      </div>
-
-
-
-                    </div>
-
-
-
-                  </div>
-
-
-
-                </div>
-
-
-
-              )}
-
-
-
-
-
-
-
-              {activeTab === "notes" && (
-
-
-
-                <div className="mt-5 animate-[fadeIn_0.25s_ease-out]">
-
-
-
-                  <div className="mb-3 flex items-center justify-between">
-
-
-
-                    <div className="text-sm font-semibold text-slate-900">Notes</div>
-
-
-
-                    <div className="text-xs text-slate-500">Keep key context and decisions attached to this case</div>
-
-
-
-                  </div>
-
-
-
-                  <textarea
-
-
-
-                    value={noteText}
-
-
-
-                    onChange={(e) => setNoteText(e.target.value)}
-
-
-
-                    placeholder="What's this note about?"
-
-
-
-                    className="h-40 w-full rounded-2xl border border-slate-200/80 bg-slate-50/70 p-3 text-sm text-slate-800 shadow-inner shadow-slate-200/60 outline-none transition focus:border-emerald-500 focus:bg-white focus:shadow-[0_0_0_1px_rgba(16,185,129,0.35)]"
-
-
-
-                  />
-
-
-
-                  <div className="mt-3 flex items-center gap-3">
-
-
-
-                    <button
-
-
-
-                      onClick={handleAddNote}
-
-
-
-                      disabled={noteSaveInFlight.current}
-
-
-
-                      className="rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-emerald-500/30 transition hover:translate-y-[1px] hover:shadow-lg disabled:cursor-not-allowed disabled:bg-emerald-300"
-
-
-
-                    >
-
-
-
-                      Save
-
-
-
-                    </button>
-
-
-
-                    <button
-
-
-
-                      onClick={() => {
-
-
-
-                        setNoteText("");
-
-
-
-                        setNoteTitle("");
-
-
-
-                        setNoteFile(null);
-
-
-
-                      }}
-
-
-
-                      className="rounded-full border border-slate-300 px-4 py-2 text-xs font-medium text-slate-700 hover:border-slate-400 hover:bg-slate-50"
-
-
-
-                    >
-
-
-
-                      Cancel
-
-
-
-                    </button>
-
-
-
-                    <label className="inline-flex cursor-pointer items-center gap-2 text-xs font-medium text-slate-700">
-
-
-
-                      <PaperclipIcon />
-
-
-
-                      <input
-
-
-
-                        type="file"
-
-
-
-                        className="hidden"
-
-
-
-                        onChange={(e) => setNoteFile(e.target.files?.[0] || null)}
-
-
-
-                      />
-
-
-
-                      Attach file
-
-
-
-                    </label>
-
-
-
-                    <input
-
-
-
-                      type="text"
-
-
-
-                      value={noteTitle}
-
-
-
-                      onChange={(e) => setNoteTitle(e.target.value)}
-
-
-
-                      className="ml-auto w-56 rounded-full border border-slate-200 px-3 py-2 text-xs text-slate-700 placeholder:text-slate-400 focus:border-indigo-400"
-
-
-
-                      placeholder="Add a Title"
-
-
-
-                    />
-
-
-
-                  </div>
-
-
-
-                  <div className="mt-6 overflow-hidden rounded-2xl border border-slate-200/80 bg-slate-950/[0.01] shadow-sm">
-
-
-
-                    <div className="max-h-[290px] overflow-auto p-4">
-
-
-
-                      <div className="space-y-3">
-
-
-
-                        {/*  FIX 1: Safe array check */}
-
-                        {(Array.isArray(notes) ? notes : []).length === 0 ? (
-
-
-
-                          <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/70 px-4 py-3 text-xs text-slate-500">
-
-
-
-                            This record doesn&apos;t have any notes yet. Capture important context and decisions here.
-
-
-
-                          </div>
-
-
-
-                        ) : (
-
-
-
-                          (Array.isArray(notes) ? notes : []).map((n) => (
-
-
-
-                            <div
-
-
-
-                              key={n.id}
-
-
-
-                              className="rounded-2xl border border-slate-200/80 bg-white/90 p-4 text-sm text-slate-700 shadow-sm transition hover:-translate-y-[1px] hover:shadow-md"
-
-
-
-                            >
-
-
-
-                              <div className="flex items-start justify-between gap-3">
-
-
-
-                                <div className="text-sm font-semibold text-slate-900">{n.title || "Note"}</div>
-
-
-
-                                <div className="text-[11px] text-slate-500">
-
-
-
-                                  {(n.createdByName || n.createdBy || "System")}{n.createdAt ? `  ${new Date(n.createdAt).toLocaleString()}` : ""}
-
-
-
-                                </div>
-
-
-
-                              </div>
-
-
-
-                              <div className="mt-2 whitespace-pre-wrap text-sm text-slate-700">{n.body || n.text || ""}</div>
-
-
-
-                            </div>
-
-
-
-                          ))
-
-
-
-                        )}
-
-
-
-                      </div>
-
-
-
-                    </div>
-
-
-
-                  </div>
-
-
-
-                </div>
-
-
-
-              )}
-
-
-
-
-
-
-
-              {activeTab === "activities" && (
-
-
-
-                <div className="mt-5 animate-[fadeIn_0.25s_ease-out]">
-
-
-
-                  <div className="mb-4 flex items-center justify-between gap-3">
-
-
-
-                    <div className="flex items-center gap-2">
-
-
-
-                      {["tasks", "events", "calls"].map((k) => (
-
-
-
-                        <button
-
-
-
-                          key={k}
-
-
-
-                          onClick={() => setActivitiesTab(k)}
-
-
-
-                          className={`rounded-full px-3 py-1 text-xs font-medium transition ${
-
-
-
-                            activitiesTab === k
-
-
-
-                              ? "bg-slate-900 text-slate-50 shadow-sm shadow-slate-900/40"
-
-
-
-                              : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                            : "text-slate-600 hover:bg-slate-100"
 
 
 
@@ -7868,1255 +7167,39 @@ async function ensureDealId() {
 
 
 
-                        >
-
-
-
-                          {k[0].toUpperCase() + k.slice(1)}
-
-
-
-                        </button>
-
-
-
-                      ))}
-
-
-
-                    </div>
-
-
-
-                    <div className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50/90 px-1.5 py-1 text-[11px] text-slate-700 shadow-sm shadow-slate-200/70">
-
-
-
-                      <button
-
-
-
-                        onClick={openTaskCreate}
-
-
-
-                        className="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-[11px] font-medium text-slate-800 shadow-sm transition hover:bg-slate-100 hover:text-indigo-700"
-
-
-
                       >
 
 
 
-                        <Plus className="h-3.5 w-3.5" />
+                        <span className="flex items-center gap-1.5">
 
 
 
-                        <span>Task</span>
+                          <span>{t.label}</span>
 
 
 
-                      </button>
+                          {t.count ? (
 
 
 
-                      <button
+                            <span
 
 
 
-                        onClick={openEventCreate}
+                              className={`inline-flex h-4 min-w-[1.25rem] items-center justify-center rounded-full border px-1 text-[10px] ${activeTab === t.key
 
 
 
-                        className="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-[11px] font-medium text-slate-800 shadow-sm transition hover:bg-slate-100 hover:text-indigo-700"
+                                  ? "border-slate-500/70 bg-slate-800 text-slate-100"
 
 
 
-                      >
+                                  : "border-slate-200 bg-slate-50 text-slate-500"
 
 
 
-                        <Plus className="h-3.5 w-3.5" />
-
-
-
-                        <span>Event</span>
-
-
-
-                      </button>
-
-
-
-                      <button
-
-
-
-                        onClick={openCallCreate}
-
-
-
-                        className="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-[11px] font-medium text-slate-800 shadow-sm transition hover:bg-slate-100 hover:text-indigo-700"
-
-
-
-                      >
-
-
-
-                        <Plus className="h-3.5 w-3.5" />
-
-
-
-                        <span>Call</span>
-
-
-
-                      </button>
-
-
-
-                    </div>
-
-
-
-                  </div>
-
-
-
-
-
-
-
-                  {activitiesTab === "tasks" && (
-
-
-
-                    <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-slate-950/[0.01] shadow-sm">
-
-
-
-                      <div className="max-h-[290px] overflow-auto">
-
-
-
-                        <table className="min-w-full divide-y divide-slate-100">
-
-
-
-                          <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur">
-
-
-
-                            <tr>
-
-
-
-                              <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-
-
-
-                                Task Name
-
-
-
-                              </th>
-
-
-
-                              <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-
-
-
-                                Due Date
-
-
-
-                              </th>
-
-
-
-                              <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-
-
-
-                                Status
-
-
-
-                              </th>
-
-
-
-                              <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-
-
-
-                                Task Owner
-
-
-
-                              </th>
-
-
-
-                              <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-
-
-
-                                Description
-
-
-
-                              </th>
-
-
-
-                              {taskColumnConfig.priority && (
-
-
-
-                                <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-
-
-
-                                  Priority
-
-
-
-                                </th>
-
-
-
-                              )}
-
-
-
-                              {taskColumnConfig.expenseAmount && (
-
-
-
-                                <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-
-
-
-                                  Expense Amount
-
-
-
-                                </th>
-
-
-
-                              )}
-
-
-
-                              <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-
-
-
-                                Action
-
-
-
-                              </th>
-
-
-
-                            </tr>
-
-
-
-                          </thead>
-
-
-
-                          <tbody className="divide-y divide-slate-100 bg-white/90">
-
-
-
-                            {tasks.map((t) => (
-
-
-
-                              <tr key={t.id} className="transition hover:bg-slate-50/80">
-
-
-
-                                <td className="whitespace-nowrap px-4 py-3 text-xs font-medium text-indigo-700">
-
-
-
-                                  {t.name}
-
-
-
-                                </td>
-
-
-
-                                <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">
-
-
-
-                                  {formatDueDateWithTime(t.dueDate)}
-
-
-
-                                </td>
-
-
-
-                                <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">
-
-
-
-                                  <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
-
-
-
-                                    {t.status}
-
-
-
-                                  </span>
-
-
-
-                                </td>
-
-
-
-                                <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">{resolveOwnerName(t.ownerId ?? t.owner)}</td>
-
-
-
-                                <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-500">
-
-
-
-                                  {t.description || ""}
-
-
-
-                                </td>
-
-
-
-                                {taskColumnConfig.priority && (
-
-
-
-                                  <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">{t.priority || ""}</td>
-
-
-
-                                )}
-
-
-
-                                {taskColumnConfig.expenseAmount && (
-
-
-
-                                  <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">{t.expenseAmount || ""}</td>
-
-
-
-                                )}
-
-
-
-                                <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">
-
-
-
-                                  <div className="flex items-center gap-2">
-
-
-
-                                    <button
-
-
-
-                                      type="button"
-
-
-
-                                      onClick={() => openTaskEdit(t)}
-
-
-
-                                      className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:border-indigo-300 hover:text-indigo-700"
-
-
-
-                                    >
-
-
-
-                                      <Edit3 className="h-3.5 w-3.5" />
-
-
-
-                                    </button>
-
-
-
-                                    <button
-
-
-
-                                      type="button"
-
-
-
-                                      onClick={async () => {
-
-
-
-                                        if (!confirm("Delete this task?")) return;
-
-
-
-                                        await handleDeleteActivity("Task", t.id);
-
-
-
-                                      }}
-
-
-
-                                      className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white text-rose-500 shadow-sm transition hover:border-rose-300 hover:text-rose-600"
-
-
-
-                                    >
-
-
-
-                                      <TrashIcon />
-
-
-
-                                    </button>
-
-
-
-                                  </div>
-
-
-
-                                </td>
-
-
-
-                              </tr>
-
-
-
-                            ))}
-
-
-
-                          </tbody>
-
-
-
-                        </table>
-
-
-
-                      </div>
-
-
-
-                    </div>
-
-
-
-                  )}
-
-
-
-
-
-
-
-                  {activitiesTab === "events" && (
-
-
-
-                    <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-slate-950/[0.01] shadow-sm">
-
-
-
-                      <div className="max-h-[290px] overflow-auto">
-
-
-
-                        <table className="min-w-full divide-y divide-slate-100">
-
-
-
-                          <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur">
-
-
-
-                            <tr>
-
-
-
-                              <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-
-
-
-                                Title
-
-
-
-                              </th>
-
-
-
-                              <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-
-
-
-                                From
-
-
-
-                              </th>
-
-
-
-                              <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-
-
-
-                                To
-
-
-
-                              </th>
-
-
-
-                              <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-
-
-
-                                Host
-
-
-
-                              </th>
-
-
-
-                              {eventColumnConfig.location && (
-
-
-
-                                <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-
-
-
-                                  Location
-
-
-
-                                </th>
-
-
-
-                              )}
-
-
-
-                              <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-
-
-
-                                Action
-
-
-
-                              </th>
-
-
-
-                              <th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-
-
-
-                                
-
-
-
-                              </th>
-
-
-
-                            </tr>
-
-
-
-                          </thead>
-
-
-
-                          <tbody className="divide-y divide-slate-100 bg-white/90">
-
-
-
-                            {events.length === 0 ? (
-
-
-
-                              <tr>
-
-
-
-                                <td className="px-4 py-4 text-center text-xs text-slate-500" colSpan={eventColumnConfig.location ? 7 : 6}>
-
-
-
-                                  No events yet. Use + Event to create one.
-
-
-
-                                </td>
-
-
-
-                              </tr>
-
-
-
-                            ) : (
-
-
-
-                              events.map((e) => (
-
-
-
-                                <tr key={e.id} className="transition hover:bg-slate-50/80">
-
-
-
-                                  <td className="whitespace-nowrap px-4 py-3 text-xs font-medium text-indigo-700">
-
-
-
-                                    {e.name || e.title}
-
-
-
-                                  </td>
-
-
-
-                                  <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">{e.from || e.date}</td>
-
-
-
-                                  <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">{e.to || ""}</td>
-
-
-
-                                  <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">{e.owner || e.host || ""}</td>
-
-
-
-                                  {eventColumnConfig.location && (
-
-
-
-                                    <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">{e.location || ""}</td>
-
-
-
-                                  )}
-
-
-
-                                  <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">
-
-
-
-                                    <div className="flex items-center gap-2">
-
-
-
-                                      <button
-
-
-
-                                        type="button"
-
-
-
-                                        onClick={() => openEventEdit(e)}
-
-
-
-                                        className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:border-indigo-300 hover:text-indigo-700"
-
-
-
-                                      >
-
-
-
-                                        <Edit3 className="h-3.5 w-3.5" />
-
-
-
-                                      </button>
-
-
-
-                                      <button
-
-
-
-                                        type="button"
-
-
-
-                                        onClick={async () => {
-
-
-
-                                          if (!confirm("Delete this event?")) return;
-
-
-
-                                          await handleDeleteActivity("Event", e.id);
-
-
-
-                                        }}
-
-
-
-                                        className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white text-rose-500 shadow-sm transition hover:border-rose-300 hover:text-rose-600"
-
-
-
-                                      >
-
-
-
-                                        <TrashIcon />
-
-
-
-                                      </button>
-
-
-
-                                    </div>
-
-
-
-                                  </td>
-
-
-
-                                  <td className="whitespace-nowrap px-4 py-3 text-right text-xs text-slate-400"></td>
-
-
-
-                                </tr>
-
-
-
-                              ))
-
-
-
-                            )}
-
-
-
-                          </tbody>
-
-
-
-                        </table>
-
-
-
-                      </div>
-
-
-
-                    </div>
-
-
-
-                  )}
-
-
-
-
-
-
-
-                  {activitiesTab === "calls" && (
-
-
-
-                    <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-slate-950/[0.01] shadow-sm">
-
-
-
-                      <div className="max-h-[290px] overflow-auto">
-
-
-
-                        <table className="min-w-full divide-y divide-slate-100">
-
-
-
-                          <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur">
-
-
-
-                            <tr>
-
-
-
-                              <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-
-
-
-                                To / From
-
-
-
-                              </th>
-
-
-
-                              <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-
-
-
-                                Call Type
-
-
-
-                              </th>
-
-
-
-                              <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-
-
-
-                                Call Start Time
-
-
-
-                              </th>
-
-
-
-                              <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-
-
-
-                                Modified Time
-
-
-
-                              </th>
-
-
-
-                              <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-
-
-
-                                Call Owner
-
-
-
-                              </th>
-
-
-
-                              <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-
-
-
-                                Call Duration
-
-
-
-                              </th>
-
-
-
-                              <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-
-
-
-                                Action
-
-
-
-                              </th>
-
-
-
-                            </tr>
-
-
-
-                          </thead>
-
-
-
-                          <tbody className="divide-y divide-slate-100 bg-white/90">
-
-
-
-                            {calls.length === 0 ? (
-
-
-
-                              <tr>
-
-
-
-                                <td className="px-4 py-4 text-center text-xs text-slate-500" colSpan={8}>
-
-
-
-                                  No calls yet. Use + Call to create one.
-
-
-
-                                </td>
-
-
-
-                              </tr>
-
-
-
-                            ) : (
-
-
-
-                              calls.map((c) => (
-
-
-
-                                <tr key={c.id} className="transition hover:bg-slate-50/80">
-
-
-
-                                  <td className="whitespace-nowrap px-4 py-3 text-xs font-medium text-indigo-700">
-
-
-
-                                    {c.toFrom || c.subject}
-
-
-
-                                  </td>
-
-
-
-                                  <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">{c.callType || "Outbound"}</td>
-
-
-
-                                  <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">{c.startTime || c.date}</td>
-
-
-
-                                  <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">{c.modifiedTime || ""}</td>
-
-
-
-                                  <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">{c.owner || ""}</td>
-
-
-
-                                  <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">{c.duration || ""}</td>
-
-
-
-                                  <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">
-
-
-
-                                    <div className="flex items-center gap-2">
-
-
-
-                                      <button
-
-
-
-                                        type="button"
-
-
-
-                                        onClick={() => openCallEdit(c)}
-
-
-
-                                        className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:border-indigo-300 hover:text-indigo-700"
-
-
-
-                                      >
-
-
-
-                                        <Edit3 className="h-3.5 w-3.5" />
-
-
-
-                                      </button>
-
-
-
-                                      <button
-
-
-
-                                        type="button"
-
-
-
-                                        onClick={async () => {
-
-
-
-                                          if (!confirm("Delete this call?")) return;
-
-
-
-                                          await handleDeleteActivity("Call", c.id);
-
-
-
-                                        }}
-
-
-
-                                        className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white text-rose-500 shadow-sm transition hover:border-rose-300 hover:text-rose-600"
-
-
-
-                                      >
-
-
-
-                                        <TrashIcon />
-
-
-
-                                      </button>
-
-
-
-                                    </div>
-
-
-
-                                  </td>
-
-
-
-                                  <td className="whitespace-nowrap px-4 py-3 text-right text-xs text-slate-400"></td>
-
-
-
-                                </tr>
-
-
-
-                              ))
-
-
-
-                            )}
-
-
-
-                          </tbody>
-
-
-
-                        </table>
-
-
-
-                      </div>
-
-
-
-                    </div>
-
-
-
-                  )}
-
-
-
-                </div>
-
-
-
-              )}
-
-
-
-
-
-
-
-              {activeTab === "stageHistory" && (
-
-
-
-                <div className="mt-5 animate-[fadeIn_0.25s_ease-out]">
-
-
-
-                  <div className="mb-3 flex items-center justify-between">
-
-
-
-                    <div className="text-sm font-semibold text-slate-900">Stage History</div>
-
-
-
-                    <div className="text-xs text-slate-500">How long the case spent in each stage</div>
-
-
-
-                  </div>
-
-
-
-                  <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-slate-950/[0.01] shadow-sm">
-
-
-
-                    <div className="max-h-[290px] overflow-auto">
-
-
-
-                      <table className="min-w-full divide-y divide-slate-100">
-
-
-
-                        <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur">
-
-
-
-                          <tr>
-
-
-
-                            <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-
-
-
-                              Stage
-
-
-
-                            </th>
-
-
-
-                            <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-
-
-
-                              Amount
-
-
-
-                            </th>
-
-
-
-                            <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-
-
-
-                             Duration (Days)
-
-
-
-                            </th>
-
-
-
-                            <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-
-
-
-                              Modified By
-
-
-
-                            </th>
-
-
-
-                            <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-
-
-
-                              Timestamp
-
-
-
-                            </th>
-
-
-
-                          </tr>
-
-
-
-                        </thead>
-
-
-
-                        <tbody className="divide-y divide-slate-100 bg-white/90">
-
-
-
-                          {stageHistory.map((row, idx) => (
-
-
-
-                            <tr
-
-
-
-                              key={row.id}
-
-
-
-                              className={`transition ${idx === 0 ? "bg-indigo-50/50" : "hover:bg-slate-50/80"}`}
+                                }`}
 
 
 
@@ -9124,51 +7207,95 @@ async function ensureDealId() {
 
 
 
-                              <td className="whitespace-nowrap px-4 py-3 text-xs font-medium text-slate-900">
+                              {t.count}
 
 
 
-                                {getStageName(deal?.department, row.stage)}
+                            </span>
 
 
 
-                                {idx === 0 ? " (Current Stage)" : ""}
+                          ) : null}
 
 
 
-                              </td>
+                        </span>
 
 
 
-                              <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">{formatCurrency(row.amount)}</td>
+                      </button>
 
 
 
-                              <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-900">
+                    ))}
 
 
 
-                                <div className="flex items-center gap-2">
+                  </div>
 
 
 
-                                  <div className="h-1.5 flex-1 rounded-full bg-slate-100">
 
 
 
-                                    <div
+
+                  {activeTab === "timeline" && (
 
 
 
-                                      className="h-1.5 rounded-full bg-gradient-to-r from-indigo-500 to-emerald-500"
+                    <div className="mt-5 animate-[fadeIn_0.25s_ease-out]">
 
 
 
-                                      style={{ width: `${Math.min(100, (row.durationDays || 1) * 10)}%` }}
+                      <div className="mb-3 flex items-center justify-between">
 
 
 
-                                    />
+                        <div className="text-sm font-semibold text-slate-900">Activity Timeline</div>
+
+
+
+                        <div className="text-xs text-slate-500">Most recent stage changes appear on top</div>
+
+
+
+                      </div>
+
+
+
+                      <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-slate-950/[0.01] shadow-sm">
+
+
+
+                        <div className="max-h-[290px] overflow-auto p-4">
+
+
+
+                          <div className="space-y-6">
+
+
+
+                            {timelineGroups.map((group) => (
+
+
+
+                              <div key={group.key} className="relative pl-4">
+
+
+
+                                <div className="absolute left-1.5 top-2 bottom-0 w-px bg-gradient-to-b from-emerald-400/40 via-slate-200 to-transparent" />
+
+
+
+                                <div className="mb-3 flex items-center gap-2 text-[11px] font-medium text-slate-500">
+
+
+
+                                  <div className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
+
+
+
+                                    <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
 
 
 
@@ -9176,7 +7303,7 @@ async function ensureDealId() {
 
 
 
-                                  <span className="w-8 text-right tabular-nums">{row.durationDays}</span>
+                                  <span>{group.key}</span>
 
 
 
@@ -9184,267 +7311,35 @@ async function ensureDealId() {
 
 
 
-                              </td>
+                                <div className="space-y-3">
 
 
 
-                              <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">{row.modifiedBy}</td>
+                                  {group.items.map((item) => (
 
 
 
-                              <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-500">
+                                    <div
 
 
 
-                                {row.timestamp && dayjs(row.timestamp).isValid()
+                                      key={item.id}
 
 
 
-                                  ? dayjs(row.timestamp).format("DD MMM YYYY, hh:mm A")
+                                      className="group flex items-start gap-3 rounded-xl border border-slate-200/80 bg-white/80 px-4 py-3 shadow-sm transition hover:-translate-y-[1px] hover:border-emerald-400/70 hover:shadow-md"
 
 
 
-                                  : "-"}
+                                    >
 
 
 
-                              </td>
+                                      <div className="mt-0.5 w-16 text-[11px] tabular-nums text-slate-400">
 
 
 
-                            </tr>
-
-
-
-                          ))}
-
-
-
-                        </tbody>
-
-
-
-                      </table>
-
-
-
-                    </div>
-
-
-
-                  </div>
-
-
-
-                </div>
-
-
-
-              )}
-
-
-
-
-
-
-
-              {activeTab === "sites" && (
-
-
-
-                <div className="mt-5 animate-[fadeIn_0.25s_ease-out]">
-
-
-
-                  <div className="mb-4 flex items-center justify-between">
-
-
-
-                    <div className="text-sm font-semibold text-slate-900">Sites & Locations</div>
-
-
-
-                    <button
-
-
-
-                      className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-emerald-500/40 transition hover:translate-y-[1px] hover:shadow-lg"
-
-
-
-                    >
-
-
-
-                      <Plus className="h-4 w-4" /> Add Site
-
-
-
-                    </button>
-
-
-
-                  </div>
-
-
-
-                  {sites.length === 0 ? (
-
-
-
-                    <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/50 p-8 text-center">
-
-
-
-                      <Building className="mx-auto h-12 w-12 text-slate-400" />
-
-
-
-                      <h3 className="mt-4 text-sm font-semibold text-slate-900">No sites yet</h3>
-
-
-
-                      <p className="mt-2 text-sm text-slate-600">Get started by adding the first site for this customer.</p>
-
-
-
-                    </div>
-
-
-
-                  ) : (
-
-
-
-                    <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-slate-950/[0.01] shadow-sm">
-
-
-
-                      <div className="max-h-[400px] overflow-auto">
-
-
-
-                        <table className="min-w-full divide-y divide-slate-100">
-
-
-
-                          <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur">
-
-
-
-                            <tr>
-
-
-
-                              <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Site Name</th>
-
-
-
-                              <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Site ID</th>
-
-
-
-                              <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Address</th>
-
-
-
-                              <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Contact</th>
-
-
-
-                              <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Location</th>
-
-
-
-                            </tr>
-
-
-
-                          </thead>
-
-
-
-                          <tbody className="divide-y divide-slate-100 bg-white/90">
-
-
-
-                            {sites.map((site) => (
-
-
-
-                              <tr key={site.id} className="transition hover:bg-slate-50/80">
-
-
-
-                                <td className="whitespace-nowrap px-4 py-3 text-sm font-medium text-slate-900">
-
-
-
-                                  <div className="flex items-center gap-2">
-
-
-
-                                    <Building className="h-4 w-4 text-slate-400" />
-
-
-
-                                    {site.siteName}
-
-
-
-                                  </div>
-
-
-
-                                </td>
-
-
-
-                                <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-700">{site.siteId}</td>
-
-
-
-                                <td className="px-4 py-3 text-sm text-slate-900">
-
-
-
-                                  <div className="max-w-xs">
-
-
-
-                                    <div className="truncate">{site.address || '-'}</div>
-
-
-
-                                    {site.city && <div className="text-xs text-slate-500">{site.city}</div>}
-
-
-
-                                  </div>
-
-
-
-                                </td>
-
-
-
-                                <td className="px-4 py-3 text-sm text-slate-900">
-
-
-
-                                  <div className="flex flex-col gap-1">
-
-
-
-                                    {site.contactPerson && (
-
-
-
-                                      <div className="flex items-center gap-1">
-
-
-
-                                        <span className="text-xs text-slate-600">{site.contactPerson}</span>
+                                        {new Date(item.time).toLocaleTimeString()}
 
 
 
@@ -9452,23 +7347,51 @@ async function ensureDealId() {
 
 
 
-                                    )}
+                                      <div className="flex-1">
 
 
 
-                                    {site.contactNumber && (
+                                        <div className="flex items-center justify-between gap-2">
 
 
 
-                                      <div className="flex items-center gap-1 text-xs text-slate-500">
+                                          <div className="text-sm font-medium text-slate-900">
+                                            {item.message.includes("Expense") ? (
+                                              <span className="text-red-600"> {item.message}</span>
+                                            ) : item.message.includes("Product") ? (
+                                              <span className="text-green-600"> {item.message}</span>
+                                            ) : (
+                                              item.message
+                                            )}
+                                          </div>
 
 
 
-                                        <Phone className="h-3 w-3" />
+                                          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
 
 
 
-                                        {site.contactNumber}
+                                            Stage update
+
+
+
+                                          </span>
+
+
+
+                                        </div>
+
+
+
+                                        <div className="mt-1 text-[11px] text-slate-500">
+
+
+
+                                          by <span className="font-medium text-slate-700">{item.actor}</span>
+
+
+
+                                        </div>
 
 
 
@@ -9476,71 +7399,19 @@ async function ensureDealId() {
 
 
 
-                                    )}
-
-
-
-                                  </div>
-
-
-
-                                </td>
-
-
-
-                                <td className="px-4 py-3 text-sm text-slate-900">
-
-
-
-                                  {site.latitude && site.longitude ? (
-
-
-
-                                    <div className="flex items-center gap-1 text-xs text-emerald-600">
-
-
-
-                                      <MapPin className="h-3 w-3" />
-
-
-
-                                      Location set
-
-
-
                                     </div>
 
 
 
-                                  ) : (
+                                  ))}
 
 
 
-                                    <div className="flex items-center gap-1 text-xs text-slate-400">
+                                </div>
 
 
 
-                                      <MapPin className="h-3 w-3" />
-
-
-
-                                      No location
-
-
-
-                                    </div>
-
-
-
-                                  )}
-
-
-
-                                </td>
-
-
-
-                              </tr>
+                              </div>
 
 
 
@@ -9548,11 +7419,11 @@ async function ensureDealId() {
 
 
 
-                          </tbody>
+                          </div>
 
 
 
-                        </table>
+                        </div>
 
 
 
@@ -9568,83 +7439,59 @@ async function ensureDealId() {
 
 
 
-                </div>
-
-
-
-              )}
 
 
 
 
+                  {activeTab === "notes" && (
 
 
 
-              {activeTab === "files" && (
+                    <div className="mt-5 animate-[fadeIn_0.25s_ease-out]">
 
 
 
-                <div className="mt-5 animate-[fadeIn_0.25s_ease-out]">
+                      <div className="mb-3 flex items-center justify-between">
 
 
 
-                  <div className="mb-4 flex items-center justify-between">
+                        <div className="text-sm font-semibold text-slate-900">Notes</div>
 
 
 
-                    <div className="text-sm font-semibold text-slate-900">Cases &amp; Files</div>
+                        <div className="text-xs text-slate-500">Keep key context and decisions attached to this case</div>
 
 
 
-                    <button
+                      </div>
 
 
 
-                      onClick={() => setIsCaseModalOpen(true)}
+                      <textarea
 
 
 
-                      className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-indigo-600 to-sky-600 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-indigo-500/40 transition hover:translate-y-[1px] hover:shadow-lg"
+                        value={noteText}
 
 
 
-                    >
+                        onChange={(e) => setNoteText(e.target.value)}
 
 
 
-                      <Plus className="h-4 w-4" /> Create Case
+                        placeholder="What's this note about?"
 
 
 
-                    </button>
+                        className="h-40 w-full rounded-2xl border border-slate-200/80 bg-slate-50/70 p-3 text-sm text-slate-800 shadow-inner shadow-slate-200/60 outline-none transition focus:border-emerald-500 focus:bg-white focus:shadow-[0_0_0_1px_rgba(16,185,129,0.35)]"
 
 
 
-                  </div>
+                      />
 
 
 
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
-
-
-
-                    {cases.map((item) => (
-
-
-
-                      <div
-
-
-
-                        key={item.id}
-
-
-
-                        className="flex items-center gap-3 rounded-2xl border border-slate-200/80 bg-slate-50/80 px-4 py-3 shadow-sm transition hover:-translate-y-[1px] hover:border-indigo-300 hover:bg-slate-50 hover:shadow-md"
-
-
-
-                      >
+                      <div className="mt-3 flex items-center gap-3">
 
 
 
@@ -9652,15 +7499,15 @@ async function ensureDealId() {
 
 
 
-                          type="button"
+                          onClick={handleAddNote}
 
 
 
-                          onClick={() => openCaseViewer(item.id)}
+                          disabled={noteSaveInFlight.current}
 
 
 
-                          className="flex flex-1 items-center gap-3 text-left"
+                          className="rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-emerald-500/30 transition hover:translate-y-[1px] hover:shadow-lg disabled:cursor-not-allowed disabled:bg-emerald-300"
 
 
 
@@ -9668,35 +7515,7 @@ async function ensureDealId() {
 
 
 
-                          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 text-white shadow-sm">
-
-
-
-                            <FolderIcon />
-
-
-
-                          </div>
-
-
-
-                          <div className="flex-1">
-
-
-
-                            <div className="text-sm font-medium text-slate-900">
-
-
-
-                              {item.title || item.caseNumber || `Case #${item.id}`}
-
-
-
-                            </div>
-
-
-
-                          </div>
+                          Save
 
 
 
@@ -9704,7 +7523,301 @@ async function ensureDealId() {
 
 
 
+                        <button
+
+
+
+                          onClick={() => {
+
+
+
+                            setNoteText("");
+
+
+
+                            setNoteTitle("");
+
+
+
+                            setNoteFile(null);
+
+
+
+                          }}
+
+
+
+                          className="rounded-full border border-slate-300 px-4 py-2 text-xs font-medium text-slate-700 hover:border-slate-400 hover:bg-slate-50"
+
+
+
+                        >
+
+
+
+                          Cancel
+
+
+
+                        </button>
+
+
+
+                        <label className="inline-flex cursor-pointer items-center gap-2 text-xs font-medium text-slate-700">
+
+
+
+                          <PaperclipIcon />
+
+
+
+                          <input
+
+
+
+                            type="file"
+
+
+
+                            className="hidden"
+
+
+
+                            onChange={(e) => setNoteFile(e.target.files?.[0] || null)}
+
+
+
+                          />
+
+
+
+                          Attach file
+
+
+
+                        </label>
+
+
+
+                        <input
+
+
+
+                          type="text"
+
+
+
+                          value={noteTitle}
+
+
+
+                          onChange={(e) => setNoteTitle(e.target.value)}
+
+
+
+                          className="ml-auto w-56 rounded-full border border-slate-200 px-3 py-2 text-xs text-slate-700 placeholder:text-slate-400 focus:border-indigo-400"
+
+
+
+                          placeholder="Add a Title"
+
+
+
+                        />
+
+
+
+                      </div>
+
+
+
+                      <div className="mt-6 overflow-hidden rounded-2xl border border-slate-200/80 bg-slate-950/[0.01] shadow-sm">
+
+
+
+                        <div className="max-h-[290px] overflow-auto p-4">
+
+
+
+                          <div className="space-y-3">
+
+
+
+                            {/*  FIX 1: Safe array check */}
+
+                            {(Array.isArray(notes) ? notes : []).length === 0 ? (
+
+
+
+                              <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/70 px-4 py-3 text-xs text-slate-500">
+
+
+
+                                This record doesn&apos;t have any notes yet. Capture important context and decisions here.
+
+
+
+                              </div>
+
+
+
+                            ) : (
+
+
+
+                              (Array.isArray(notes) ? notes : []).map((n) => (
+
+
+
+                                <div
+
+
+
+                                  key={n.id}
+
+
+
+                                  className="rounded-2xl border border-slate-200/80 bg-white/90 p-4 text-sm text-slate-700 shadow-sm transition hover:-translate-y-[1px] hover:shadow-md"
+
+
+
+                                >
+
+
+
+                                  <div className="flex items-start justify-between gap-3">
+
+
+
+                                    <div className="text-sm font-semibold text-slate-900">{n.title || "Note"}</div>
+
+
+
+                                    <div className="text-[11px] text-slate-500">
+
+
+
+                                      {(n.createdByName || n.createdBy || "System")}{n.createdAt ? `  ${new Date(n.createdAt).toLocaleString()}` : ""}
+
+
+
+                                    </div>
+
+
+
+                                  </div>
+
+
+
+                                  <div className="mt-2 whitespace-pre-wrap text-sm text-slate-700">{n.body || n.text || ""}</div>
+
+
+
+                                </div>
+
+
+
+                              ))
+
+
+
+                            )}
+
+
+
+                          </div>
+
+
+
+                        </div>
+
+
+
+                      </div>
+
+
+
+                    </div>
+
+
+
+                  )}
+
+
+
+
+
+
+
+                  {activeTab === "activities" && (
+
+
+
+                    <div className="mt-5 animate-[fadeIn_0.25s_ease-out]">
+
+
+
+                      <div className="mb-4 flex items-center justify-between gap-3">
+
+
+
                         <div className="flex items-center gap-2">
+
+
+
+                          {["tasks", "events", "calls"].map((k) => (
+
+
+
+                            <button
+
+
+
+                              key={k}
+
+
+
+                              onClick={() => setActivitiesTab(k)}
+
+
+
+                              className={`rounded-full px-3 py-1 text-xs font-medium transition ${activitiesTab === k
+
+
+
+                                  ? "bg-slate-900 text-slate-50 shadow-sm shadow-slate-900/40"
+
+
+
+                                  : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+
+
+
+                                }`}
+
+
+
+                            >
+
+
+
+                              {k[0].toUpperCase() + k.slice(1)}
+
+
+
+                            </button>
+
+
+
+                          ))}
+
+
+
+                        </div>
+
+
+
+                        <div className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50/90 px-1.5 py-1 text-[11px] text-slate-700 shadow-sm shadow-slate-200/70">
 
 
 
@@ -9712,19 +7825,11 @@ async function ensureDealId() {
 
 
 
-                            type="button"
+                            onClick={openTaskCreate}
 
 
 
-                            onClick={() => handleRemoveCase(item.id)}
-
-
-
-                            className="rounded-full p-1 text-rose-500 transition hover:bg-rose-50 hover:text-rose-600"
-
-
-
-                            title="Remove case"
+                            className="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-[11px] font-medium text-slate-800 shadow-sm transition hover:bg-slate-100 hover:text-indigo-700"
 
 
 
@@ -9732,7 +7837,67 @@ async function ensureDealId() {
 
 
 
-                            <TrashIcon />
+                            <Plus className="h-3.5 w-3.5" />
+
+
+
+                            <span>Task</span>
+
+
+
+                          </button>
+
+
+
+                          <button
+
+
+
+                            onClick={openEventCreate}
+
+
+
+                            className="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-[11px] font-medium text-slate-800 shadow-sm transition hover:bg-slate-100 hover:text-indigo-700"
+
+
+
+                          >
+
+
+
+                            <Plus className="h-3.5 w-3.5" />
+
+
+
+                            <span>Event</span>
+
+
+
+                          </button>
+
+
+
+                          <button
+
+
+
+                            onClick={openCallCreate}
+
+
+
+                            className="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-[11px] font-medium text-slate-800 shadow-sm transition hover:bg-slate-100 hover:text-indigo-700"
+
+
+
+                          >
+
+
+
+                            <Plus className="h-3.5 w-3.5" />
+
+
+
+                            <span>Call</span>
 
 
 
@@ -9748,63 +7913,347 @@ async function ensureDealId() {
 
 
 
-                    ))}
-
-
-
-                    {cases.length === 0 && (
-
-
-
-                      <p className="col-span-full rounded-xl border border-dashed border-slate-200 bg-slate-50/70 px-4 py-3 text-xs text-slate-500">
-
-
-
-                        No cases yet. Click <span className="font-semibold">Create Case</span> to add one.
-
-
-
-                      </p>
-
-
-
-                    )}
-
-
-
-                  </div>
 
 
 
 
+                      {activitiesTab === "tasks" && (
 
 
 
-                  {selectedCaseId && (
+                        <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-slate-950/[0.01] shadow-sm">
 
 
 
-                    <div className="mt-6 rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4 shadow-inner shadow-slate-200/80">
+                          <div className="max-h-[290px] overflow-auto">
 
 
 
-                      <div className="flex items-start justify-between">
+                            <table className="min-w-full divide-y divide-slate-100">
 
 
 
-                        <div>
+                              <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur">
 
 
 
-                          <div className="text-sm text-slate-500">Selected Case</div>
+                                <tr>
 
 
 
-                          <div className="text-base font-semibold text-slate-900">
+                                  <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
 
 
 
-                            {caseData?.title || caseData?.caseNumber || `Case #${selectedCaseId}`}
+                                    Task Name
+
+
+
+                                  </th>
+
+
+
+                                  <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+
+
+
+                                    Due Date
+
+
+
+                                  </th>
+
+
+
+                                  <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+
+
+
+                                    Status
+
+
+
+                                  </th>
+
+
+
+                                  <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+
+
+
+                                    Task Owner
+
+
+
+                                  </th>
+
+
+
+                                  <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+
+
+
+                                    Description
+
+
+
+                                  </th>
+
+
+
+                                  {taskColumnConfig.priority && (
+
+
+
+                                    <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+
+
+
+                                      Priority
+
+
+
+                                    </th>
+
+
+
+                                  )}
+
+
+
+                                  {taskColumnConfig.expenseAmount && (
+
+
+
+                                    <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+
+
+
+                                      Expense Amount
+
+
+
+                                    </th>
+
+
+
+                                  )}
+
+
+
+                                  <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+
+
+
+                                    Action
+
+
+
+                                  </th>
+
+
+
+                                </tr>
+
+
+
+                              </thead>
+
+
+
+                              <tbody className="divide-y divide-slate-100 bg-white/90">
+
+
+
+                                {tasks.map((t) => (
+
+
+
+                                  <tr key={t.id} className="transition hover:bg-slate-50/80">
+
+
+
+                                    <td className="whitespace-nowrap px-4 py-3 text-xs font-medium text-indigo-700">
+
+
+
+                                      {t.name}
+
+
+
+                                    </td>
+
+
+
+                                    <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">
+
+
+
+                                      {formatDueDateWithTime(t.dueDate)}
+
+
+
+                                    </td>
+
+
+
+                                    <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">
+
+
+
+                                      <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
+
+
+
+                                        {t.status}
+
+
+
+                                      </span>
+
+
+
+                                    </td>
+
+
+
+                                    <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">{resolveOwnerName(t.ownerId ?? t.owner)}</td>
+
+
+
+                                    <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-500">
+
+
+
+                                      {t.description || ""}
+
+
+
+                                    </td>
+
+
+
+                                    {taskColumnConfig.priority && (
+
+
+
+                                      <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">{t.priority || ""}</td>
+
+
+
+                                    )}
+
+
+
+                                    {taskColumnConfig.expenseAmount && (
+
+
+
+                                      <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">{t.expenseAmount || ""}</td>
+
+
+
+                                    )}
+
+
+
+                                    <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">
+
+
+
+                                      <div className="flex items-center gap-2">
+
+
+
+                                        <button
+
+
+
+                                          type="button"
+
+
+
+                                          onClick={() => openTaskEdit(t)}
+
+
+
+                                          className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:border-indigo-300 hover:text-indigo-700"
+
+
+
+                                        >
+
+
+
+                                          <Edit3 className="h-3.5 w-3.5" />
+
+
+
+                                        </button>
+
+
+
+                                        <button
+
+
+
+                                          type="button"
+
+
+
+                                          onClick={async () => {
+
+
+
+                                            if (!confirm("Delete this task?")) return;
+
+
+
+                                            await handleDeleteActivity("Task", t.id);
+
+
+
+                                          }}
+
+
+
+                                          className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white text-rose-500 shadow-sm transition hover:border-rose-300 hover:text-rose-600"
+
+
+
+                                        >
+
+
+
+                                          <TrashIcon />
+
+
+
+                                        </button>
+
+
+
+                                      </div>
+
+
+
+                                    </td>
+
+
+
+                                  </tr>
+
+
+
+                                ))}
+
+
+
+                              </tbody>
+
+
+
+                            </table>
 
 
 
@@ -9816,323 +8265,319 @@ async function ensureDealId() {
 
 
 
-                      </div>
+                      )}
 
 
 
-                      <form onSubmit={uploadDoc} className="mt-4 flex flex-wrap items-center gap-3">
 
 
 
-                        <input
 
+                      {activitiesTab === "events" && (
 
 
-                          type="text"
 
+                        <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-slate-950/[0.01] shadow-sm">
 
 
-                          className="w-64 rounded-full border border-slate-200 px-3 py-2 text-xs text-slate-700 placeholder:text-slate-400 focus:border-indigo-400"
 
+                          <div className="max-h-[290px] overflow-auto">
 
 
-                          value={docType}
 
+                            <table className="min-w-full divide-y divide-slate-100">
 
 
-                          onChange={(e) => setDocType(e.target.value)}
 
+                              <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur">
 
 
-                          placeholder="Enter document name"
 
+                                <tr>
 
 
-                        />
 
+                                  <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
 
 
-                        <input
 
+                                    Title
 
 
-                          type="file"
 
+                                  </th>
 
 
-                          accept="application/pdf,.pdf"
 
+                                  <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
 
 
-                          onChange={(e) => setDocFile(e.target.files?.[0] || null)}
 
+                                    From
 
 
-                          className="text-xs file:mr-2 file:rounded-full file:border-0 file:bg-indigo-50 file:px-3 file:py-1 file:text-xs file:font-medium file:text-indigo-700 hover:file:bg-indigo-100"
 
+                                  </th>
 
 
-                          ref={caseFileInputRef}
 
+                                  <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
 
 
-                        />
 
+                                    To
 
 
-                        <button
 
+                                  </th>
 
 
-                          type="submit"
 
+                                  <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
 
 
-                          disabled={uploadingDoc || !docFile}
 
+                                    Host
 
 
-                          className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-indigo-600 to-sky-600 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-indigo-500/40 transition hover:translate-y-[1px] hover:shadow-lg disabled:cursor-not-allowed disabled:bg-indigo-300 disabled:shadow-none"
 
+                                  </th>
 
 
-                        >
 
+                                  {eventColumnConfig.location && (
 
 
-                          <Upload className="h-4 w-4" />
 
+                                    <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
 
 
-                          {uploadingDoc ? "Uploading..." : "Upload Document"}
 
+                                      Location
 
 
-                        </button>
 
+                                    </th>
 
 
-                      </form>
 
+                                  )}
 
 
 
+                                  <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
 
 
 
-                      <div className="mt-4">
+                                    Action
 
 
 
-                        {docs.length === 0 ? (
+                                  </th>
 
 
 
-                          <p className="text-xs text-slate-500">No documents uploaded. Use Upload Document to add a PDF.</p>
+                                  <th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
 
 
 
-                        ) : (
 
 
 
-                          <div className="grid grid-cols-2 gap-4">
 
+                                  </th>
 
 
-                            {docs.map((doc) => (
 
+                                </tr>
 
 
-                              <div key={doc.id} className="flex items-center justify-between rounded-2xl border border-slate-200/80 bg-white/90 px-4 py-3 shadow-sm transition hover:-translate-y-[1px] hover:border-indigo-300 hover:shadow-md">
 
+                              </thead>
 
 
-                                <div className="flex min-w-0 items-center gap-3">
 
+                              <tbody className="divide-y divide-slate-100 bg-white/90">
 
 
-                                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-rose-500 to-red-500 text-white shadow-sm">
 
+                                {events.length === 0 ? (
 
 
-                                    <PdfIcon />
 
+                                  <tr>
 
 
-                                  </div>
 
+                                    <td className="px-4 py-4 text-center text-xs text-slate-500" colSpan={eventColumnConfig.location ? 7 : 6}>
 
 
-                                  <div className="min-w-0">
 
+                                      No events yet. Use + Event to create one.
 
 
-                                    <div
 
+                                    </td>
 
 
-                                      className="max-w-[260px] truncate text-xs font-semibold uppercase tracking-wide text-slate-700"
 
+                                  </tr>
 
 
-                                      title={doc.documentName || "Document"}
 
+                                ) : (
 
 
-                                    >
 
+                                  events.map((e) => (
 
 
-                                      {doc.documentName || "Document"}
 
+                                    <tr key={e.id} className="transition hover:bg-slate-50/80">
 
 
-                                    </div>
 
+                                      <td className="whitespace-nowrap px-4 py-3 text-xs font-medium text-indigo-700">
 
 
-                                    <div
 
+                                        {e.name || e.title}
 
 
-                                      className="max-w-[260px] truncate text-sm font-medium text-slate-900"
 
+                                      </td>
 
 
-                                      title={doc.fileName || "File"}
 
+                                      <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">{e.from || e.date}</td>
 
 
-                                    >
 
+                                      <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">{e.to || ""}</td>
 
 
-                                      {doc.fileName || "File"}
 
+                                      <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">{e.owner || e.host || ""}</td>
 
 
-                                    </div>
 
+                                      {eventColumnConfig.location && (
 
 
-                                  </div>
 
+                                        <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">{e.location || ""}</td>
 
 
-                                </div>
 
+                                      )}
 
 
-                                <div className="flex items-center gap-2">
 
+                                      <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">
 
 
-                                  <button
 
+                                        <div className="flex items-center gap-2">
 
 
-                                    type="button"
 
+                                          <button
 
 
-                                    onClick={() => viewDoc(doc)}
 
+                                            type="button"
 
 
-                                    className="flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-medium text-indigo-600 transition hover:bg-indigo-50 hover:text-indigo-800"
 
+                                            onClick={() => openEventEdit(e)}
 
 
-                                    title="View document"
 
+                                            className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:border-indigo-300 hover:text-indigo-700"
 
 
-                                  >
 
+                                          >
 
 
-                                    <Eye className="h-4 w-4" /> View
 
+                                            <Edit3 className="h-3.5 w-3.5" />
 
 
-                                  </button>
 
+                                          </button>
 
 
-                                  <button
 
+                                          <button
 
 
-                                    type="button"
 
+                                            type="button"
 
 
-                                    onClick={() => downloadDoc(doc)}
 
+                                            onClick={async () => {
 
 
-                                    className="flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-medium text-emerald-600 transition hover:bg-emerald-50 hover:text-emerald-800"
 
+                                              if (!confirm("Delete this event?")) return;
 
 
-                                    title="Download document"
 
+                                              await handleDeleteActivity("Event", e.id);
 
 
-                                  >
 
+                                            }}
 
 
-                                    <Download className="h-4 w-4" /> Download
 
+                                            className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white text-rose-500 shadow-sm transition hover:border-rose-300 hover:text-rose-600"
 
 
-                                  </button>
 
+                                          >
 
 
-                                  <button
 
+                                            <TrashIcon />
 
 
-                                    type="button"
 
+                                          </button>
 
 
-                                    onClick={() => removeDoc(doc.id)}
 
+                                        </div>
 
 
-                                    className="rounded-full p-1 text-rose-500 transition hover:bg-rose-50 hover:text-rose-600"
 
+                                      </td>
 
 
-                                    title="Remove document"
 
+                                      <td className="whitespace-nowrap px-4 py-3 text-right text-xs text-slate-400"></td>
 
 
-                                  >
 
+                                    </tr>
 
 
-                                    <TrashIcon />
 
+                                  ))
 
 
-                                  </button>
 
+                                )}
 
 
-                                </div>
 
+                              </tbody>
 
 
-                              </div>
 
-
-
-                            ))}
+                            </table>
 
 
 
@@ -10140,7 +8585,579 @@ async function ensureDealId() {
 
 
 
-                        )}
+                        </div>
+
+
+
+                      )}
+
+
+
+
+
+
+
+                      {activitiesTab === "calls" && (
+
+
+
+                        <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-slate-950/[0.01] shadow-sm">
+
+
+
+                          <div className="max-h-[290px] overflow-auto">
+
+
+
+                            <table className="min-w-full divide-y divide-slate-100">
+
+
+
+                              <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur">
+
+
+
+                                <tr>
+
+
+
+                                  <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+
+
+
+                                    To / From
+
+
+
+                                  </th>
+
+
+
+                                  <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+
+
+
+                                    Call Type
+
+
+
+                                  </th>
+
+
+
+                                  <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+
+
+
+                                    Call Start Time
+
+
+
+                                  </th>
+
+
+
+                                  <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+
+
+
+                                    Modified Time
+
+
+
+                                  </th>
+
+
+
+                                  <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+
+
+
+                                    Call Owner
+
+
+
+                                  </th>
+
+
+
+                                  <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+
+
+
+                                    Call Duration
+
+
+
+                                  </th>
+
+
+
+                                  <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+
+
+
+                                    Action
+
+
+
+                                  </th>
+
+
+
+                                </tr>
+
+
+
+                              </thead>
+
+
+
+                              <tbody className="divide-y divide-slate-100 bg-white/90">
+
+
+
+                                {calls.length === 0 ? (
+
+
+
+                                  <tr>
+
+
+
+                                    <td className="px-4 py-4 text-center text-xs text-slate-500" colSpan={8}>
+
+
+
+                                      No calls yet. Use + Call to create one.
+
+
+
+                                    </td>
+
+
+
+                                  </tr>
+
+
+
+                                ) : (
+
+
+
+                                  calls.map((c) => (
+
+
+
+                                    <tr key={c.id} className="transition hover:bg-slate-50/80">
+
+
+
+                                      <td className="whitespace-nowrap px-4 py-3 text-xs font-medium text-indigo-700">
+
+
+
+                                        {c.toFrom || c.subject}
+
+
+
+                                      </td>
+
+
+
+                                      <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">{c.callType || "Outbound"}</td>
+
+
+
+                                      <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">{c.startTime || c.date}</td>
+
+
+
+                                      <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">{c.modifiedTime || ""}</td>
+
+
+
+                                      <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">{c.owner || ""}</td>
+
+
+
+                                      <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">{c.duration || ""}</td>
+
+
+
+                                      <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">
+
+
+
+                                        <div className="flex items-center gap-2">
+
+
+
+                                          <button
+
+
+
+                                            type="button"
+
+
+
+                                            onClick={() => openCallEdit(c)}
+
+
+
+                                            className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:border-indigo-300 hover:text-indigo-700"
+
+
+
+                                          >
+
+
+
+                                            <Edit3 className="h-3.5 w-3.5" />
+
+
+
+                                          </button>
+
+
+
+                                          <button
+
+
+
+                                            type="button"
+
+
+
+                                            onClick={async () => {
+
+
+
+                                              if (!confirm("Delete this call?")) return;
+
+
+
+                                              await handleDeleteActivity("Call", c.id);
+
+
+
+                                            }}
+
+
+
+                                            className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white text-rose-500 shadow-sm transition hover:border-rose-300 hover:text-rose-600"
+
+
+
+                                          >
+
+
+
+                                            <TrashIcon />
+
+
+
+                                          </button>
+
+
+
+                                        </div>
+
+
+
+                                      </td>
+
+
+
+                                      <td className="whitespace-nowrap px-4 py-3 text-right text-xs text-slate-400"></td>
+
+
+
+                                    </tr>
+
+
+
+                                  ))
+
+
+
+                                )}
+
+
+
+                              </tbody>
+
+
+
+                            </table>
+
+
+
+                          </div>
+
+
+
+                        </div>
+
+
+
+                      )}
+
+
+
+                    </div>
+
+
+
+                  )}
+
+
+
+
+
+
+
+                  {activeTab === "stageHistory" && (
+
+
+
+                    <div className="mt-5 animate-[fadeIn_0.25s_ease-out]">
+
+
+
+                      <div className="mb-3 flex items-center justify-between">
+
+
+
+                        <div className="text-sm font-semibold text-slate-900">Stage History</div>
+
+
+
+                        <div className="text-xs text-slate-500">How long the case spent in each stage</div>
+
+
+
+                      </div>
+
+
+
+                      <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-slate-950/[0.01] shadow-sm">
+
+
+
+                        <div className="max-h-[290px] overflow-auto">
+
+
+
+                          <table className="min-w-full divide-y divide-slate-100">
+
+
+
+                            <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur">
+
+
+
+                              <tr>
+
+
+
+                                <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+
+
+
+                                  Stage
+
+
+
+                                </th>
+
+
+
+                                <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+
+
+
+                                  Amount
+
+
+
+                                </th>
+
+
+
+                                <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+
+
+
+                                  Duration (Days)
+
+
+
+                                </th>
+
+
+
+                                <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+
+
+
+                                  Modified By
+
+
+
+                                </th>
+
+
+
+                                <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+
+
+
+                                  Timestamp
+
+
+
+                                </th>
+
+
+
+                              </tr>
+
+
+
+                            </thead>
+
+
+
+                            <tbody className="divide-y divide-slate-100 bg-white/90">
+
+
+
+                              {stageHistory.map((row, idx) => (
+
+
+
+                                <tr
+
+
+
+                                  key={row.id}
+
+
+
+                                  className={`transition ${idx === 0 ? "bg-indigo-50/50" : "hover:bg-slate-50/80"}`}
+
+
+
+                                >
+
+
+
+                                  <td className="whitespace-nowrap px-4 py-3 text-xs font-medium text-slate-900">
+
+
+
+                                    {getStageName(deal?.department, row.stage)}
+
+
+
+                                    {idx === 0 ? " (Current Stage)" : ""}
+
+
+
+                                  </td>
+
+
+
+                                  <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">{formatCurrency(row.amount)}</td>
+
+
+
+                                  <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-900">
+
+
+
+                                    <div className="flex items-center gap-2">
+
+
+
+                                      <div className="h-1.5 flex-1 rounded-full bg-slate-100">
+
+
+
+                                        <div
+
+
+
+                                          className="h-1.5 rounded-full bg-gradient-to-r from-indigo-500 to-emerald-500"
+
+
+
+                                          style={{ width: `${Math.min(100, (row.durationDays || 1) * 10)}%` }}
+
+
+
+                                        />
+
+
+
+                                      </div>
+
+
+
+                                      <span className="w-8 text-right tabular-nums">{row.durationDays}</span>
+
+
+
+                                    </div>
+
+
+
+                                  </td>
+
+
+
+                                  <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">{row.modifiedBy}</td>
+
+
+
+                                  <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-500">
+
+
+
+                                    {row.timestamp && dayjs(row.timestamp).isValid()
+
+
+
+                                      ? dayjs(row.timestamp).format("DD MMM YYYY, hh:mm A")
+
+
+
+                                      : "-"}
+
+
+
+                                  </td>
+
+
+
+                                </tr>
+
+
+
+                              ))}
+
+
+
+                            </tbody>
+
+
+
+                          </table>
+
+
+
+                        </div>
 
 
 
@@ -10160,51 +9177,403 @@ async function ensureDealId() {
 
 
 
-                  {viewingDoc && (
+                  {activeTab === "sites" && (
 
 
 
-                    <>
+                    <div className="mt-5 animate-[fadeIn_0.25s_ease-out]">
 
 
 
-                      <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm" onClick={closeDocViewer} />
+                      <div className="mb-4 flex items-center justify-between">
 
 
 
-                      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                        <div className="text-sm font-semibold text-slate-900">Sites & Locations</div>
 
 
 
-                        <div className="relative h-[90vh] w-full max-w-6xl overflow-hidden rounded-2xl bg-slate-950/95 shadow-2xl shadow-slate-950/70">
+                        <button
 
 
 
-                          <div className="flex items-center justify-between border-b border-slate-800 bg-slate-900/70 px-4 py-3">
+                          className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-emerald-500/40 transition hover:translate-y-[1px] hover:shadow-lg"
 
 
 
-                            <div>
+                        >
 
 
 
-                              <h3 className="text-sm font-semibold text-slate-50">
+                          <Plus className="h-4 w-4" /> Add Site
 
 
 
-                                {viewingDoc.documentName || viewingDoc.fileName || "Document"}
+                        </button>
 
 
 
-                              </h3>
+                      </div>
 
 
 
-                              <p className="text-xs text-slate-400">{viewingDoc.fileName}</p>
+                      {sites.length === 0 ? (
 
 
 
-                            </div>
+                        <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/50 p-8 text-center">
+
+
+
+                          <Building className="mx-auto h-12 w-12 text-slate-400" />
+
+
+
+                          <h3 className="mt-4 text-sm font-semibold text-slate-900">No sites yet</h3>
+
+
+
+                          <p className="mt-2 text-sm text-slate-600">Get started by adding the first site for this customer.</p>
+
+
+
+                        </div>
+
+
+
+                      ) : (
+
+
+
+                        <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-slate-950/[0.01] shadow-sm">
+
+
+
+                          <div className="max-h-[400px] overflow-auto">
+
+
+
+                            <table className="min-w-full divide-y divide-slate-100">
+
+
+
+                              <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur">
+
+
+
+                                <tr>
+
+
+
+                                  <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Site Name</th>
+
+
+
+                                  <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Site ID</th>
+
+
+
+                                  <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Address</th>
+
+
+
+                                  <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Contact</th>
+
+
+
+                                  <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Location</th>
+
+
+
+                                </tr>
+
+
+
+                              </thead>
+
+
+
+                              <tbody className="divide-y divide-slate-100 bg-white/90">
+
+
+
+                                {sites.map((site) => (
+
+
+
+                                  <tr key={site.id} className="transition hover:bg-slate-50/80">
+
+
+
+                                    <td className="whitespace-nowrap px-4 py-3 text-sm font-medium text-slate-900">
+
+
+
+                                      <div className="flex items-center gap-2">
+
+
+
+                                        <Building className="h-4 w-4 text-slate-400" />
+
+
+
+                                        {site.siteName}
+
+
+
+                                      </div>
+
+
+
+                                    </td>
+
+
+
+                                    <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-700">{site.siteId}</td>
+
+
+
+                                    <td className="px-4 py-3 text-sm text-slate-900">
+
+
+
+                                      <div className="max-w-xs">
+
+
+
+                                        <div className="truncate">{site.address || '-'}</div>
+
+
+
+                                        {site.city && <div className="text-xs text-slate-500">{site.city}</div>}
+
+
+
+                                      </div>
+
+
+
+                                    </td>
+
+
+
+                                    <td className="px-4 py-3 text-sm text-slate-900">
+
+
+
+                                      <div className="flex flex-col gap-1">
+
+
+
+                                        {site.contactPerson && (
+
+
+
+                                          <div className="flex items-center gap-1">
+
+
+
+                                            <span className="text-xs text-slate-600">{site.contactPerson}</span>
+
+
+
+                                          </div>
+
+
+
+                                        )}
+
+
+
+                                        {site.contactNumber && (
+
+
+
+                                          <div className="flex items-center gap-1 text-xs text-slate-500">
+
+
+
+                                            <Phone className="h-3 w-3" />
+
+
+
+                                            {site.contactNumber}
+
+
+
+                                          </div>
+
+
+
+                                        )}
+
+
+
+                                      </div>
+
+
+
+                                    </td>
+
+
+
+                                    <td className="px-4 py-3 text-sm text-slate-900">
+
+
+
+                                      {site.latitude && site.longitude ? (
+
+
+
+                                        <div className="flex items-center gap-1 text-xs text-emerald-600">
+
+
+
+                                          <MapPin className="h-3 w-3" />
+
+
+
+                                          Location set
+
+
+
+                                        </div>
+
+
+
+                                      ) : (
+
+
+
+                                        <div className="flex items-center gap-1 text-xs text-slate-400">
+
+
+
+                                          <MapPin className="h-3 w-3" />
+
+
+
+                                          No location
+
+
+
+                                        </div>
+
+
+
+                                      )}
+
+
+
+                                    </td>
+
+
+
+                                  </tr>
+
+
+
+                                ))}
+
+
+
+                              </tbody>
+
+
+
+                            </table>
+
+
+
+                          </div>
+
+
+
+                        </div>
+
+
+
+                      )}
+
+
+
+                    </div>
+
+
+
+                  )}
+
+
+
+
+
+
+
+                  {activeTab === "files" && (
+
+
+
+                    <div className="mt-5 animate-[fadeIn_0.25s_ease-out]">
+
+
+
+                      <div className="mb-4 flex items-center justify-between">
+
+
+
+                        <div className="text-sm font-semibold text-slate-900">Cases &amp; Files</div>
+
+
+
+                        <button
+
+
+
+                          onClick={() => setIsCaseModalOpen(true)}
+
+
+
+                          className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-indigo-600 to-sky-600 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-indigo-500/40 transition hover:translate-y-[1px] hover:shadow-lg"
+
+
+
+                        >
+
+
+
+                          <Plus className="h-4 w-4" /> Create Case
+
+
+
+                        </button>
+
+
+
+                      </div>
+
+
+
+                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
+
+
+
+                        {cases.map((item) => (
+
+
+
+                          <div
+
+
+
+                            key={item.id}
+
+
+
+                            className="flex items-center gap-3 rounded-2xl border border-slate-200/80 bg-slate-50/80 px-4 py-3 shadow-sm transition hover:-translate-y-[1px] hover:border-indigo-300 hover:bg-slate-50 hover:shadow-md"
+
+
+
+                          >
 
 
 
@@ -10216,11 +9585,11 @@ async function ensureDealId() {
 
 
 
-                              onClick={closeDocViewer}
+                              onClick={() => openCaseViewer(item.id)}
 
 
 
-                              className="rounded-full p-2 text-slate-400 transition hover:bg-slate-800 hover:text-slate-100"
+                              className="flex flex-1 items-center gap-3 text-left"
 
 
 
@@ -10228,7 +9597,35 @@ async function ensureDealId() {
 
 
 
-                              <XCircle className="h-5 w-5" />
+                              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 text-white shadow-sm">
+
+
+
+                                <FolderIcon />
+
+
+
+                              </div>
+
+
+
+                              <div className="flex-1">
+
+
+
+                                <div className="text-sm font-medium text-slate-900">
+
+
+
+                                  {item.title || item.caseNumber || `Case #${item.id}`}
+
+
+
+                                </div>
+
+
+
+                              </div>
 
 
 
@@ -10236,348 +9633,47 @@ async function ensureDealId() {
 
 
 
+                            <div className="flex items-center gap-2">
+
+
+
+                              <button
+
+
+
+                                type="button"
+
+
+
+                                onClick={() => handleRemoveCase(item.id)}
+
+
+
+                                className="rounded-full p-1 text-rose-500 transition hover:bg-rose-50 hover:text-rose-600"
+
+
+
+                                title="Remove case"
+
+
+
+                              >
+
+
+
+                                <TrashIcon />
+
+
+
+                              </button>
+
+
+
+                            </div>
+
+
+
                           </div>
-
-
-
-                          <div className="flex-1 bg-slate-900 p-1">
-
-
-
-                            {viewingDocBlobUrl ? (<iframe
-
-
-
-                              src={viewingDocBlobUrl}
-
-
-
-                              className="h-full w-full rounded-lg border-0 bg-slate-900"
-
-
-
-                              title="PDF Viewer"
-
-
-
-                              style={{ minHeight: 'calc(90vh - 80px)' }}
-
-
-
-                              onError={() => window.open(`${process.env.NEXT_PUBLIC_BACKEND_URL || "https://api.yashrajent.com"}/api/case-documents/download/${viewingDoc.id}`, "_blank")}
-
-
-
-                            />) : (<div className="flex items-center justify-center h-full text-slate-400 text-sm gap-2"><span>Loading PDF...</span></div>)}
-
-
-
-                          </div>
-
-
-
-                        </div>
-
-
-
-                      </div>
-
-
-
-                    </>
-
-
-
-                  )}
-
-
-
-                </div>
-
-
-
-              )}
-
-
-
-
-
-
-
-              {activeTab === "products" && (
-
-
-
-                <div className="mt-5 animate-[fadeIn_0.25s_ease-out]">
-
-
-
-                  <div className="mb-3 flex items-center justify-between">
-
-
-
-                    <div className="text-sm font-semibold text-slate-900">Account</div>
-
-
-
-                    <div className="text-xs text-slate-500">Billing-grade view of charges linked to this case</div>
-
-
-
-                  </div>
-
-
-
-                  <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-slate-950/[0.01] shadow-sm">
-
-
-
-                    <div className="max-h-[260px] overflow-auto">
-
-
-
-                      <table className="min-w-full divide-y divide-slate-100">
-
-
-
-                        <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur">
-
-
-
-                        <tr>
-
-
-
-                          <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-
-
-
-                            Product
-
-
-
-                          </th>
-
-
-
-                          <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-
-
-
-                            List Price ()
-
-
-
-                          </th>
-
-
-
-                          <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-
-
-
-                            Quantity
-
-
-
-                          </th>
-
-
-
-                          <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-
-
-
-                            Discount
-
-
-
-                          </th>
-
-
-
-                          <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-
-
-
-                            Tax
-
-
-
-                          </th>
-
-
-
-                          {productFieldDefs.map((def) => (
-
-
-
-                            <th key={def.key} className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-
-
-
-                              {def.label || def.key}
-
-
-
-                            </th>
-
-
-
-                          ))}
-
-
-
-                          <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-
-
-
-                            Final Amount ()
-
-
-
-                          </th>
-
-
-
-                          <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-
-
-
-                            Action
-
-
-
-                          </th>
-
-
-
-                        </tr>
-
-
-
-                        </thead>
-
-
-
-                        {/*  COMBINED ACCOUNTS TABLE (Products + Expenses) */}
-                        <tbody className="divide-y divide-slate-100 bg-white/90">
-                        
-                        {/* Combine products and expenses */}
-                        {[
-                          ...products.map(p => ({ ...p, type: "product", name: p.name || p.productName, amount: p.price * p.qty - (p.discount || 0) + (p.tax || 0) })),
-                          ...expenses.map(e => ({ ...e, type: "expense", name: e.category, amount: e.amount }))
-                        ]
-                          .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
-                          .map((item, index) => (
-
-
-
-                          <tr key={`${item.type}-${item.id || index}`} className="transition hover:bg-slate-50/80">
-
-
-
-                            <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-900">
-                              <span className="inline-flex items-center gap-2">
-                                {item.type === "product" ? (
-                                  <span className="text-green-600"></span>
-                                ) : (
-                                  <span className="text-red-600"></span>
-                                )}
-                                {item.name}
-                              </span>
-                            </td>
-
-
-
-                            <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">{(item.price || 0).toLocaleString("en-IN")}</td>
-
-
-
-                            <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">{(item.qty || 0).toFixed(2)}</td>
-
-
-
-                            <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">{(item.discount || 0).toLocaleString("en-IN")}</td>
-
-
-
-                            <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">{(item.tax || 0).toLocaleString("en-IN")}</td>
-
-
-
-                            {productFieldDefs.map((def) => {
-                              const custom = item.customFields || item.fields || {};
-                              let v = "";
-                              try {
-                                const obj = typeof custom === "string" ? JSON.parse(custom || "{}") : custom;
-                                v = obj?.[def.key] ?? "";
-                              } catch { v = ""; }
-                              return (
-                                <td key={def.key} className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">
-                                  {String(v)}
-                                </td>
-                              );
-                            })}
-
-
-
-            <td className="whitespace-nowrap px-4 py-3 text-xs font-semibold text-slate-900">
-                              {item.type === "product" 
-                                ? ((item.price || 0) * (item.qty || 0) - (item.discount || 0) + (item.tax || 0)).toLocaleString("en-IN")
-                                : item.amount.toLocaleString("en-IN")
-                              }
-                            </td>
-
-
-
-            <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">
-                              <div className="flex items-center gap-2">
-                                {item.type === "product" && (
-                                  <>
-                                    <button
-                                      type="button"
-                                      onClick={() => openProductEdit(item)}
-                                      className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:border-indigo-300 hover:text-indigo-700"
-                                    >
-                                      <Edit3 className="h-3.5 w-3.5" />
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={async () => {
-                                        if (!confirm("Delete this product?")) return;
-                                        await handleDeleteDealProduct(item.dealProductId ?? item.id);
-                                      }}
-                                      className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white text-rose-500 shadow-sm transition hover:border-rose-300 hover:text-rose-600"
-                                    >
-                                      <TrashIcon />
-                                    </button>
-                                  </>
-                                )}
-                                {item.type === "expense" && (
-                                  <>
-                                    <button
-                                      type="button"
-                                      onClick={() => openExpenseEdit(item)}
-                                      className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:border-indigo-300 hover:text-indigo-700"
-                                    >
-                                      <Edit3 className="h-3.5 w-3.5" />
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => handleDeleteExpense(item.id)}
-                                      className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white text-rose-500 shadow-sm transition hover:border-rose-300 hover:text-rose-600"
-                                    >
-                                      <TrashIcon />
-                                    </button>
-                                  </>
-                                )}
-                              </div>
-                            </td>
-
-
-
-                          </tr>
 
 
 
@@ -10585,360 +9681,4196 @@ async function ensureDealId() {
 
 
 
-                        </tbody>
+                        {cases.length === 0 && (
 
 
 
-                      </table>
+                          <p className="col-span-full rounded-xl border border-dashed border-slate-200 bg-slate-50/70 px-4 py-3 text-xs text-slate-500">
 
 
 
-                    </div>
+                            No cases yet. Click <span className="font-semibold">Create Case</span> to add one.
 
 
 
-                  </div>
+                          </p>
 
 
 
-                  <div className="sticky bottom-0 mt-4 flex items-center justify-between bg-white/90 py-2 backdrop-blur">
+                        )}
 
 
 
-                    <button
-
-
-
-                      onClick={openProductModal}
-
-
-
-                      className="inline-flex items-center gap-2 rounded-full border border-slate-300 px-3 py-2 text-xs font-medium text-slate-800 shadow-sm transition hover:border-indigo-400 hover:text-indigo-700"
-
-
-
-                    >
-
-
-
-                      <Plus className="h-4 w-4" /> Product
-
-
-
-                    </button>
-
-
-
-                    <button
-
-
-
-                      onClick={() => setShowExpenseModal(true)}
-
-
-
-                      className="inline-flex items-center gap-2 rounded-full border border-rose-300 px-3 py-2 text-xs font-medium text-rose-800 shadow-sm transition hover:border-rose-400 hover:text-rose-700"
-
-
-
-                    >
-
-
-
-                      <Plus className="h-4 w-4" /> Expense
-
-
-
-                    </button>
-
-
-
-                    <div className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-slate-50 shadow-md shadow-slate-900/40">
-
-
-
-                      <span className="text-slate-400">Final Amount</span>
-
-
-
-                      <span>{formatCurrency(finalAmount)}</span>
-
-
-
-                    </div>
-
-
-
-                  </div>
-
-
-                </div>
-
-              )}
-
-              {/*  EXPENSE MODAL - Full form matching /expenses page */}
-              {showExpenseModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-                  <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowExpenseModal(false)} />
-                  <div className="relative w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
-                    <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-6 py-4">
-                      <div>
-                        <h3 className="text-lg font-semibold text-slate-900">{editingExpenseId ? 'Edit Expense' : 'Add Expense'}</h3>
-                        <p className="text-xs text-slate-500 mt-0.5">Client: <span className="font-medium text-indigo-600">{customer?.name}</span></p>
-                      </div>
-                      <button type="button" onClick={() => setShowExpenseModal(false)} className="rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600">
-                        <XCircle className="h-5 w-5" />
-                      </button>
-                    </div>
-                    <div className="p-6 space-y-3 max-h-[70vh] overflow-y-auto">
-
-                      {/* Employee */}
-                      <div>
-                        <label className="block text-xs text-slate-500 mb-1">Employee *</label>
-                        <select
-                          value={expenseForm.employeeId}
-                          onChange={e => setExpenseForm(p => ({ ...p, employeeId: e.target.value }))}
-                          required
-                          className="w-full border rounded-lg px-3 py-2 text-sm"
-                        >
-                          <option value="">Select Employee</option>
-                          {expenseEmployees.map(emp => (
-                            <option key={emp.id} value={emp.id}>
-                              {emp.firstName} {emp.lastName}  {emp.departmentName || emp.tlDepartmentName || 'No Dept'} ({emp.roleName})
-                            </option>
-                          ))}
-                        </select>
                       </div>
 
-                      {/* Category + Amount */}
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-xs text-slate-500 mb-1">Category *</label>
-                          <input
-                            type="text"
-                            value={expenseForm.category}
-                            onChange={e => setExpenseForm(p => ({ ...p, category: e.target.value }))}
-                            placeholder="e.g. Travel"
-                            className="w-full border rounded-lg px-3 py-2 text-sm"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs text-slate-500 mb-1">Amount () *</label>
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={expenseForm.amount}
-                            onChange={e => setExpenseForm(p => ({ ...p, amount: e.target.value }))}
-                            placeholder="0.00"
-                            className="w-full border rounded-lg px-3 py-2 text-sm"
-                          />
-                        </div>
-                      </div>
 
-                      {/* Description */}
-                      <div>
-                        <label className="block text-xs text-slate-500 mb-1">Description</label>
-                        <textarea
-                          value={expenseForm.description}
-                          onChange={e => setExpenseForm(p => ({ ...p, description: e.target.value }))}
-                          rows={2}
-                          placeholder="Brief description..."
-                          className="w-full border rounded-lg px-3 py-2 text-sm"
-                        />
-                      </div>
 
-                      {/* Date + Status */}
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-xs text-slate-500 mb-1">Date *</label>
-                          <input
-                            type="date"
-                            value={expenseForm.expenseDate}
-                            onChange={e => setExpenseForm(p => ({ ...p, expenseDate: e.target.value }))}
-                            className="w-full border rounded-lg px-3 py-2 text-sm"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs text-slate-500 mb-1">Status</label>
-                          <select
-                            value={expenseForm.status}
-                            onChange={e => setExpenseForm(p => ({ ...p, status: e.target.value }))}
-                            className="w-full border rounded-lg px-3 py-2 text-sm"
-                          >
-                            <option value="PENDING">Pending</option>
-                            <option value="APPROVED">Approved</option>
-                            <option value="REJECTED">Rejected</option>
-                            <option value="PAID">Paid</option>
-                          </select>
-                        </div>
-                      </div>
 
-                      {/* File Upload */}
-                      <div>
-                        <label className="block text-xs text-slate-500 mb-1">Evidence / Receipt</label>
-                        <label className="flex flex-col items-center justify-center w-full h-20 border-2 border-dashed border-slate-300 rounded-lg cursor-pointer hover:border-indigo-400 hover:bg-indigo-50 transition-colors">
-                          <input
-                            type="file"
-                            accept="image/*,.pdf"
-                            className="hidden"
-                            onChange={e => {
-                              const f = e.target.files[0];
-                              setExpenseFile(f || null);
-                              if (f && f.type.startsWith('image/')) {
-                                setExpenseFilePreview(URL.createObjectURL(f));
-                              } else {
-                                setExpenseFilePreview(f ? f.name : null);
-                              }
-                            }}
-                          />
-                          {expenseFilePreview ? (
-                            expenseFilePreview.startsWith('blob:') ? (
-                              <img src={expenseFilePreview} className="h-16 object-contain rounded" />
-                            ) : (
-                              <span className="text-sm text-indigo-600">{expenseFilePreview}</span>
-                            )
-                          ) : (
-                            <>
-                              <span className="text-2xl text-slate-400"></span>
-                              <span className="text-xs text-slate-500 mt-1">Click to upload image or PDF (max 5MB)</span>
-                            </>
-                          )}
-                        </label>
-                      </div>
 
-                      <div className="flex justify-end gap-3 pt-2">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setShowExpenseModal(false);
-                            setExpenseFilePreview(null);
-                            setExpenseFile(null);
-                            setEditingExpenseId(null);
-                          }}
-                          className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          type="button"
-                          disabled={savingExpense}
-                          onClick={async () => {
-                            if (!expenseForm.amount || !expenseForm.category) {
-                              addToast('Please fill in amount and category', 'error');
-                              return;
-                            }
-                            if (expenseFile && expenseFile.size > 5 * 1024 * 1024) {
-                              addToast('File must be under 5MB', 'error');
-                              return;
-                            }
-                            try {
-                              setSavingExpense(true);
-                              const payload = {
-                                ...expenseForm,
-                                clientId: customerId,
-                                clientName: customer?.name || safeCustomer?.name || '',
-                                dealId: dealId ?? null,
-                                departmentName: deal?.department || '',
-                                stageCode: deal?.stageCode || '',
-                                expenseType: dealId ? 'DEAL' : 'COMPANY',
-                                amount: Number(expenseForm.amount)
-                              };
-                              const uploadData = new FormData();
-                              uploadData.append('expense', JSON.stringify(payload));
-                              if (expenseFile) uploadData.append('file', expenseFile);
-                              const expUrl = editingExpenseId
-                                ? `${process.env.NEXT_PUBLIC_BACKEND_URL || "https://api.yashrajent.com"}/api/expenses/${editingExpenseId}`
-                                : `${process.env.NEXT_PUBLIC_BACKEND_URL || "https://api.yashrajent.com"}/api/expenses`;
-                              await fetch(expUrl, {
-                                method: editingExpenseId ? 'PUT' : 'POST',
-                                body: uploadData
-                              });
-                              setExpenseForm({ employeeId: "", amount: "", category: "", description: "", expenseDate: new Date().toISOString().split('T')[0], status: "PENDING" });
-                              setExpenseFilePreview(null);
-                              setExpenseFile(null);
-                              setEditingExpenseId(null);
-                              setShowExpenseModal(false);
-                              await fetchExpenses(customerId);
-                              // Broadcast so /expenses page also refreshes
-                              window.dispatchEvent(new CustomEvent('crm-data-update', {
-                                detail: { type: 'EXPENSE_UPDATED', clientId: Number(customerId) }
-                              }));
-                            } catch (error) {
-                              console.error('Failed to save expense:', error);
-                              addToast('Failed to save expense', 'error');
-                            } finally {
-                              setSavingExpense(false);
-                            }
-                          }}
-                          className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:opacity-50"
-                        >
-                          {savingExpense ? 'Saving...' : 'Save Expense'}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
 
-              {activeTab === "emails" && (
-                <div className="mt-5 animate-[fadeIn_0.25s_ease-out]">
-                  <div className="mb-4 flex items-center justify-between">
-                    <div className="text-sm font-semibold text-slate-900">Email History</div>
-                    <button
-                      onClick={() => {
-                        setEmailForm({ to: customer?.email || '', cc: '', subject: '', body: '' });
-                        setEmailFile(null);
-                        setShowEmailModal(true);
-                      }}
-                      className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-teal-500 to-emerald-500 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-emerald-500/40 transition hover:translate-y-[1px] hover:shadow-lg"
-                    >
-                      <Mail className="h-4 w-4" /> Compose Email
-                    </button>
-                  </div>
-                  {loadingEmailHistory ? (
-                    <div className="py-6 text-center text-xs text-slate-500">Loading...</div>
-                  ) : emailHistory.length === 0 ? (
-                    <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/70 px-4 py-8 text-center text-xs text-slate-500">
-                      No emails sent yet. Click Compose Email to send the first one.
-                    </div>
-                  ) : (
-                    <div className="space-y-3 max-h-[400px] overflow-auto">
-                      {emailHistory.map((em) => (
-                        <div key={em.id} className="rounded-2xl border border-slate-200/80 bg-white/90 p-4 shadow-sm">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${em.status === 'SENT' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
-                                  {em.status}
-                                </span>
-                                <span className="text-xs font-medium text-slate-900 truncate">{em.subject || '(no subject)'}</span>
+
+                      {selectedCaseId && (
+
+
+
+                        <div className="mt-6 rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4 shadow-inner shadow-slate-200/80">
+
+
+
+                          <div className="flex items-start justify-between">
+
+
+
+                            <div>
+
+
+
+                              <div className="text-sm text-slate-500">Selected Case</div>
+
+
+
+                              <div className="text-base font-semibold text-slate-900">
+
+
+
+                                {caseData?.title || caseData?.caseNumber || `Case #${selectedCaseId}`}
+
+
+
                               </div>
-                              <div className="mt-1 text-[11px] text-slate-500">
-                                To: <span className="font-medium text-slate-700">{em.toAddress}</span>
-                                {em.ccAddress && <span>  CC: {em.ccAddress}</span>}
-                              </div>
-                              {em.body && (
-                                <div className="mt-2 text-xs text-slate-600 line-clamp-2 whitespace-pre-wrap">{em.body}</div>
-                              )}
-                              {em.attachmentName && (
-                                <div className="mt-1 text-[11px] text-indigo-600"> {em.attachmentName}</div>
-                              )}
+
+
+
                             </div>
-                            <div className="text-[11px] text-slate-400 whitespace-nowrap">
-                              {em.sentAt ? new Date(em.sentAt).toLocaleString('en-IN', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' }) : ''}
+
+
+
+                          </div>
+
+
+
+                          <form onSubmit={uploadDoc} className="mt-4 flex flex-wrap items-center gap-3">
+
+
+
+                            <input
+
+
+
+                              type="text"
+
+
+
+                              className="w-64 rounded-full border border-slate-200 px-3 py-2 text-xs text-slate-700 placeholder:text-slate-400 focus:border-indigo-400"
+
+
+
+                              value={docType}
+
+
+
+                              onChange={(e) => setDocType(e.target.value)}
+
+
+
+                              placeholder="Enter document name"
+
+
+
+                            />
+
+
+
+                            <input
+
+
+
+                              type="file"
+
+
+
+                              accept="application/pdf,.pdf"
+
+
+
+                              onChange={(e) => setDocFile(e.target.files?.[0] || null)}
+
+
+
+                              className="text-xs file:mr-2 file:rounded-full file:border-0 file:bg-indigo-50 file:px-3 file:py-1 file:text-xs file:font-medium file:text-indigo-700 hover:file:bg-indigo-100"
+
+
+
+                              ref={caseFileInputRef}
+
+
+
+                            />
+
+
+
+                            <button
+
+
+
+                              type="submit"
+
+
+
+                              disabled={uploadingDoc || !docFile}
+
+
+
+                              className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-indigo-600 to-sky-600 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-indigo-500/40 transition hover:translate-y-[1px] hover:shadow-lg disabled:cursor-not-allowed disabled:bg-indigo-300 disabled:shadow-none"
+
+
+
+                            >
+
+
+
+                              <Upload className="h-4 w-4" />
+
+
+
+                              {uploadingDoc ? "Uploading..." : "Upload Document"}
+
+
+
+                            </button>
+
+
+
+                          </form>
+
+
+
+
+
+
+
+                          <div className="mt-4">
+
+
+
+                            {docs.length === 0 ? (
+
+
+
+                              <p className="text-xs text-slate-500">No documents uploaded. Use Upload Document to add a PDF.</p>
+
+
+
+                            ) : (
+
+
+
+                              <div className="grid grid-cols-2 gap-4">
+
+
+
+                                {docs.map((doc) => (
+
+
+
+                                  <div key={doc.id} className="flex items-center justify-between rounded-2xl border border-slate-200/80 bg-white/90 px-4 py-3 shadow-sm transition hover:-translate-y-[1px] hover:border-indigo-300 hover:shadow-md">
+
+
+
+                                    <div className="flex min-w-0 items-center gap-3">
+
+
+
+                                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-rose-500 to-red-500 text-white shadow-sm">
+
+
+
+                                        <PdfIcon />
+
+
+
+                                      </div>
+
+
+
+                                      <div className="min-w-0">
+
+
+
+                                        <div
+
+
+
+                                          className="max-w-[260px] truncate text-xs font-semibold uppercase tracking-wide text-slate-700"
+
+
+
+                                          title={doc.documentName || "Document"}
+
+
+
+                                        >
+
+
+
+                                          {doc.documentName || "Document"}
+
+
+
+                                        </div>
+
+
+
+                                        <div
+
+
+
+                                          className="max-w-[260px] truncate text-sm font-medium text-slate-900"
+
+
+
+                                          title={doc.fileName || "File"}
+
+
+
+                                        >
+
+
+
+                                          {doc.fileName || "File"}
+
+
+
+                                        </div>
+
+
+
+                                      </div>
+
+
+
+                                    </div>
+
+
+
+                                    <div className="flex items-center gap-2">
+
+
+
+                                      <button
+
+
+
+                                        type="button"
+
+
+
+                                        onClick={() => viewDoc(doc)}
+
+
+
+                                        className="flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-medium text-indigo-600 transition hover:bg-indigo-50 hover:text-indigo-800"
+
+
+
+                                        title="View document"
+
+
+
+                                      >
+
+
+
+                                        <Eye className="h-4 w-4" /> View
+
+
+
+                                      </button>
+
+
+
+                                      <button
+
+
+
+                                        type="button"
+
+
+
+                                        onClick={() => downloadDoc(doc)}
+
+
+
+                                        className="flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-medium text-emerald-600 transition hover:bg-emerald-50 hover:text-emerald-800"
+
+
+
+                                        title="Download document"
+
+
+
+                                      >
+
+
+
+                                        <Download className="h-4 w-4" /> Download
+
+
+
+                                      </button>
+
+
+
+                                      <button
+
+
+
+                                        type="button"
+
+
+
+                                        onClick={() => removeDoc(doc.id)}
+
+
+
+                                        className="rounded-full p-1 text-rose-500 transition hover:bg-rose-50 hover:text-rose-600"
+
+
+
+                                        title="Remove document"
+
+
+
+                                      >
+
+
+
+                                        <TrashIcon />
+
+
+
+                                      </button>
+
+
+
+                                    </div>
+
+
+
+                                  </div>
+
+
+
+                                ))}
+
+
+
+                              </div>
+
+
+
+                            )}
+
+
+
+                          </div>
+
+
+
+                        </div>
+
+
+
+                      )}
+
+
+
+
+
+
+
+                      {viewingDoc && (
+
+
+
+                        <>
+
+
+
+                          <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm" onClick={closeDocViewer} />
+
+
+
+                          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+
+
+
+                            <div className="relative h-[90vh] w-full max-w-6xl overflow-hidden rounded-2xl bg-slate-950/95 shadow-2xl shadow-slate-950/70">
+
+
+
+                              <div className="flex items-center justify-between border-b border-slate-800 bg-slate-900/70 px-4 py-3">
+
+
+
+                                <div>
+
+
+
+                                  <h3 className="text-sm font-semibold text-slate-50">
+
+
+
+                                    {viewingDoc.documentName || viewingDoc.fileName || "Document"}
+
+
+
+                                  </h3>
+
+
+
+                                  <p className="text-xs text-slate-400">{viewingDoc.fileName}</p>
+
+
+
+                                </div>
+
+
+
+                                <button
+
+
+
+                                  type="button"
+
+
+
+                                  onClick={closeDocViewer}
+
+
+
+                                  className="rounded-full p-2 text-slate-400 transition hover:bg-slate-800 hover:text-slate-100"
+
+
+
+                                >
+
+
+
+                                  <XCircle className="h-5 w-5" />
+
+
+
+                                </button>
+
+
+
+                              </div>
+
+
+
+                              <div className="flex-1 bg-slate-900 p-1">
+
+
+
+                                {viewingDocBlobUrl ? (<iframe
+
+
+
+                                  src={viewingDocBlobUrl}
+
+
+
+                                  className="h-full w-full rounded-lg border-0 bg-slate-900"
+
+
+
+                                  title="PDF Viewer"
+
+
+
+                                  style={{ minHeight: 'calc(90vh - 80px)' }}
+
+
+
+                                  onError={() => window.open(`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080"}/api/case-documents/download/${viewingDoc.id}`, "_blank")}
+
+
+
+                                />) : (<div className="flex items-center justify-center h-full text-slate-400 text-sm gap-2"><span>Loading PDF...</span></div>)}
+
+
+
+                              </div>
+
+
+
+                            </div>
+
+
+
+                          </div>
+
+
+
+                        </>
+
+
+
+                      )}
+
+
+
+                    </div>
+
+
+
+                  )}
+
+
+
+
+
+
+
+                  {activeTab === "products" && (
+
+
+
+                    <div className="mt-5 animate-[fadeIn_0.25s_ease-out]">
+
+
+
+                      <div className="mb-3 flex items-center justify-between">
+
+
+
+                        <div className="text-sm font-semibold text-slate-900">Account</div>
+
+
+
+                        <div className="text-xs text-slate-500">Billing-grade view of charges linked to this case</div>
+
+
+
+                      </div>
+
+
+
+                      <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-slate-950/[0.01] shadow-sm">
+
+
+
+                        <div className="max-h-[260px] overflow-auto">
+
+
+
+                          <table className="min-w-full divide-y divide-slate-100">
+
+
+
+                            <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur">
+
+
+
+                              <tr>
+
+
+
+                                <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+
+
+
+                                  Product
+
+
+
+                                </th>
+
+
+
+                                <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+
+
+
+                                  List Price ()
+
+
+
+                                </th>
+
+
+
+                                <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+
+
+
+                                  Quantity
+
+
+
+                                </th>
+
+
+
+                                <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+
+
+
+                                  Discount
+
+
+
+                                </th>
+
+
+
+                                <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+
+
+
+                                  Tax
+
+
+
+                                </th>
+
+
+
+                                {productFieldDefs.map((def) => (
+
+
+
+                                  <th key={def.key} className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+
+
+
+                                    {def.label || def.key}
+
+
+
+                                  </th>
+
+
+
+                                ))}
+
+
+
+                                <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+
+
+
+                                  Final Amount ()
+
+
+
+                                </th>
+
+
+
+                                <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+
+
+
+                                  Action
+
+
+
+                                </th>
+
+
+
+                              </tr>
+
+
+
+                            </thead>
+
+
+
+                            {/*  COMBINED ACCOUNTS TABLE (Products + Expenses) */}
+                            <tbody className="divide-y divide-slate-100 bg-white/90">
+
+                              {/* Combine products and expenses */}
+                              {[
+                                ...products.map(p => ({ ...p, type: "product", name: p.name || p.productName, amount: p.price * p.qty - (p.discount || 0) + (p.tax || 0) })),
+                                ...expenses.map(e => ({ ...e, type: "expense", name: e.category, amount: e.amount }))
+                              ]
+                                .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
+                                .map((item, index) => (
+
+
+
+                                  <tr key={`${item.type}-${item.id || index}`} className="transition hover:bg-slate-50/80">
+
+
+
+                                    <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-900">
+                                      <span className="inline-flex items-center gap-2">
+                                        {item.type === "product" ? (
+                                          <span className="text-green-600"></span>
+                                        ) : (
+                                          <span className="text-red-600"></span>
+                                        )}
+                                        {item.name}
+                                      </span>
+                                    </td>
+
+
+
+                                    <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">{(item.price || 0).toLocaleString("en-IN")}</td>
+
+
+
+                                    <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">{(item.qty || 0).toFixed(2)}</td>
+
+
+
+                                    <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">{(item.discount || 0).toLocaleString("en-IN")}</td>
+
+
+
+                                    <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">{(item.tax || 0).toLocaleString("en-IN")}</td>
+
+
+
+                                    {productFieldDefs.map((def) => {
+                                      const custom = item.customFields || item.fields || {};
+                                      let v = "";
+                                      try {
+                                        const obj = typeof custom === "string" ? JSON.parse(custom || "{}") : custom;
+                                        v = obj?.[def.key] ?? "";
+                                      } catch { v = ""; }
+                                      return (
+                                        <td key={def.key} className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">
+                                          {String(v)}
+                                        </td>
+                                      );
+                                    })}
+
+
+
+                                    <td className="whitespace-nowrap px-4 py-3 text-xs font-semibold text-slate-900">
+                                      {item.type === "product"
+                                        ? ((item.price || 0) * (item.qty || 0) - (item.discount || 0) + (item.tax || 0)).toLocaleString("en-IN")
+                                        : item.amount.toLocaleString("en-IN")
+                                      }
+                                    </td>
+
+
+
+                                    <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">
+                                      <div className="flex items-center gap-2">
+                                        {item.type === "product" && (
+                                          <>
+                                            <button
+                                              type="button"
+                                              onClick={() => openProductEdit(item)}
+                                              className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:border-indigo-300 hover:text-indigo-700"
+                                            >
+                                              <Edit3 className="h-3.5 w-3.5" />
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={async () => {
+                                                if (!confirm("Delete this product?")) return;
+                                                await handleDeleteDealProduct(item.dealProductId ?? item.id);
+                                              }}
+                                              className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white text-rose-500 shadow-sm transition hover:border-rose-300 hover:text-rose-600"
+                                            >
+                                              <TrashIcon />
+                                            </button>
+                                          </>
+                                        )}
+                                        {item.type === "expense" && (
+                                          <>
+                                            <button
+                                              type="button"
+                                              onClick={() => openExpenseEdit(item)}
+                                              className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:border-indigo-300 hover:text-indigo-700"
+                                            >
+                                              <Edit3 className="h-3.5 w-3.5" />
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={() => handleDeleteExpense(item.id)}
+                                              className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white text-rose-500 shadow-sm transition hover:border-rose-300 hover:text-rose-600"
+                                            >
+                                              <TrashIcon />
+                                            </button>
+                                          </>
+                                        )}
+                                      </div>
+                                    </td>
+
+
+
+                                  </tr>
+
+
+
+                                ))}
+
+
+
+                            </tbody>
+
+
+
+                          </table>
+
+
+
+                        </div>
+
+
+
+                      </div>
+
+
+
+                      <div className="sticky bottom-0 mt-4 flex items-center justify-between bg-white/90 py-2 backdrop-blur">
+
+
+
+                        <button
+
+
+
+                          onClick={openProductModal}
+
+
+
+                          className="inline-flex items-center gap-2 rounded-full border border-slate-300 px-3 py-2 text-xs font-medium text-slate-800 shadow-sm transition hover:border-indigo-400 hover:text-indigo-700"
+
+
+
+                        >
+
+
+
+                          <Plus className="h-4 w-4" /> Product
+
+
+
+                        </button>
+
+
+
+                        <button
+
+
+
+                          onClick={() => setShowExpenseModal(true)}
+
+
+
+                          className="inline-flex items-center gap-2 rounded-full border border-rose-300 px-3 py-2 text-xs font-medium text-rose-800 shadow-sm transition hover:border-rose-400 hover:text-rose-700"
+
+
+
+                        >
+
+
+
+                          <Plus className="h-4 w-4" /> Expense
+
+
+
+                        </button>
+
+
+
+                        <div className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-slate-50 shadow-md shadow-slate-900/40">
+
+
+
+                          <span className="text-slate-400">Final Amount</span>
+
+
+
+                          <span>{formatCurrency(finalAmount)}</span>
+
+
+
+                        </div>
+
+
+
+                      </div>
+
+
+                    </div>
+
+                  )}
+
+                  {/*  EXPENSE MODAL - Full form matching /expenses page */}
+                  {showExpenseModal && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowExpenseModal(false)} />
+                      <div className="relative w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
+                        <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-6 py-4">
+                          <div>
+                            <h3 className="text-lg font-semibold text-slate-900">{editingExpenseId ? 'Edit Expense' : 'Add Expense'}</h3>
+                            <p className="text-xs text-slate-500 mt-0.5">Client: <span className="font-medium text-indigo-600">{customer?.name}</span></p>
+                          </div>
+                          <button type="button" onClick={() => setShowExpenseModal(false)} className="rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600">
+                            <XCircle className="h-5 w-5" />
+                          </button>
+                        </div>
+                        <div className="p-6 space-y-3 max-h-[70vh] overflow-y-auto">
+
+                          {/* Employee */}
+                          <div>
+                            <label className="block text-xs text-slate-500 mb-1">Employee *</label>
+                            <select
+                              value={expenseForm.employeeId}
+                              onChange={e => setExpenseForm(p => ({ ...p, employeeId: e.target.value }))}
+                              required
+                              className="w-full border rounded-lg px-3 py-2 text-sm"
+                            >
+                              <option value="">Select Employee</option>
+                              {expenseEmployees.map(emp => (
+                                <option key={emp.id} value={emp.id}>
+                                  {emp.firstName} {emp.lastName}  {emp.departmentName || emp.tlDepartmentName || 'No Dept'} ({emp.roleName})
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          {/* Category + Amount */}
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-xs text-slate-500 mb-1">Category *</label>
+                              <input
+                                type="text"
+                                value={expenseForm.category}
+                                onChange={e => setExpenseForm(p => ({ ...p, category: e.target.value }))}
+                                placeholder="e.g. Travel"
+                                className="w-full border rounded-lg px-3 py-2 text-sm"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs text-slate-500 mb-1">Amount () *</label>
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={expenseForm.amount}
+                                onChange={e => setExpenseForm(p => ({ ...p, amount: e.target.value }))}
+                                placeholder="0.00"
+                                className="w-full border rounded-lg px-3 py-2 text-sm"
+                              />
                             </div>
                           </div>
+
+                          {/* Description */}
+                          <div>
+                            <label className="block text-xs text-slate-500 mb-1">Description</label>
+                            <textarea
+                              value={expenseForm.description}
+                              onChange={e => setExpenseForm(p => ({ ...p, description: e.target.value }))}
+                              rows={2}
+                              placeholder="Brief description..."
+                              className="w-full border rounded-lg px-3 py-2 text-sm"
+                            />
+                          </div>
+
+                          {/* Date + Status */}
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-xs text-slate-500 mb-1">Date *</label>
+                              <input
+                                type="date"
+                                value={expenseForm.expenseDate}
+                                onChange={e => setExpenseForm(p => ({ ...p, expenseDate: e.target.value }))}
+                                className="w-full border rounded-lg px-3 py-2 text-sm"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs text-slate-500 mb-1">Status</label>
+                              <select
+                                value={expenseForm.status}
+                                onChange={e => setExpenseForm(p => ({ ...p, status: e.target.value }))}
+                                className="w-full border rounded-lg px-3 py-2 text-sm"
+                              >
+                                <option value="PENDING">Pending</option>
+                                <option value="APPROVED">Approved</option>
+                                <option value="REJECTED">Rejected</option>
+                                <option value="PAID">Paid</option>
+                              </select>
+                            </div>
+                          </div>
+
+                          {/* File Upload */}
+                          <div>
+                            <label className="block text-xs text-slate-500 mb-1">Evidence / Receipt</label>
+                            <label className="flex flex-col items-center justify-center w-full h-20 border-2 border-dashed border-slate-300 rounded-lg cursor-pointer hover:border-indigo-400 hover:bg-indigo-50 transition-colors">
+                              <input
+                                type="file"
+                                accept="image/*,.pdf"
+                                className="hidden"
+                                onChange={e => {
+                                  const f = e.target.files[0];
+                                  setExpenseFile(f || null);
+                                  if (f && f.type.startsWith('image/')) {
+                                    setExpenseFilePreview(URL.createObjectURL(f));
+                                  } else {
+                                    setExpenseFilePreview(f ? f.name : null);
+                                  }
+                                }}
+                              />
+                              {expenseFilePreview ? (
+                                expenseFilePreview.startsWith('blob:') ? (
+                                  <img src={expenseFilePreview} className="h-16 object-contain rounded" />
+                                ) : (
+                                  <span className="text-sm text-indigo-600">{expenseFilePreview}</span>
+                                )
+                              ) : (
+                                <>
+                                  <span className="text-2xl text-slate-400"></span>
+                                  <span className="text-xs text-slate-500 mt-1">Click to upload image or PDF (max 5MB)</span>
+                                </>
+                              )}
+                            </label>
+                          </div>
+
+                          <div className="flex justify-end gap-3 pt-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setShowExpenseModal(false);
+                                setExpenseFilePreview(null);
+                                setExpenseFile(null);
+                                setEditingExpenseId(null);
+                              }}
+                              className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="button"
+                              disabled={savingExpense}
+                              onClick={async () => {
+                                if (!expenseForm.amount || !expenseForm.category) {
+                                  addToast('Please fill in amount and category', 'error');
+                                  return;
+                                }
+                                if (expenseFile && expenseFile.size > 5 * 1024 * 1024) {
+                                  addToast('File must be under 5MB', 'error');
+                                  return;
+                                }
+                                try {
+                                  setSavingExpense(true);
+                                  const payload = {
+                                    ...expenseForm,
+                                    clientId: customerId,
+                                    clientName: customer?.name || safeCustomer?.name || '',
+                                    dealId: dealId ?? null,
+                                    departmentName: deal?.department || '',
+                                    stageCode: deal?.stageCode || '',
+                                    expenseType: dealId ? 'DEAL' : 'COMPANY',
+                                    amount: Number(expenseForm.amount)
+                                  };
+                                  const uploadData = new FormData();
+                                  uploadData.append('expense', JSON.stringify(payload));
+                                  if (expenseFile) uploadData.append('file', expenseFile);
+                                  const expUrl = editingExpenseId
+                                    ? `${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080"}/api/expenses/${editingExpenseId}`
+                                    : `${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080"}/api/expenses`;
+                                  await fetch(expUrl, {
+                                    method: editingExpenseId ? 'PUT' : 'POST',
+                                    body: uploadData
+                                  });
+                                  setExpenseForm({ employeeId: "", amount: "", category: "", description: "", expenseDate: new Date().toISOString().split('T')[0], status: "PENDING" });
+                                  setExpenseFilePreview(null);
+                                  setExpenseFile(null);
+                                  setEditingExpenseId(null);
+                                  setShowExpenseModal(false);
+                                  await fetchExpenses(customerId);
+                                  // Broadcast so /expenses page also refreshes
+                                  window.dispatchEvent(new CustomEvent('crm-data-update', {
+                                    detail: { type: 'EXPENSE_UPDATED', clientId: Number(customerId) }
+                                  }));
+                                } catch (error) {
+                                  console.error('Failed to save expense:', error);
+                                  addToast('Failed to save expense', 'error');
+                                } finally {
+                                  setSavingExpense(false);
+                                }
+                              }}
+                              className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:opacity-50"
+                            >
+                              {savingExpense ? 'Saving...' : 'Save Expense'}
+                            </button>
+                          </div>
                         </div>
-                      ))}
+                      </div>
                     </div>
                   )}
+
+                  {activeTab === "emails" && (
+                    <div className="mt-5 animate-[fadeIn_0.25s_ease-out]">
+                      <div className="mb-4 flex items-center justify-between">
+                        <div className="text-sm font-semibold text-slate-900">Email History</div>
+                        <button
+                          onClick={() => {
+                            setEmailForm({ to: customer?.email || '', cc: '', subject: '', body: '' });
+                            setEmailFile(null);
+                            setShowEmailModal(true);
+                          }}
+                          className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-teal-500 to-emerald-500 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-emerald-500/40 transition hover:translate-y-[1px] hover:shadow-lg"
+                        >
+                          <Mail className="h-4 w-4" /> Compose Email
+                        </button>
+                      </div>
+                      {loadingEmailHistory ? (
+                        <div className="py-6 text-center text-xs text-slate-500">Loading...</div>
+                      ) : emailHistory.length === 0 ? (
+                        <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/70 px-4 py-8 text-center text-xs text-slate-500">
+                          No emails sent yet. Click Compose Email to send the first one.
+                        </div>
+                      ) : (
+                        <div className="space-y-3 max-h-[400px] overflow-auto">
+                          {emailHistory.map((em) => (
+                            <div key={em.id} className="rounded-2xl border border-slate-200/80 bg-white/90 p-4 shadow-sm">
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${em.status === 'SENT' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
+                                      {em.status}
+                                    </span>
+                                    <span className="text-xs font-medium text-slate-900 truncate">{em.subject || '(no subject)'}</span>
+                                  </div>
+                                  <div className="mt-1 text-[11px] text-slate-500">
+                                    To: <span className="font-medium text-slate-700">{em.toAddress}</span>
+                                    {em.ccAddress && <span>  CC: {em.ccAddress}</span>}
+                                  </div>
+                                  {em.body && (
+                                    <div className="mt-2 text-xs text-slate-600 line-clamp-2 whitespace-pre-wrap">{em.body}</div>
+                                  )}
+                                  {em.attachmentName && (
+                                    <div className="mt-1 text-[11px] text-indigo-600"> {em.attachmentName}</div>
+                                  )}
+                                </div>
+                                <div className="text-[11px] text-slate-400 whitespace-nowrap">
+                                  {em.sentAt ? new Date(em.sentAt).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+
+
                 </div>
-              )}
+
+
+
+              </div>
 
 
 
             </div>
+
+
+
+
+
+
+
+            {/* Email Compose Modal */}
+            {showEmailModal && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowEmailModal(false)} />
+                <div className="relative w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
+                  <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-6 py-4">
+                    <div>
+                      <h3 className="text-lg font-semibold text-slate-900">Compose Email</h3>
+                      <p className="text-xs text-slate-500 mt-0.5">To: <span className="font-medium text-indigo-600">{emailForm.to || customer?.email}</span></p>
+                    </div>
+                    <button type="button" onClick={() => setShowEmailModal(false)} className="rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600">
+                      <XCircle className="h-5 w-5" />
+                    </button>
+                  </div>
+                  <div className="p-6 space-y-3">
+                    <div>
+                      <label className="block text-xs text-slate-500 mb-1">To *</label>
+                      <input
+                        type="email"
+                        value={emailForm.to}
+                        onChange={e => setEmailForm(p => ({ ...p, to: e.target.value }))}
+                        placeholder="recipient@example.com"
+                        className="w-full border rounded-lg px-3 py-2 text-sm focus:border-indigo-400 outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-slate-500 mb-1">CC</label>
+                      <input
+                        type="email"
+                        value={emailForm.cc}
+                        onChange={e => setEmailForm(p => ({ ...p, cc: e.target.value }))}
+                        placeholder="cc@example.com"
+                        className="w-full border rounded-lg px-3 py-2 text-sm focus:border-indigo-400 outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-slate-500 mb-1">Subject</label>
+                      <input
+                        type="text"
+                        value={emailForm.subject}
+                        onChange={e => setEmailForm(p => ({ ...p, subject: e.target.value }))}
+                        placeholder="Email subject"
+                        className="w-full border rounded-lg px-3 py-2 text-sm focus:border-indigo-400 outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-slate-500 mb-1">Body</label>
+                      <textarea
+                        value={emailForm.body}
+                        onChange={e => setEmailForm(p => ({ ...p, body: e.target.value }))}
+                        rows={5}
+                        placeholder="Write your message..."
+                        className="w-full border rounded-lg px-3 py-2 text-sm focus:border-indigo-400 outline-none resize-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-slate-500 mb-1">Attach File</label>
+                      <label className="flex items-center gap-3 w-full border-2 border-dashed border-slate-300 rounded-lg px-4 py-3 cursor-pointer hover:border-indigo-400 hover:bg-indigo-50 transition-colors">
+                        <input
+                          type="file"
+                          className="hidden"
+                          onChange={e => setEmailFile(e.target.files?.[0] || null)}
+                        />
+                        <span className="text-slate-400 text-lg"></span>
+                        <span className="text-xs text-slate-500">
+                          {emailFile ? emailFile.name : 'Click to attach a file'}
+                        </span>
+                        {emailFile && (
+                          <button type="button" onClick={e => { e.preventDefault(); setEmailFile(null); }} className="ml-auto text-rose-500 hover:text-rose-700 text-xs">Remove</button>
+                        )}
+                      </label>
+                    </div>
+                    <div className="flex justify-end gap-3 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => { setShowEmailModal(false); setEmailFile(null); }}
+                        className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        disabled={sendingEmail}
+                        onClick={handleSendEmail}
+                        className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-teal-500 to-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-md transition hover:translate-y-[1px] disabled:opacity-50"
+                      >
+                        <Mail className="h-4 w-4" />
+                        {sendingEmail ? 'Sending...' : 'Send Email'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            {isProductModalOpen && (
+
+
+
+              <>
+
+
+
+                <div
+
+
+
+                  className="fixed inset-0 z-[65] bg-slate-900/60 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]"
+
+
+
+                  onClick={closeProductModal}
+
+
+
+                />
+
+
+
+                <div className="fixed inset-0 z-[70] flex items-center justify-center px-4 py-6">
+
+
+
+                  <div
+
+
+
+                    className="relative flex w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white/95 shadow-2xl shadow-slate-900/50 animate-[scaleIn_0.2s_ease-out]"
+
+
+
+                    onClick={(e) => e.stopPropagation()}
+
+
+
+                  >
+
+
+
+                    <div className="flex items-start justify-between border-b border-slate-200/80 px-5 py-4">
+
+
+
+                      <div>
+
+
+
+                        <div className="text-sm font-semibold text-slate-900">{editingDealProductId ? "Edit Product" : "Add Product"}</div>
+
+
+
+                        <div className="mt-0.5 text-xs text-slate-500">
+
+
+
+                          {editingDealProductId ? "Update product details and pricing" : "Create a new product and configure pricing for this case"}
+
+
+
+                        </div>
+
+
+
+                      </div>
+
+
+
+                      <button
+
+
+
+                        type="button"
+
+
+
+                        onClick={closeProductModal}
+
+
+
+                        className="rounded-full p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
+
+
+
+                      >
+
+
+
+                        <XCircle className="h-5 w-5" />
+
+
+
+                      </button>
+
+
+
+                    </div>
+
+
+
+
+
+
+
+                    <div className="max-h-[70vh] flex-1 overflow-y-auto px-5 py-4">
+
+
+
+                      <div className="space-y-4">
+
+
+
+                        {productFormError && (
+
+
+
+                          <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+
+
+
+                            {productFormError}
+
+
+
+                          </div>
+
+
+
+                        )}
+
+
+
+
+
+
+
+                        <div>
+
+
+
+                          <label className="block text-xs font-medium text-slate-700">Product (choose from catalog or create new)</label>
+
+
+
+                          <div className="mt-1 flex gap-2">
+
+
+
+                            <select
+
+
+
+                              value={productForm.productId || ""}
+
+
+
+                              onChange={(e) => {
+
+
+
+                                const v = e.target.value;
+
+
+
+                                if (!v) {
+
+
+
+                                  // Create new
+
+
+
+                                  setProductForm((prev) => ({ ...prev, productId: "", productName: "", productCode: "", basePrice: "", listPrice: "", quantity: "1", discount: "0", tax: "0" }));
+
+
+
+                                  setEditingDealProductId(null);
+
+
+
+                                  return;
+
+
+
+                                }
+
+
+
+                                handleSelectCatalogProduct(Number(v));
+
+
+
+                              }}
+
+
+
+                              className="w-2/3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
+
+
+
+                            >
+
+
+
+                              <option value="">{loadingCatalog ? "Loading..." : "-- Create new product --"}</option>
+
+
+
+                              {catalogProducts.map((cp) => (
+
+
+
+                                <option key={cp.id} value={cp.id}>
+
+
+
+                                  {cp.name || cp.productName} {cp.code ? `(${cp.code})` : ""}
+
+
+
+                                </option>
+
+
+
+                              ))}
+
+
+
+                            </select>
+
+
+
+
+
+
+
+                            <input
+
+
+
+                              type="text"
+
+
+
+                              value={productForm.productName}
+
+
+
+                              onChange={(e) => setProductForm((prev) => ({ ...prev, productName: e.target.value, productId: "" }))}
+
+
+
+                              placeholder="Product name (for new product)"
+
+
+
+                              className="w-1/3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
+
+
+
+                            />
+
+
+
+                          </div>
+
+
+
+                        </div>
+
+
+
+
+
+
+
+                        <div className="grid grid-cols-2 gap-3">
+
+
+
+                          <div>
+
+
+
+                            <label className="block text-xs font-medium text-slate-700">Product Code (optional)</label>
+
+
+
+                            <input
+
+
+
+                              value={productForm.productCode}
+
+
+
+                              onChange={(e) => setProductForm((prev) => ({ ...prev, productCode: e.target.value }))}
+
+
+
+                              placeholder="Code"
+
+
+
+                              className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-400"
+
+
+
+                            />
+
+
+
+                          </div>
+
+
+
+                          <div>
+
+
+
+                            <label className="block text-xs font-medium text-slate-700">Base Price ()</label>
+
+
+
+                            <input
+
+
+
+                              type="number"
+
+
+
+                              min="0"
+
+
+
+                              value={productForm.basePrice}
+
+
+
+                              onChange={(e) => {
+
+
+
+                                const v = e.target.value;
+
+
+
+                                setProductForm((prev) => ({
+
+
+
+                                  ...prev,
+
+
+
+                                  basePrice: v,
+
+
+
+                                  listPrice: prev.listPrice || v,
+
+
+
+                                }));
+
+
+
+                                setProductFormError("");
+
+
+
+                              }}
+
+
+
+                              className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-400"
+
+
+
+                              placeholder="0"
+
+
+
+                            />
+
+
+
+                          </div>
+
+
+
+                        </div>
+
+
+
+
+
+
+
+                        <div className="grid grid-cols-2 gap-3">
+
+
+
+                          <div>
+
+
+
+                            <label className="block text-xs font-medium text-slate-700">List Price ()</label>
+
+
+
+                            <input
+
+
+
+                              type="number"
+
+
+
+                              min="0"
+
+
+
+                              value={productForm.listPrice}
+
+
+
+                              onChange={(e) => {
+
+
+
+                                setProductForm((prev) => ({ ...prev, listPrice: e.target.value }));
+
+
+
+                                setProductFormError("");
+
+
+
+                              }}
+
+
+
+                              className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-400"
+
+
+
+                              placeholder="0"
+
+
+
+                            />
+
+
+
+                          </div>
+
+
+
+                          <div>
+
+
+
+                            <label className="block text-xs font-medium text-slate-700">Quantity</label>
+
+
+
+                            <input
+
+
+
+                              type="number"
+
+
+
+                              min="0"
+
+
+
+                              step="0.01"
+
+
+
+                              value={productForm.quantity}
+
+
+
+                              onChange={(e) => {
+
+
+
+                                setProductForm((prev) => ({ ...prev, quantity: e.target.value }));
+
+
+
+                                setProductFormError("");
+
+
+
+                              }}
+
+
+
+                              className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-400"
+
+
+
+                              placeholder="1"
+
+
+
+                            />
+
+
+
+                          </div>
+
+
+
+                        </div>
+
+
+
+
+
+
+
+                        <div className="grid grid-cols-2 gap-3">
+
+
+
+                          <div>
+
+
+
+                            <label className="block text-xs font-medium text-slate-700">Discount ()</label>
+
+
+
+                            <input
+
+
+
+                              type="number"
+
+
+
+                              min="0"
+
+
+
+                              value={productForm.discount}
+
+
+
+                              onChange={(e) => setProductForm((prev) => ({ ...prev, discount: e.target.value }))}
+
+
+
+                              className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-400"
+
+
+
+                              placeholder="0"
+
+
+
+                            />
+
+
+
+                          </div>
+
+
+
+                          <div>
+
+
+
+                            <label className="block text-xs font-medium text-slate-700">Tax (, optional)</label>
+
+
+
+                            <input
+
+
+
+                              type="number"
+
+
+
+                              min="0"
+
+
+
+                              value={productForm.tax}
+
+
+
+                              onChange={(e) => setProductForm((prev) => ({ ...prev, tax: e.target.value }))}
+
+
+
+                              className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-400"
+
+
+
+                              placeholder="0"
+
+
+
+                            />
+
+
+
+                          </div>
+
+
+
+                        </div>
+
+
+
+
+
+
+
+                        {productFieldDefs.length > 0 && (
+
+
+
+                          <div>
+
+
+
+                            <DynamicFieldsSection
+
+
+
+                              title="Product Custom Fields"
+
+
+
+                              definitions={productFieldDefs}
+
+
+
+                              values={productCustomValues[editingDealProductId || 'new'] || {}}
+
+
+
+                              onChange={(k, v) => {
+
+
+
+                                setProductCustomValues((prev) => {
+
+
+
+                                  const key = editingDealProductId || 'new';
+
+
+
+                                  return { ...prev, [key]: { ...(prev[key] || {}), [k]: v } };
+
+
+
+                                });
+
+
+
+                              }}
+
+
+
+                            />
+
+
+
+                          </div>
+
+
+
+                        )}
+
+
+
+
+
+
+
+                        <div>
+
+
+
+                          <label className="block text-xs font-medium text-slate-700">Final Amount ()</label>
+
+
+
+                          <input
+
+
+
+                            type="text"
+
+
+
+                            readOnly
+
+
+
+                            value={productFinalAmount.toLocaleString("en-IN", {
+
+
+
+                              maximumFractionDigits: 2,
+
+
+
+                            })}
+
+
+
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900"
+
+
+
+                          />
+
+
+
+                        </div>
+
+
+
+                      </div>
+
+
+
+                    </div>
+
+
+
+
+
+
+
+                    <div className="sticky bottom-0 border-t border-slate-200 bg-white px-5 py-4">
+
+
+
+                      <div className="flex items-center justify-end gap-3">
+
+
+
+                        <button
+
+
+
+                          type="button"
+
+
+
+                          onClick={closeProductModal}
+
+
+
+                          className="rounded-full border border-slate-300 px-4 py-2 text-xs font-medium text-slate-700 hover:border-slate-400 hover:bg-slate-50"
+
+
+
+                        >
+
+
+
+                          Cancel
+
+
+
+                        </button>
+
+
+
+                        <button
+
+
+
+                          type="button"
+
+
+
+                          onClick={saveProductFromModal}
+
+
+
+                          className="rounded-full bg-gradient-to-r from-indigo-600 to-sky-600 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-indigo-500/40 transition hover:translate-y-[1px] hover:shadow-lg"
+
+
+
+                        >
+
+
+
+                          {editingDealProductId ? "Update Product" : "Save Product"}
+
+
+
+                        </button>
+
+
+
+                      </div>
+
+
+
+                    </div>
+
+
+
+                  </div>
+
+
+
+                </div>
+
+
+
+              </>
+
+
+
+            )}
+
+
+
+
+
+
+
+            {/*  FIX: Single backdrop for any open drawer */}
+
+            {activeDrawer && (
+
+
+
+              <div
+
+
+
+                className="fixed inset-0 z-[60] bg-slate-900/50 backdrop-blur-[2px]"
+
+
+
+                onClick={() => setActiveDrawer(null)}
+
+              />
+
+
+
+            )}
+
+
+
+
+
+
+
+            {/*  FIX: Task drawer - only renders when activeDrawer === 'task' */}
+
+            {activeDrawer === "task" && (
+
+              <div
+
+                className="fixed inset-y-0 right-0 z-[70] w-full max-w-[460px] transform bg-white shadow-2xl shadow-slate-900/30 transition-transform duration-300 ease-out translate-x-0"
+
+
+
+                onClick={(e) => e.stopPropagation()}
+
+
+
+              >
+
+
+
+                <div className="flex h-full flex-col">
+
+
+
+                  <div className="border-b border-slate-200/80 px-5 py-4">
+
+
+
+                    <div className="flex items-start justify-between gap-4">
+
+
+
+                      <div>
+
+
+
+                        <div className="text-sm font-semibold text-slate-900">Create Task</div>
+
+
+
+                        <div className="mt-0.5 text-xs text-slate-500">Add a new task for this customer</div>
+
+
+
+                      </div>
+
+
+
+                      <button
+
+
+
+                        type="button"
+
+
+
+                        onClick={closeTaskCreate}
+
+
+
+                        className="rounded-full p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
+
+
+
+                      >
+
+
+
+                        <XCircle className="h-5 w-5" />
+
+
+
+                      </button>
+
+
+
+                    </div>
+
+
+
+                  </div>
+
+
+
+
+
+
+
+                  <div className="flex-1 overflow-y-auto px-5 py-4">
+
+
+
+                    <div className="space-y-4">
+
+
+
+                      <div>
+
+
+
+                        <label className="block text-xs font-medium text-slate-700">Task Name</label>
+
+
+
+                        <input
+
+
+
+                          value={taskForm.name}
+
+
+
+                          onChange={(e) => setTaskForm((p) => ({ ...p, name: e.target.value }))}
+
+
+
+                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-400"
+
+
+
+                          placeholder="Enter task name"
+
+
+
+                        />
+
+
+
+                      </div>
+
+
+
+
+
+
+
+                      <div className="grid grid-cols-2 gap-3">
+
+
+
+                        <div>
+
+
+
+                          <label className="block text-xs font-medium text-slate-700">Due Date</label>
+
+
+
+                          <input
+
+
+
+                            type="date"
+
+
+
+                            value={taskForm.dueDate}
+
+
+
+                            onChange={(e) => setTaskForm((p) => ({ ...p, dueDate: e.target.value }))}
+
+
+
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-400"
+
+
+
+                          />
+
+
+
+                        </div>
+
+
+
+                        <div>
+
+
+
+                          <label className="block text-xs font-medium text-slate-700">Related To</label>
+
+
+
+                          <input
+
+
+
+                            value={taskForm.relatedTo}
+
+
+
+                            onChange={(e) => setTaskForm((p) => ({ ...p, relatedTo: e.target.value }))}
+
+
+
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:border-indigo-400"
+
+
+
+                            placeholder={safeCustomer.name}
+
+
+
+                          />
+
+
+
+                        </div>
+
+
+
+                      </div>
+
+
+
+
+
+
+
+                      <div className="grid grid-cols-2 gap-3">
+
+
+
+                        <div>
+
+
+
+                          <label className="block text-xs font-medium text-slate-700">Repeat</label>
+
+
+
+                          <select
+
+
+
+                            value={taskForm.repeat}
+
+
+
+                            onChange={(e) => setTaskForm((p) => ({ ...p, repeat: e.target.value }))}
+
+
+
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-400"
+
+
+
+                          >
+
+
+
+                            <option>Never</option>
+
+
+
+                            <option>Daily</option>
+
+
+
+                            <option>Weekly</option>
+
+
+
+                            <option>Monthly</option>
+
+
+
+                          </select>
+
+
+
+                        </div>
+
+
+
+                        <div>
+
+
+
+                          <label className="block text-xs font-medium text-slate-700">Reminder</label>
+
+
+
+                          <select
+
+
+
+                            value={taskForm.reminder}
+
+
+
+                            onChange={(e) => setTaskForm((p) => ({ ...p, reminder: e.target.value }))}
+
+
+
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-400"
+
+
+
+                          >
+
+
+
+                            <option>None</option>
+
+
+
+                            <option>5 minutes before</option>
+
+
+
+                            <option>15 minutes before</option>
+
+
+
+                            <option>1 hour before</option>
+
+
+
+                          </select>
+
+
+
+                        </div>
+
+
+
+                      </div>
+
+
+
+
+
+
+
+                      <div className="grid grid-cols-2 gap-3">
+
+
+
+                        <div>
+
+
+
+                          <label className="block text-xs font-medium text-slate-700">Task Status</label>
+
+
+
+                          <select
+
+
+
+                            value={taskForm.status}
+
+
+
+                            onChange={(e) => setTaskForm((p) => ({ ...p, status: e.target.value }))}
+
+
+
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-400"
+
+
+
+                          >
+
+
+
+                            <option>Open</option>
+
+
+
+                            <option>In Progress</option>
+
+
+
+                            <option>Completed</option>
+
+
+
+                          </select>
+
+
+
+                        </div>
+
+
+
+                        <div>
+
+
+
+                          <label className="block text-xs font-medium text-slate-700">Priority</label>
+
+
+
+                          <select
+
+
+
+                            value={taskForm.priority}
+
+
+
+                            onChange={(e) => setTaskForm((p) => ({ ...p, priority: e.target.value }))}
+
+
+
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-400"
+
+
+
+                          >
+
+
+
+                            <option>Normal</option>
+
+
+
+                            <option>High</option>
+
+
+
+                            <option>Low</option>
+
+
+
+                          </select>
+
+
+
+                        </div>
+
+
+
+                      </div>
+
+
+
+
+
+
+
+                      <div>
+
+
+
+                        <label className="block text-xs font-medium text-slate-700">Description</label>
+
+
+
+                        <textarea
+
+
+
+                          value={taskForm.description}
+
+
+
+                          onChange={(e) => setTaskForm((p) => ({ ...p, description: e.target.value }))}
+
+
+
+                          className="mt-1 h-24 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-400"
+
+
+
+                          placeholder="Add details / notes"
+
+
+
+                        />
+
+
+
+                      </div>
+
+
+
+
+
+
+
+                      <div className="grid grid-cols-2 gap-3">
+
+
+
+                        <div>
+
+
+
+                          <label className="block text-xs font-medium text-slate-700">Expense Amount</label>
+
+
+
+                          <input
+
+
+
+                            value={taskForm.expenseAmount}
+
+
+
+                            onChange={(e) => setTaskForm((p) => ({ ...p, expenseAmount: e.target.value }))}
+
+
+
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-400"
+
+
+
+                            placeholder="0"
+
+
+
+                          />
+
+
+
+                        </div>
+
+
+
+                        <div className="flex items-end">
+
+
+
+                          <label className="inline-flex items-center gap-2 text-sm text-slate-700">
+
+
+
+                            <input
+
+
+
+                              type="checkbox"
+
+
+
+                              checked={taskForm.completed}
+
+
+
+                              onChange={(e) => setTaskForm((p) => ({ ...p, completed: e.target.checked }))}
+
+
+
+                              className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+
+
+
+                            />
+
+
+
+                            Mark as completed
+
+
+
+                          </label>
+
+
+
+                        </div>
+
+
+
+                      </div>
+
+
+
+                    </div>
+
+
+
+                  </div>
+
+
+
+
+
+
+
+                  <div className="sticky bottom-0 border-t border-slate-200 bg-white px-5 py-4">
+
+
+
+                    <div className="flex items-center justify-end gap-3">
+
+
+
+                      <button
+
+
+
+                        type="button"
+
+
+
+                        onClick={closeTaskCreate}
+
+
+
+                        className="rounded-full border border-slate-300 px-4 py-2 text-xs font-medium text-slate-700 hover:border-slate-400 hover:bg-slate-50"
+
+
+
+                      >
+
+
+
+                        Cancel
+
+
+
+                      </button>
+
+
+
+                      <button
+
+
+
+                        type="button"
+
+
+
+                        onClick={saveTask}
+
+
+
+                        className="rounded-full bg-gradient-to-r from-indigo-600 to-sky-600 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-indigo-500/40 transition hover:translate-y-[1px] hover:shadow-lg"
+
+
+
+                      >
+
+
+
+                        Save
+
+
+
+                      </button>
+
+
+
+                    </div>
+
+
+
+                  </div>
+
+
+
+                </div>
+
+
+
+              </div>
+
+
+
+            )}
+
+
+
+
+
+
+
+            {/*  FIX: Event drawer - only renders when activeDrawer === 'event' */}
+
+            {activeDrawer === "event" && (
+
+              <div
+
+
+
+                className="fixed inset-y-0 right-0 z-[70] w-full max-w-[460px] transform bg-white shadow-2xl shadow-slate-900/30 transition-transform duration-300 ease-out translate-x-0"
+
+
+
+                onClick={(e) => e.stopPropagation()}
+
+
+
+              >
+
+
+
+                <div className="flex h-full flex-col">
+
+
+
+                  <div className="border-b border-slate-200/80 px-5 py-4">
+
+
+
+                    <div className="flex items-start justify-between gap-4">
+
+
+
+                      <div>
+
+
+
+                        <div className="text-sm font-semibold text-slate-900">Create Event</div>
+
+
+
+                        <div className="mt-0.5 text-xs text-slate-500">Schedule an event</div>
+
+
+
+                      </div>
+
+
+
+                      <button
+
+
+
+                        type="button"
+
+
+
+                        onClick={closeEventCreate}
+
+
+
+                        className="rounded-full p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
+
+
+
+                      >
+
+
+
+                        <XCircle className="h-5 w-5" />
+
+
+
+                      </button>
+
+
+
+                    </div>
+
+
+
+                  </div>
+
+
+
+
+
+
+
+                  <div className="flex-1 overflow-y-auto px-5 py-4">
+
+
+
+                    <div className="space-y-4">
+
+
+
+                      <div>
+
+
+
+                        <label className="block text-xs font-medium text-slate-700">Title</label>
+
+
+
+                        <input
+
+
+
+                          value={eventForm.title}
+
+
+
+                          onChange={(e) => setEventForm((p) => ({ ...p, title: e.target.value }))}
+
+
+
+                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-400"
+
+
+
+                          placeholder="Event title"
+
+
+
+                        />
+
+
+
+                      </div>
+
+
+
+
+
+
+
+                      <div className="grid grid-cols-2 gap-3">
+
+
+
+                        <div>
+
+
+
+                          <label className="block text-xs font-medium text-slate-700">From</label>
+
+
+
+                          <input
+
+
+
+                            type="datetime-local"
+
+
+
+                            value={eventForm.from}
+
+
+
+                            onChange={(e) => setEventForm((p) => ({ ...p, from: e.target.value }))}
+
+
+
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-400"
+
+
+
+                          />
+
+
+
+                        </div>
+
+
+
+                        <div>
+
+
+
+                          <label className="block text-xs font-medium text-slate-700">To</label>
+
+
+
+                          <input
+
+
+
+                            type="datetime-local"
+
+
+
+                            value={eventForm.to}
+
+
+
+                            onChange={(e) => setEventForm((p) => ({ ...p, to: e.target.value }))}
+
+
+
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-400"
+
+
+
+                          />
+
+
+
+                        </div>
+
+
+
+                      </div>
+
+
+
+
+
+
+
+                      <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-800">
+
+
+
+                        Working hours warning: please ensure timing is within business hours.
+
+
+
+                      </div>
+
+
+
+
+
+
+
+                      <div className="grid grid-cols-2 gap-3">
+
+
+
+                        <div>
+
+
+
+                          <label className="block text-xs font-medium text-slate-700">Repeat</label>
+
+
+
+                          <select
+
+
+
+                            value={eventForm.repeat}
+
+
+
+                            onChange={(e) => setEventForm((p) => ({ ...p, repeat: e.target.value }))}
+
+
+
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-400"
+
+
+
+                          >
+
+
+
+                            <option>Never</option>
+
+
+
+                            <option>Daily</option>
+
+
+
+                            <option>Weekly</option>
+
+
+
+                            <option>Monthly</option>
+
+
+
+                          </select>
+
+
+
+                        </div>
+
+
+
+                        <div>
+
+
+
+                          <label className="block text-xs font-medium text-slate-700">Reminder</label>
+
+
+
+                          <select
+
+
+
+                            value={eventForm.reminder}
+
+
+
+                            onChange={(e) => setEventForm((p) => ({ ...p, reminder: e.target.value }))}
+
+
+
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-400"
+
+
+
+                          >
+
+
+
+                            <option>None</option>
+
+
+
+                            <option>15 minutes before</option>
+
+
+
+                            <option>1 hour before</option>
+
+
+
+                            <option>1 day before</option>
+
+
+
+                          </select>
+
+
+
+                        </div>
+
+
+
+                      </div>
+
+
+
+
+
+
+
+                      <div className="grid grid-cols-2 gap-3">
+
+
+
+                        <div>
+
+
+
+                          <label className="block text-xs font-medium text-slate-700">Location</label>
+
+
+
+                          <input
+
+
+
+                            value={eventForm.location}
+
+
+
+                            onChange={(e) => setEventForm((p) => ({ ...p, location: e.target.value }))}
+
+
+
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-400"
+
+
+
+                            placeholder="Meeting room / link"
+
+
+
+                          />
+
+
+
+                        </div>
+
+
+
+                        <div>
+
+
+
+                          <label className="block text-xs font-medium text-slate-700">Related To</label>
+
+
+
+                          <input
+
+
+
+                            value={eventForm.relatedTo}
+
+
+
+                            onChange={(e) => setEventForm((p) => ({ ...p, relatedTo: e.target.value }))}
+
+
+
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:border-indigo-400"
+
+
+
+                            placeholder={safeCustomer.name}
+
+
+
+                          />
+
+
+
+                        </div>
+
+
+
+                      </div>
+
+
+
+
+
+
+
+                      <div>
+
+
+
+                        <label className="block text-xs font-medium text-slate-700">Participants</label>
+
+
+
+                        <input
+
+
+
+                          value={eventForm.participants}
+
+
+
+                          onChange={(e) => setEventForm((p) => ({ ...p, participants: e.target.value }))}
+
+
+
+                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-400"
+
+
+
+                          placeholder="Add participants"
+
+
+
+                        />
+
+
+
+                      </div>
+
+
+
+
+
+
+
+                      <div>
+
+
+
+                        <label className="block text-xs font-medium text-slate-700">Description</label>
+
+
+
+                        <textarea
+
+
+
+                          value={eventForm.description}
+
+
+
+                          onChange={(e) => setEventForm((p) => ({ ...p, description: e.target.value }))}
+
+
+
+                          className="mt-1 h-24 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-400"
+
+
+
+                          placeholder="Agenda / notes"
+
+
+
+                        />
+
+
+
+                      </div>
+
+
+
+                    </div>
+
+
+
+                  </div>
+
+
+
+
+
+
+
+                  <div className="sticky bottom-0 border-t border-slate-200 bg-white px-5 py-4">
+
+
+
+                    <div className="flex items-center justify-end gap-3">
+
+
+
+                      <button
+
+
+
+                        type="button"
+
+
+
+                        onClick={closeEventCreate}
+
+
+
+                        className="rounded-full border border-slate-300 px-4 py-2 text-xs font-medium text-slate-700 hover:border-slate-400 hover:bg-slate-50"
+
+
+
+                      >
+
+
+
+                        Cancel
+
+
+
+                      </button>
+
+
+
+                      <button
+
+
+
+                        type="button"
+
+
+
+                        onClick={saveEvent}
+
+
+
+                        className="rounded-full bg-gradient-to-r from-indigo-600 to-sky-600 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-indigo-500/40 transition hover:translate-y-[1px] hover:shadow-lg"
+
+
+
+                      >
+
+
+
+                        Save
+
+
+
+                      </button>
+
+
+
+                    </div>
+
+
+
+                  </div>
+
+
+
+                </div>
+
+
+
+              </div>
+
+
+
+            )}
+
+
+
+
+
+
+
+            {/*  FIX: Call drawer - only renders when activeDrawer === 'call' */}
+
+            {activeDrawer === "call" && (
+
+              <div
+
+                className="fixed inset-y-0 right-0 z-[70] w-full max-w-[460px] transform bg-white shadow-2xl shadow-slate-900/30 transition-transform duration-300 ease-out translate-x-0"
+
+                onClick={(e) => e.stopPropagation()}
+
+              >
+
+
+
+                <div className="flex h-full flex-col">
+
+
+
+                  <div className="border-b border-slate-200/80 px-5 py-4">
+
+
+
+                    <div className="flex items-start justify-between gap-4">
+
+
+
+                      <div>
+
+
+
+                        <div className="text-sm font-semibold text-slate-900">Create Call</div>
+
+
+
+                        <div className="mt-0.5 text-xs text-slate-500">Log a call activity</div>
+
+
+
+                      </div>
+
+
+
+                      <button
+
+
+
+                        type="button"
+
+
+
+                        onClick={(e) => {
+
+                          e.stopPropagation();
+
+                          closeCallCreate();
+
+                        }}
+
+
+
+                        className="rounded-full p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
+
+
+
+                      >
+
+
+
+                        <XCircle className="h-5 w-5" />
+
+
+
+                      </button>
+
+
+
+                    </div>
+
+
+
+                  </div>
+
+
+
+
+
+
+
+                  <div className="flex-1 overflow-y-auto px-5 py-4">
+
+
+
+                    <div className="space-y-4">
+
+
+
+                      <div>
+
+
+
+                        <label className="block text-xs font-medium text-slate-700">To / From</label>
+
+
+
+                        <input
+
+
+
+                          value={callForm.toFrom}
+
+
+
+                          onChange={(e) => setCallForm((p) => ({ ...p, toFrom: e.target.value }))}
+
+
+
+                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-400"
+
+
+
+                          placeholder="Contact name / number"
+
+
+
+                        />
+
+
+
+                      </div>
+
+
+
+
+
+
+
+                      <div className="grid grid-cols-2 gap-3">
+
+
+
+                        <div>
+
+
+
+                          <label className="block text-xs font-medium text-slate-700">Call Start Time</label>
+
+
+
+                          <input
+
+
+
+                            type="datetime-local"
+
+
+
+                            value={callForm.startTime}
+
+
+
+                            onChange={(e) => setCallForm((p) => ({ ...p, startTime: e.target.value }))}
+
+
+
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-400"
+
+
+
+                          />
+
+
+
+                        </div>
+
+
+
+                        <div>
+
+
+
+                          <label className="block text-xs font-medium text-slate-700">Reminder</label>
+
+
+
+                          <select
+
+
+
+                            value={callForm.reminder}
+
+
+
+                            onChange={(e) => setCallForm((p) => ({ ...p, reminder: e.target.value }))}
+
+
+
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-400"
+
+
+
+                          >
+
+
+
+                            <option>None</option>
+
+
+
+                            <option>15 minutes before</option>
+
+
+
+                            <option>1 hour before</option>
+
+
+
+                          </select>
+
+
+
+                        </div>
+
+
+
+                      </div>
+
+
+
+
+
+
+
+                      <div className="grid grid-cols-2 gap-3">
+
+
+
+                        <div>
+
+
+
+                          <label className="block text-xs font-medium text-slate-700">Call Type</label>
+
+
+
+                          <select
+
+
+
+                            value={callForm.callType}
+
+
+
+                            onChange={(e) => setCallForm((p) => ({ ...p, callType: e.target.value }))}
+
+
+
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-400"
+
+
+
+                          >
+
+
+
+                            <option>Outbound</option>
+
+
+
+                            <option>Inbound</option>
+
+
+
+                          </select>
+
+
+
+                        </div>
+
+
+
+                        <div>
+
+
+
+                          <label className="block text-xs font-medium text-slate-700">Call Status</label>
+
+
+
+                          <select
+
+
+
+                            value={callForm.callStatus}
+
+
+
+                            onChange={(e) => setCallForm((p) => ({ ...p, callStatus: e.target.value }))}
+
+
+
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-400"
+
+
+
+                          >
+
+
+
+                            <option>Planned</option>
+
+
+
+                            <option>Completed</option>
+
+
+
+                            <option>Missed</option>
+
+
+
+                          </select>
+
+
+
+                        </div>
+
+
+
+                      </div>
+
+
+
+
+
+
+
+                      <div className="grid grid-cols-2 gap-3">
+
+
+
+                        <div>
+
+
+
+                          <label className="block text-xs font-medium text-slate-700">Related To</label>
+
+
+
+                          <input
+
+
+
+                            value={callForm.relatedTo}
+
+
+
+                            onChange={(e) => setCallForm((p) => ({ ...p, relatedTo: e.target.value }))}
+
+
+
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:border-indigo-400"
+
+
+
+                            placeholder={safeCustomer.name}
+
+
+
+                          />
+
+
+
+                        </div>
+
+
+
+                        <div>
+
+
+
+                          <label className="block text-xs font-medium text-slate-700">Call Duration</label>
+
+
+
+                          <input
+
+
+
+                            value={callForm.duration}
+
+
+
+                            onChange={(e) => setCallForm((p) => ({ ...p, duration: e.target.value }))}
+
+
+
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-400"
+
+
+
+                            placeholder="e.g. 05:30"
+
+
+
+                          />
+
+
+
+                        </div>
+
+
+
+                      </div>
+
+
+
+
+
+
+
+                      <div>
+
+
+
+                        <label className="block text-xs font-medium text-slate-700">Call Agenda</label>
+
+
+
+                        <textarea
+
+
+
+                          value={callForm.callAgenda}
+
+
+
+                          onChange={(e) => setCallForm((p) => ({ ...p, callAgenda: e.target.value }))}
+
+
+
+                          className="mt-1 h-24 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-400"
+
+
+
+                          placeholder="Agenda / notes"
+
+
+
+                        />
+
+
+
+                      </div>
+
+
+
+                    </div>
+
+
+
+                  </div>
+
+
+
+
+
+
+
+                  <div className="sticky bottom-0 border-t border-slate-200 bg-white px-5 py-4">
+
+
+
+                    <div className="flex items-center justify-end gap-3">
+
+
+
+                      <button
+
+
+
+                        type="button"
+
+
+
+                        onClick={(e) => {
+
+                          e.stopPropagation();
+
+                          closeCallCreate();
+
+                        }}
+
+
+
+                        className="rounded-full border border-slate-300 px-4 py-2 text-xs font-medium text-slate-700 hover:border-slate-400 hover:bg-slate-50"
+
+
+
+                      >
+
+
+
+                        Cancel
+
+
+
+                      </button>
+
+
+
+                      <button
+
+
+
+                        type="button"
+
+
+
+                        onClick={saveCall}
+
+
+
+                        className="rounded-full bg-gradient-to-r from-indigo-600 to-sky-600 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-indigo-500/40 transition hover:translate-y-[1px] hover:shadow-lg"
+
+
+
+                      >
+
+
+
+                        Save
+
+
+
+                      </button>
+
+
+
+                    </div>
+
+
+
+                  </div>
+
+
+
+                </div>
+
+
+
+              </div>
+
+            )}
+
+
+
+            {isCaseModalOpen && (
+
+
+
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 backdrop-blur-sm">
+
+
+
+                <div className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-950/95 p-6 shadow-2xl shadow-slate-950/70">
+
+
+
+                  <div className="mb-4 flex items-center justify-between">
+
+
+
+                    <div>
+
+
+
+                      <h2 className="text-sm font-semibold text-slate-50">Create New Case</h2>
+
+
+
+                      <p className="text-xs text-slate-500">Link a new legal/billing case to this customer</p>
+
+
+
+                    </div>
+
+
+
+                    <button
+
+
+
+                      onClick={() => setIsCaseModalOpen(false)}
+
+
+
+                      className="rounded-full p-1.5 text-slate-500 transition hover:bg-slate-800 hover:text-slate-100"
+
+
+
+                    >
+
+
+
+
+
+
+
+                    </button>
+
+
+
+                  </div>
+
+
+
+                  <form onSubmit={handleAddCase} className="space-y-4">
+
+
+
+                    <div>
+
+
+
+                      <label className="block text-xs font-medium text-slate-300">Case Name</label>
+
+
+
+
+
+
+                      <input
+
+
+
+                        type="text"
+
+
+
+                        value={caseName}
+
+
+
+                        onChange={(e) => setCaseName(e.target.value)}
+
+
+
+                        className="mt-1 w-full rounded-full border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-slate-100 placeholder:text-slate-500 focus:border-indigo-400"
+
+
+
+                        placeholder="Enter case name"
+
+
+
+                        required
+
+
+
+                      />
+
+
+
+                    </div>
+
+
+
+                    <div className="mt-4 flex justify-end gap-3">
+
+
+
+                      <button
+
+
+
+                        type="button"
+
+
+
+                        onClick={() => setIsCaseModalOpen(false)}
+
+
+
+                        className="rounded-full border border-slate-600 px-4 py-2 text-xs font-medium text-slate-200 hover:bg-slate-800"
+
+
+
+                      >
+
+
+
+                        Cancel
+
+
+
+                      </button>
+
+
+
+                      <button
+
+
+
+                        type="submit"
+
+
+
+                        className="rounded-full bg-gradient-to-r from-indigo-500 to-sky-500 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-indigo-500/40 hover:translate-y-[1px] hover:shadow-lg"
+
+
+
+                      >
+
+
+
+                        Add Case
+
+
+
+                      </button>
+
+
+
+                    </div>
+
+
+
+                  </form>
+
+
+
+                </div>
+
+
+
+              </div>
+
+
+
+            )}
 
 
 
@@ -10950,105 +13882,27 @@ async function ensureDealId() {
 
 
 
+      </div>
 
 
 
 
-        {/* Email Compose Modal */}
-        {showEmailModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowEmailModal(false)} />
-            <div className="relative w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
-              <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-6 py-4">
-                <div>
-                  <h3 className="text-lg font-semibold text-slate-900">Compose Email</h3>
-                  <p className="text-xs text-slate-500 mt-0.5">To: <span className="font-medium text-indigo-600">{emailForm.to || customer?.email}</span></p>
-                </div>
-                <button type="button" onClick={() => setShowEmailModal(false)} className="rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600">
-                  <XCircle className="h-5 w-5" />
-                </button>
-              </div>
-              <div className="p-6 space-y-3">
-                <div>
-                  <label className="block text-xs text-slate-500 mb-1">To *</label>
-                  <input
-                    type="email"
-                    value={emailForm.to}
-                    onChange={e => setEmailForm(p => ({ ...p, to: e.target.value }))}
-                    placeholder="recipient@example.com"
-                    className="w-full border rounded-lg px-3 py-2 text-sm focus:border-indigo-400 outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-slate-500 mb-1">CC</label>
-                  <input
-                    type="email"
-                    value={emailForm.cc}
-                    onChange={e => setEmailForm(p => ({ ...p, cc: e.target.value }))}
-                    placeholder="cc@example.com"
-                    className="w-full border rounded-lg px-3 py-2 text-sm focus:border-indigo-400 outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-slate-500 mb-1">Subject</label>
-                  <input
-                    type="text"
-                    value={emailForm.subject}
-                    onChange={e => setEmailForm(p => ({ ...p, subject: e.target.value }))}
-                    placeholder="Email subject"
-                    className="w-full border rounded-lg px-3 py-2 text-sm focus:border-indigo-400 outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-slate-500 mb-1">Body</label>
-                  <textarea
-                    value={emailForm.body}
-                    onChange={e => setEmailForm(p => ({ ...p, body: e.target.value }))}
-                    rows={5}
-                    placeholder="Write your message..."
-                    className="w-full border rounded-lg px-3 py-2 text-sm focus:border-indigo-400 outline-none resize-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-slate-500 mb-1">Attach File</label>
-                  <label className="flex items-center gap-3 w-full border-2 border-dashed border-slate-300 rounded-lg px-4 py-3 cursor-pointer hover:border-indigo-400 hover:bg-indigo-50 transition-colors">
-                    <input
-                      type="file"
-                      className="hidden"
-                      onChange={e => setEmailFile(e.target.files?.[0] || null)}
-                    />
-                    <span className="text-slate-400 text-lg"></span>
-                    <span className="text-xs text-slate-500">
-                      {emailFile ? emailFile.name : 'Click to attach a file'}
-                    </span>
-                    {emailFile && (
-                      <button type="button" onClick={e => { e.preventDefault(); setEmailFile(null); }} className="ml-auto text-rose-500 hover:text-rose-700 text-xs">Remove</button>
-                    )}
-                  </label>
-                </div>
-                <div className="flex justify-end gap-3 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => { setShowEmailModal(false); setEmailFile(null); }}
-                    className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    disabled={sendingEmail}
-                    onClick={handleSendEmail}
-                    className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-teal-500 to-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-md transition hover:translate-y-[1px] disabled:opacity-50"
-                  >
-                    <Mail className="h-4 w-4" />
-                    {sendingEmail ? 'Sending...' : 'Send Email'}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-        {isProductModalOpen && (
+
+
+
+      {/* Modals */}
+
+
+
+      <>
+
+
+
+        {/* Bank Picker Modal */}
+
+
+
+        {showBankPicker && (
 
 
 
@@ -11064,7 +13918,7 @@ async function ensureDealId() {
 
 
 
-              onClick={closeProductModal}
+              onClick={closeBankPicker}
 
 
 
@@ -11080,7 +13934,7 @@ async function ensureDealId() {
 
 
 
-                className="relative flex w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white/95 shadow-2xl shadow-slate-900/50 animate-[scaleIn_0.2s_ease-out]"
+                className="relative flex w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white/95 shadow-2xl shadow-slate-900/50 animate-[scaleIn_0.2s_ease-out]"
 
 
 
@@ -11100,7 +13954,7 @@ async function ensureDealId() {
 
 
 
-                    <div className="text-sm font-semibold text-slate-900">{editingDealProductId ? "Edit Product" : "Add Product"}</div>
+                    <div className="text-sm font-semibold text-slate-900">Select Bank</div>
 
 
 
@@ -11108,7 +13962,7 @@ async function ensureDealId() {
 
 
 
-                      {editingDealProductId ? "Update product details and pricing" : "Create a new product and configure pricing for this case"}
+                      Choose a bank to associate with this deal
 
 
 
@@ -11128,7 +13982,7 @@ async function ensureDealId() {
 
 
 
-                    onClick={closeProductModal}
+                    onClick={closeBankPicker}
 
 
 
@@ -11160,163 +14014,15 @@ async function ensureDealId() {
 
 
 
-                  <div className="space-y-4">
+                  {bankFormError && (
 
 
 
-                    {productFormError && (
+                    <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
 
 
 
-                      <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
-
-
-
-                        {productFormError}
-
-
-
-                      </div>
-
-
-
-                    )}
-
-
-
-
-
-
-
-                    <div>
-
-
-
-                      <label className="block text-xs font-medium text-slate-700">Product (choose from catalog or create new)</label>
-
-
-
-                      <div className="mt-1 flex gap-2">
-
-
-
-                        <select
-
-
-
-                          value={productForm.productId || ""}
-
-
-
-                          onChange={(e) => {
-
-
-
-                            const v = e.target.value;
-
-
-
-                            if (!v) {
-
-
-
-                              // Create new
-
-
-
-                              setProductForm((prev) => ({ ...prev, productId: "", productName: "", productCode: "", basePrice: "", listPrice: "", quantity: "1", discount: "0", tax: "0" }));
-
-
-
-                              setEditingDealProductId(null);
-
-
-
-                              return;
-
-
-
-                            }
-
-
-
-                            handleSelectCatalogProduct(Number(v));
-
-
-
-                          }}
-
-
-
-                          className="w-2/3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
-
-
-
-                        >
-
-
-
-                          <option value="">{loadingCatalog ? "Loading..." : "-- Create new product --"}</option>
-
-
-
-                          {catalogProducts.map((cp) => (
-
-
-
-                            <option key={cp.id} value={cp.id}>
-
-
-
-                              {cp.name || cp.productName} {cp.code ? `(${cp.code})` : ""}
-
-
-
-                            </option>
-
-
-
-                          ))}
-
-
-
-                        </select>
-
-
-
-
-
-
-
-                        <input
-
-
-
-                          type="text"
-
-
-
-                          value={productForm.productName}
-
-
-
-                          onChange={(e) => setProductForm((prev) => ({ ...prev, productName: e.target.value, productId: "" }))}
-
-
-
-                          placeholder="Product name (for new product)"
-
-
-
-                          className="w-1/3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
-
-
-
-                        />
-
-
-
-                      </div>
+                      {bankFormError}
 
 
 
@@ -11324,431 +14030,23 @@ async function ensureDealId() {
 
 
 
+                  )}
 
 
 
 
-                    <div className="grid grid-cols-2 gap-3">
 
 
 
-                      <div>
+                  <div className="mb-4">
 
 
 
-                        <label className="block text-xs font-medium text-slate-700">Product Code (optional)</label>
+                    <div className="relative">
 
 
 
-                        <input
-
-
-
-                          value={productForm.productCode}
-
-
-
-                          onChange={(e) => setProductForm((prev) => ({ ...prev, productCode: e.target.value }))}
-
-
-
-                          placeholder="Code"
-
-
-
-                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-400"
-
-
-
-                        />
-
-
-
-                      </div>
-
-
-
-                      <div>
-
-
-
-                        <label className="block text-xs font-medium text-slate-700">Base Price ()</label>
-
-
-
-                        <input
-
-
-
-                          type="number"
-
-
-
-                          min="0"
-
-
-
-                          value={productForm.basePrice}
-
-
-
-                          onChange={(e) => {
-
-
-
-                            const v = e.target.value;
-
-
-
-                            setProductForm((prev) => ({
-
-
-
-                              ...prev,
-
-
-
-                              basePrice: v,
-
-
-
-                              listPrice: prev.listPrice || v,
-
-
-
-                            }));
-
-
-
-                            setProductFormError("");
-
-
-
-                          }}
-
-
-
-                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-400"
-
-
-
-                          placeholder="0"
-
-
-
-                        />
-
-
-
-                      </div>
-
-
-
-                    </div>
-
-
-
-
-
-
-
-                    <div className="grid grid-cols-2 gap-3">
-
-
-
-                      <div>
-
-
-
-                        <label className="block text-xs font-medium text-slate-700">List Price ()</label>
-
-
-
-                        <input
-
-
-
-                          type="number"
-
-
-
-                          min="0"
-
-
-
-                          value={productForm.listPrice}
-
-
-
-                          onChange={(e) => {
-
-
-
-                            setProductForm((prev) => ({ ...prev, listPrice: e.target.value }));
-
-
-
-                            setProductFormError("");
-
-
-
-                          }}
-
-
-
-                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-400"
-
-
-
-                          placeholder="0"
-
-
-
-                        />
-
-
-
-                      </div>
-
-
-
-                      <div>
-
-
-
-                        <label className="block text-xs font-medium text-slate-700">Quantity</label>
-
-
-
-                        <input
-
-
-
-                          type="number"
-
-
-
-                          min="0"
-
-
-
-                          step="0.01"
-
-
-
-                          value={productForm.quantity}
-
-
-
-                          onChange={(e) => {
-
-
-
-                            setProductForm((prev) => ({ ...prev, quantity: e.target.value }));
-
-
-
-                            setProductFormError("");
-
-
-
-                          }}
-
-
-
-                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-400"
-
-
-
-                          placeholder="1"
-
-
-
-                        />
-
-
-
-                      </div>
-
-
-
-                    </div>
-
-
-
-
-
-
-
-                    <div className="grid grid-cols-2 gap-3">
-
-
-
-                      <div>
-
-
-
-                        <label className="block text-xs font-medium text-slate-700">Discount ()</label>
-
-
-
-                        <input
-
-
-
-                          type="number"
-
-
-
-                          min="0"
-
-
-
-                          value={productForm.discount}
-
-
-
-                          onChange={(e) => setProductForm((prev) => ({ ...prev, discount: e.target.value }))}
-
-
-
-                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-400"
-
-
-
-                          placeholder="0"
-
-
-
-                        />
-
-
-
-                      </div>
-
-
-
-                      <div>
-
-
-
-                        <label className="block text-xs font-medium text-slate-700">Tax (, optional)</label>
-
-
-
-                        <input
-
-
-
-                          type="number"
-
-
-
-                          min="0"
-
-
-
-                          value={productForm.tax}
-
-
-
-                          onChange={(e) => setProductForm((prev) => ({ ...prev, tax: e.target.value }))}
-
-
-
-                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-400"
-
-
-
-                          placeholder="0"
-
-
-
-                        />
-
-
-
-                      </div>
-
-
-
-                    </div>
-
-
-
-
-
-
-
-                    {productFieldDefs.length > 0 && (
-
-
-
-                      <div>
-
-
-
-                        <DynamicFieldsSection
-
-
-
-                          title="Product Custom Fields"
-
-
-
-                          definitions={productFieldDefs}
-
-
-
-                          values={productCustomValues[editingDealProductId || 'new'] || {}}
-
-
-
-                          onChange={(k, v) => {
-
-
-
-                            setProductCustomValues((prev) => {
-
-
-
-                              const key = editingDealProductId || 'new';
-
-
-
-                              return { ...prev, [key]: { ...(prev[key] || {}), [k]: v } };
-
-
-
-                            });
-
-
-
-                          }}
-
-
-
-                        />
-
-
-
-                      </div>
-
-
-
-                    )}
-
-
-
-
-
-
-
-                    <div>
-
-
-
-                      <label className="block text-xs font-medium text-slate-700">Final Amount ()</label>
+                      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
 
 
 
@@ -11760,23 +14058,31 @@ async function ensureDealId() {
 
 
 
-                        readOnly
+                        value={bankSearch}
 
 
 
-                        value={productFinalAmount.toLocaleString("en-IN", {
+                        onChange={(e) => {
 
 
 
-                          maximumFractionDigits: 2,
+                          setBankSearch(e.target.value);
 
 
 
-                        })}
+                          setBankFormError("");
 
 
 
-                        className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900"
+                        }}
+
+
+
+                        placeholder="Search banks by name, branch, owner..."
+
+
+
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-400 focus:bg-white"
 
 
 
@@ -11792,75 +14098,139 @@ async function ensureDealId() {
 
 
 
-                </div>
 
 
 
 
+                  <div className="space-y-2">
 
 
 
-                <div className="sticky bottom-0 border-t border-slate-200 bg-white px-5 py-4">
+                    {banks
 
 
 
-                  <div className="flex items-center justify-end gap-3">
+                      .filter((b) => {
 
 
 
-                    <button
+                        const q = bankSearch.trim().toLowerCase();
 
 
 
-                      type="button"
+                        return (
 
 
 
-                      onClick={closeProductModal}
+                          b.name?.toLowerCase().includes(q) ||
 
 
 
-                      className="rounded-full border border-slate-300 px-4 py-2 text-xs font-medium text-slate-700 hover:border-slate-400 hover:bg-slate-50"
+                          b.branch?.toLowerCase().includes(q) ||
 
 
 
-                    >
+                          b.owner?.toLowerCase().includes(q) ||
 
 
 
-                      Cancel
+                          b.phone?.includes(q)
 
 
 
-                    </button>
+                        );
 
 
 
-                    <button
+                      })
 
 
 
-                      type="button"
+                      .map((bankItem) => (
 
 
 
-                      onClick={saveProductFromModal}
+                        <div
 
 
 
-                      className="rounded-full bg-gradient-to-r from-indigo-600 to-sky-600 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-indigo-500/40 transition hover:translate-y-[1px] hover:shadow-lg"
+                          key={bankItem.id}
 
 
 
-                    >
+                          onClick={() => selectBank(bankItem)}
 
 
 
-                      {editingDealProductId ? "Update Product" : "Save Product"}
+                          className="flex items-center justify-between rounded-xl border border-slate-200 p-4 hover:bg-slate-50 cursor-pointer transition-colors"
 
 
 
-                    </button>
+                        >
+
+
+
+                          <div className="flex items-center gap-3">
+
+
+
+                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100 text-blue-600">
+
+
+
+                              <Building2 className="h-5 w-5" />
+
+
+
+                            </div>
+
+
+
+                            <div>
+
+
+
+                              <div className="text-sm font-medium text-slate-900">{bankItem.name}</div>
+
+
+
+                              <div className="text-xs text-slate-500">
+
+
+
+                                {bankItem.branch}  {bankItem.owner}
+
+
+
+                              </div>
+
+
+
+                            </div>
+
+
+
+                          </div>
+
+
+
+                          <div className="text-xs text-slate-400">
+
+
+
+                            <ChevronRight className="h-4 w-4" />
+
+
+
+                          </div>
+
+
+
+                        </div>
+
+
+
+                      ))}
 
 
 
@@ -11868,2320 +14238,11 @@ async function ensureDealId() {
 
 
 
-                </div>
 
 
 
-              </div>
 
-
-
-            </div>
-
-
-
-          </>
-
-
-
-        )}
-
-
-
-
-
-
-
-        {/*  FIX: Single backdrop for any open drawer */}
-
-        {activeDrawer && (
-
-
-
-          <div
-
-
-
-            className="fixed inset-0 z-[60] bg-slate-900/50 backdrop-blur-[2px]"
-
-
-
-            onClick={() => setActiveDrawer(null)}
-
-          />
-
-
-
-        )}
-
-
-
-
-
-
-
-        {/*  FIX: Task drawer - only renders when activeDrawer === 'task' */}
-
-        {activeDrawer === "task" && (
-
-        <div
-
-          className="fixed inset-y-0 right-0 z-[70] w-full max-w-[460px] transform bg-white shadow-2xl shadow-slate-900/30 transition-transform duration-300 ease-out translate-x-0"
-
-
-
-          onClick={(e) => e.stopPropagation()}
-
-
-
-        >
-
-
-
-          <div className="flex h-full flex-col">
-
-
-
-            <div className="border-b border-slate-200/80 px-5 py-4">
-
-
-
-              <div className="flex items-start justify-between gap-4">
-
-
-
-                <div>
-
-
-
-                  <div className="text-sm font-semibold text-slate-900">Create Task</div>
-
-
-
-                  <div className="mt-0.5 text-xs text-slate-500">Add a new task for this customer</div>
-
-
-
-                </div>
-
-
-
-                <button
-
-
-
-                  type="button"
-
-
-
-                  onClick={closeTaskCreate}
-
-
-
-                  className="rounded-full p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
-
-
-
-                >
-
-
-
-                  <XCircle className="h-5 w-5" />
-
-
-
-                </button>
-
-
-
-              </div>
-
-
-
-            </div>
-
-
-
-
-
-
-
-            <div className="flex-1 overflow-y-auto px-5 py-4">
-
-
-
-              <div className="space-y-4">
-
-
-
-                <div>
-
-
-
-                  <label className="block text-xs font-medium text-slate-700">Task Name</label>
-
-
-
-                  <input
-
-
-
-                    value={taskForm.name}
-
-
-
-                    onChange={(e) => setTaskForm((p) => ({ ...p, name: e.target.value }))}
-
-
-
-                    className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-400"
-
-
-
-                    placeholder="Enter task name"
-
-
-
-                  />
-
-
-
-                </div>
-
-
-
-
-
-
-
-                <div className="grid grid-cols-2 gap-3">
-
-
-
-                  <div>
-
-
-
-                    <label className="block text-xs font-medium text-slate-700">Due Date</label>
-
-
-
-                    <input
-
-
-
-                      type="date"
-
-
-
-                      value={taskForm.dueDate}
-
-
-
-                      onChange={(e) => setTaskForm((p) => ({ ...p, dueDate: e.target.value }))}
-
-
-
-                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-400"
-
-
-
-                    />
-
-
-
-                  </div>
-
-
-
-                  <div>
-
-
-
-                    <label className="block text-xs font-medium text-slate-700">Related To</label>
-
-
-
-                    <input
-
-
-
-                      value={taskForm.relatedTo}
-
-
-
-                      onChange={(e) => setTaskForm((p) => ({ ...p, relatedTo: e.target.value }))}
-
-
-
-                      className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:border-indigo-400"
-
-
-
-                      placeholder={safeCustomer.name}
-
-
-
-                    />
-
-
-
-                  </div>
-
-
-
-                </div>
-
-
-
-
-
-
-
-                <div className="grid grid-cols-2 gap-3">
-
-
-
-                  <div>
-
-
-
-                    <label className="block text-xs font-medium text-slate-700">Repeat</label>
-
-
-
-                    <select
-
-
-
-                      value={taskForm.repeat}
-
-
-
-                      onChange={(e) => setTaskForm((p) => ({ ...p, repeat: e.target.value }))}
-
-
-
-                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-400"
-
-
-
-                    >
-
-
-
-                      <option>Never</option>
-
-
-
-                      <option>Daily</option>
-
-
-
-                      <option>Weekly</option>
-
-
-
-                      <option>Monthly</option>
-
-
-
-                    </select>
-
-
-
-                  </div>
-
-
-
-                  <div>
-
-
-
-                    <label className="block text-xs font-medium text-slate-700">Reminder</label>
-
-
-
-                    <select
-
-
-
-                      value={taskForm.reminder}
-
-
-
-                      onChange={(e) => setTaskForm((p) => ({ ...p, reminder: e.target.value }))}
-
-
-
-                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-400"
-
-
-
-                    >
-
-
-
-                      <option>None</option>
-
-
-
-                      <option>5 minutes before</option>
-
-
-
-                      <option>15 minutes before</option>
-
-
-
-                      <option>1 hour before</option>
-
-
-
-                    </select>
-
-
-
-                  </div>
-
-
-
-                </div>
-
-
-
-
-
-
-
-                <div className="grid grid-cols-2 gap-3">
-
-
-
-                  <div>
-
-
-
-                    <label className="block text-xs font-medium text-slate-700">Task Status</label>
-
-
-
-                    <select
-
-
-
-                      value={taskForm.status}
-
-
-
-                      onChange={(e) => setTaskForm((p) => ({ ...p, status: e.target.value }))}
-
-
-
-                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-400"
-
-
-
-                    >
-
-
-
-                      <option>Open</option>
-
-
-
-                      <option>In Progress</option>
-
-
-
-                      <option>Completed</option>
-
-
-
-                    </select>
-
-
-
-                  </div>
-
-
-
-                  <div>
-
-
-
-                    <label className="block text-xs font-medium text-slate-700">Priority</label>
-
-
-
-                    <select
-
-
-
-                      value={taskForm.priority}
-
-
-
-                      onChange={(e) => setTaskForm((p) => ({ ...p, priority: e.target.value }))}
-
-
-
-                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-400"
-
-
-
-                    >
-
-
-
-                      <option>Normal</option>
-
-
-
-                      <option>High</option>
-
-
-
-                      <option>Low</option>
-
-
-
-                    </select>
-
-
-
-                  </div>
-
-
-
-                </div>
-
-
-
-
-
-
-
-                <div>
-
-
-
-                  <label className="block text-xs font-medium text-slate-700">Description</label>
-
-
-
-                  <textarea
-
-
-
-                    value={taskForm.description}
-
-
-
-                    onChange={(e) => setTaskForm((p) => ({ ...p, description: e.target.value }))}
-
-
-
-                    className="mt-1 h-24 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-400"
-
-
-
-                    placeholder="Add details / notes"
-
-
-
-                  />
-
-
-
-                </div>
-
-
-
-
-
-
-
-                <div className="grid grid-cols-2 gap-3">
-
-
-
-                  <div>
-
-
-
-                    <label className="block text-xs font-medium text-slate-700">Expense Amount</label>
-
-
-
-                    <input
-
-
-
-                      value={taskForm.expenseAmount}
-
-
-
-                      onChange={(e) => setTaskForm((p) => ({ ...p, expenseAmount: e.target.value }))}
-
-
-
-                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-400"
-
-
-
-                      placeholder="0"
-
-
-
-                    />
-
-
-
-                  </div>
-
-
-
-                  <div className="flex items-end">
-
-
-
-                    <label className="inline-flex items-center gap-2 text-sm text-slate-700">
-
-
-
-                      <input
-
-
-
-                        type="checkbox"
-
-
-
-                        checked={taskForm.completed}
-
-
-
-                        onChange={(e) => setTaskForm((p) => ({ ...p, completed: e.target.checked }))}
-
-
-
-                        className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
-
-
-
-                      />
-
-
-
-                      Mark as completed
-
-
-
-                    </label>
-
-
-
-                  </div>
-
-
-
-                </div>
-
-
-
-              </div>
-
-
-
-            </div>
-
-
-
-
-
-
-
-            <div className="sticky bottom-0 border-t border-slate-200 bg-white px-5 py-4">
-
-
-
-              <div className="flex items-center justify-end gap-3">
-
-
-
-                <button
-
-
-
-                  type="button"
-
-
-
-                  onClick={closeTaskCreate}
-
-
-
-                  className="rounded-full border border-slate-300 px-4 py-2 text-xs font-medium text-slate-700 hover:border-slate-400 hover:bg-slate-50"
-
-
-
-                >
-
-
-
-                  Cancel
-
-
-
-                </button>
-
-
-
-                <button
-
-
-
-                  type="button"
-
-
-
-                  onClick={saveTask}
-
-
-
-                  className="rounded-full bg-gradient-to-r from-indigo-600 to-sky-600 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-indigo-500/40 transition hover:translate-y-[1px] hover:shadow-lg"
-
-
-
-                >
-
-
-
-                  Save
-
-
-
-                </button>
-
-
-
-              </div>
-
-
-
-            </div>
-
-
-
-          </div>
-
-
-
-        </div>
-
-
-
-        )}
-
-
-
-
-
-
-
-        {/*  FIX: Event drawer - only renders when activeDrawer === 'event' */}
-
-        {activeDrawer === "event" && (
-
-        <div
-
-
-
-          className="fixed inset-y-0 right-0 z-[70] w-full max-w-[460px] transform bg-white shadow-2xl shadow-slate-900/30 transition-transform duration-300 ease-out translate-x-0"
-
-
-
-          onClick={(e) => e.stopPropagation()}
-
-
-
-        >
-
-
-
-          <div className="flex h-full flex-col">
-
-
-
-            <div className="border-b border-slate-200/80 px-5 py-4">
-
-
-
-              <div className="flex items-start justify-between gap-4">
-
-
-
-                <div>
-
-
-
-                  <div className="text-sm font-semibold text-slate-900">Create Event</div>
-
-
-
-                  <div className="mt-0.5 text-xs text-slate-500">Schedule an event</div>
-
-
-
-                </div>
-
-
-
-                <button
-
-
-
-                  type="button"
-
-
-
-                  onClick={closeEventCreate}
-
-
-
-                  className="rounded-full p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
-
-
-
-                >
-
-
-
-                  <XCircle className="h-5 w-5" />
-
-
-
-                </button>
-
-
-
-              </div>
-
-
-
-            </div>
-
-
-
-
-
-
-
-            <div className="flex-1 overflow-y-auto px-5 py-4">
-
-
-
-              <div className="space-y-4">
-
-
-
-                <div>
-
-
-
-                  <label className="block text-xs font-medium text-slate-700">Title</label>
-
-
-
-                  <input
-
-
-
-                    value={eventForm.title}
-
-
-
-                    onChange={(e) => setEventForm((p) => ({ ...p, title: e.target.value }))}
-
-
-
-                    className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-400"
-
-
-
-                    placeholder="Event title"
-
-
-
-                  />
-
-
-
-                </div>
-
-
-
-
-
-
-
-                <div className="grid grid-cols-2 gap-3">
-
-
-
-                  <div>
-
-
-
-                    <label className="block text-xs font-medium text-slate-700">From</label>
-
-
-
-                    <input
-
-
-
-                      type="datetime-local"
-
-
-
-                      value={eventForm.from}
-
-
-
-                      onChange={(e) => setEventForm((p) => ({ ...p, from: e.target.value }))}
-
-
-
-                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-400"
-
-
-
-                    />
-
-
-
-                  </div>
-
-
-
-                  <div>
-
-
-
-                    <label className="block text-xs font-medium text-slate-700">To</label>
-
-
-
-                    <input
-
-
-
-                      type="datetime-local"
-
-
-
-                      value={eventForm.to}
-
-
-
-                      onChange={(e) => setEventForm((p) => ({ ...p, to: e.target.value }))}
-
-
-
-                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-400"
-
-
-
-                    />
-
-
-
-                  </div>
-
-
-
-                </div>
-
-
-
-
-
-
-
-                <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-800">
-
-
-
-                  Working hours warning: please ensure timing is within business hours.
-
-
-
-                </div>
-
-
-
-
-
-
-
-                <div className="grid grid-cols-2 gap-3">
-
-
-
-                  <div>
-
-
-
-                    <label className="block text-xs font-medium text-slate-700">Repeat</label>
-
-
-
-                    <select
-
-
-
-                      value={eventForm.repeat}
-
-
-
-                      onChange={(e) => setEventForm((p) => ({ ...p, repeat: e.target.value }))}
-
-
-
-                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-400"
-
-
-
-                    >
-
-
-
-                      <option>Never</option>
-
-
-
-                      <option>Daily</option>
-
-
-
-                      <option>Weekly</option>
-
-
-
-                      <option>Monthly</option>
-
-
-
-                    </select>
-
-
-
-                  </div>
-
-
-
-                  <div>
-
-
-
-                    <label className="block text-xs font-medium text-slate-700">Reminder</label>
-
-
-
-                    <select
-
-
-
-                      value={eventForm.reminder}
-
-
-
-                      onChange={(e) => setEventForm((p) => ({ ...p, reminder: e.target.value }))}
-
-
-
-                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-400"
-
-
-
-                    >
-
-
-
-                      <option>None</option>
-
-
-
-                      <option>15 minutes before</option>
-
-
-
-                      <option>1 hour before</option>
-
-
-
-                      <option>1 day before</option>
-
-
-
-                    </select>
-
-
-
-                  </div>
-
-
-
-                </div>
-
-
-
-
-
-
-
-                <div className="grid grid-cols-2 gap-3">
-
-
-
-                  <div>
-
-
-
-                    <label className="block text-xs font-medium text-slate-700">Location</label>
-
-
-
-                    <input
-
-
-
-                      value={eventForm.location}
-
-
-
-                      onChange={(e) => setEventForm((p) => ({ ...p, location: e.target.value }))}
-
-
-
-                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-400"
-
-
-
-                      placeholder="Meeting room / link"
-
-
-
-                    />
-
-
-
-                  </div>
-
-
-
-                  <div>
-
-
-
-                    <label className="block text-xs font-medium text-slate-700">Related To</label>
-
-
-
-                    <input
-
-
-
-                      value={eventForm.relatedTo}
-
-
-
-                      onChange={(e) => setEventForm((p) => ({ ...p, relatedTo: e.target.value }))}
-
-
-
-                      className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:border-indigo-400"
-
-
-
-                      placeholder={safeCustomer.name}
-
-
-
-                    />
-
-
-
-                  </div>
-
-
-
-                </div>
-
-
-
-
-
-
-
-                <div>
-
-
-
-                  <label className="block text-xs font-medium text-slate-700">Participants</label>
-
-
-
-                  <input
-
-
-
-                    value={eventForm.participants}
-
-
-
-                    onChange={(e) => setEventForm((p) => ({ ...p, participants: e.target.value }))}
-
-
-
-                    className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-400"
-
-
-
-                    placeholder="Add participants"
-
-
-
-                  />
-
-
-
-                </div>
-
-
-
-
-
-
-
-                <div>
-
-
-
-                  <label className="block text-xs font-medium text-slate-700">Description</label>
-
-
-
-                  <textarea
-
-
-
-                    value={eventForm.description}
-
-
-
-                    onChange={(e) => setEventForm((p) => ({ ...p, description: e.target.value }))}
-
-
-
-                    className="mt-1 h-24 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-400"
-
-
-
-                    placeholder="Agenda / notes"
-
-
-
-                  />
-
-
-
-                </div>
-
-
-
-              </div>
-
-
-
-            </div>
-
-
-
-
-
-
-
-            <div className="sticky bottom-0 border-t border-slate-200 bg-white px-5 py-4">
-
-
-
-              <div className="flex items-center justify-end gap-3">
-
-
-
-                <button
-
-
-
-                  type="button"
-
-
-
-                  onClick={closeEventCreate}
-
-
-
-                  className="rounded-full border border-slate-300 px-4 py-2 text-xs font-medium text-slate-700 hover:border-slate-400 hover:bg-slate-50"
-
-
-
-                >
-
-
-
-                  Cancel
-
-
-
-                </button>
-
-
-
-                <button
-
-
-
-                  type="button"
-
-
-
-                  onClick={saveEvent}
-
-
-
-                  className="rounded-full bg-gradient-to-r from-indigo-600 to-sky-600 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-indigo-500/40 transition hover:translate-y-[1px] hover:shadow-lg"
-
-
-
-                >
-
-
-
-                  Save
-
-
-
-                </button>
-
-
-
-              </div>
-
-
-
-            </div>
-
-
-
-          </div>
-
-
-
-        </div>
-
-
-
-        )}
-
-
-
-
-
-
-
-        {/*  FIX: Call drawer - only renders when activeDrawer === 'call' */}
-
-        {activeDrawer === "call" && (
-
-        <div
-
-          className="fixed inset-y-0 right-0 z-[70] w-full max-w-[460px] transform bg-white shadow-2xl shadow-slate-900/30 transition-transform duration-300 ease-out translate-x-0"
-
-          onClick={(e) => e.stopPropagation()}
-
-        >
-
-
-
-          <div className="flex h-full flex-col">
-
-
-
-            <div className="border-b border-slate-200/80 px-5 py-4">
-
-
-
-              <div className="flex items-start justify-between gap-4">
-
-
-
-                <div>
-
-
-
-                  <div className="text-sm font-semibold text-slate-900">Create Call</div>
-
-
-
-                  <div className="mt-0.5 text-xs text-slate-500">Log a call activity</div>
-
-
-
-                </div>
-
-
-
-                <button
-
-
-
-                  type="button"
-
-
-
-                  onClick={(e) => {
-
-                    e.stopPropagation();
-
-                    closeCallCreate();
-
-                  }}
-
-
-
-                  className="rounded-full p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
-
-
-
-                >
-
-
-
-                  <XCircle className="h-5 w-5" />
-
-
-
-                </button>
-
-
-
-              </div>
-
-
-
-            </div>
-
-
-
-
-
-
-
-            <div className="flex-1 overflow-y-auto px-5 py-4">
-
-
-
-              <div className="space-y-4">
-
-
-
-                <div>
-
-
-
-                  <label className="block text-xs font-medium text-slate-700">To / From</label>
-
-
-
-                  <input
-
-
-
-                    value={callForm.toFrom}
-
-
-
-                    onChange={(e) => setCallForm((p) => ({ ...p, toFrom: e.target.value }))}
-
-
-
-                    className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-400"
-
-
-
-                    placeholder="Contact name / number"
-
-
-
-                  />
-
-
-
-                </div>
-
-
-
-
-
-
-
-                <div className="grid grid-cols-2 gap-3">
-
-
-
-                  <div>
-
-
-
-                    <label className="block text-xs font-medium text-slate-700">Call Start Time</label>
-
-
-
-                    <input
-
-
-
-                      type="datetime-local"
-
-
-
-                      value={callForm.startTime}
-
-
-
-                      onChange={(e) => setCallForm((p) => ({ ...p, startTime: e.target.value }))}
-
-
-
-                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-400"
-
-
-
-                    />
-
-
-
-                  </div>
-
-
-
-                  <div>
-
-
-
-                    <label className="block text-xs font-medium text-slate-700">Reminder</label>
-
-
-
-                    <select
-
-
-
-                      value={callForm.reminder}
-
-
-
-                      onChange={(e) => setCallForm((p) => ({ ...p, reminder: e.target.value }))}
-
-
-
-                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-400"
-
-
-
-                    >
-
-
-
-                      <option>None</option>
-
-
-
-                      <option>15 minutes before</option>
-
-
-
-                      <option>1 hour before</option>
-
-
-
-                    </select>
-
-
-
-                  </div>
-
-
-
-                </div>
-
-
-
-
-
-
-
-                <div className="grid grid-cols-2 gap-3">
-
-
-
-                  <div>
-
-
-
-                    <label className="block text-xs font-medium text-slate-700">Call Type</label>
-
-
-
-                    <select
-
-
-
-                      value={callForm.callType}
-
-
-
-                      onChange={(e) => setCallForm((p) => ({ ...p, callType: e.target.value }))}
-
-
-
-                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-400"
-
-
-
-                    >
-
-
-
-                      <option>Outbound</option>
-
-
-
-                      <option>Inbound</option>
-
-
-
-                    </select>
-
-
-
-                  </div>
-
-
-
-                  <div>
-
-
-
-                    <label className="block text-xs font-medium text-slate-700">Call Status</label>
-
-
-
-                    <select
-
-
-
-                      value={callForm.callStatus}
-
-
-
-                      onChange={(e) => setCallForm((p) => ({ ...p, callStatus: e.target.value }))}
-
-
-
-                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-400"
-
-
-
-                    >
-
-
-
-                      <option>Planned</option>
-
-
-
-                      <option>Completed</option>
-
-
-
-                      <option>Missed</option>
-
-
-
-                    </select>
-
-
-
-                  </div>
-
-
-
-                </div>
-
-
-
-
-
-
-
-                <div className="grid grid-cols-2 gap-3">
-
-
-
-                  <div>
-
-
-
-                    <label className="block text-xs font-medium text-slate-700">Related To</label>
-
-
-
-                    <input
-
-
-
-                      value={callForm.relatedTo}
-
-
-
-                      onChange={(e) => setCallForm((p) => ({ ...p, relatedTo: e.target.value }))}
-
-
-
-                      className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:border-indigo-400"
-
-
-
-                      placeholder={safeCustomer.name}
-
-
-
-                    />
-
-
-
-                  </div>
-
-
-
-                  <div>
-
-
-
-                    <label className="block text-xs font-medium text-slate-700">Call Duration</label>
-
-
-
-                    <input
-
-
-
-                      value={callForm.duration}
-
-
-
-                      onChange={(e) => setCallForm((p) => ({ ...p, duration: e.target.value }))}
-
-
-
-                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-400"
-
-
-
-                      placeholder="e.g. 05:30"
-
-
-
-                    />
-
-
-
-                  </div>
-
-
-
-                </div>
-
-
-
-
-
-
-
-                <div>
-
-
-
-                  <label className="block text-xs font-medium text-slate-700">Call Agenda</label>
-
-
-
-                  <textarea
-
-
-
-                    value={callForm.callAgenda}
-
-
-
-                    onChange={(e) => setCallForm((p) => ({ ...p, callAgenda: e.target.value }))}
-
-
-
-                    className="mt-1 h-24 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-400"
-
-
-
-                    placeholder="Agenda / notes"
-
-
-
-                  />
-
-
-
-                </div>
-
-
-
-              </div>
-
-
-
-            </div>
-
-
-
-
-
-
-
-            <div className="sticky bottom-0 border-t border-slate-200 bg-white px-5 py-4">
-
-
-
-              <div className="flex items-center justify-end gap-3">
-
-
-
-                <button
-
-
-
-                  type="button"
-
-
-
-                  onClick={(e) => {
-
-                    e.stopPropagation();
-
-                    closeCallCreate();
-
-                  }}
-
-
-
-                  className="rounded-full border border-slate-300 px-4 py-2 text-xs font-medium text-slate-700 hover:border-slate-400 hover:bg-slate-50"
-
-
-
-                >
-
-
-
-                  Cancel
-
-
-
-                </button>
-
-
-
-                <button
-
-
-
-                  type="button"
-
-
-
-                  onClick={saveCall}
-
-
-
-                  className="rounded-full bg-gradient-to-r from-indigo-600 to-sky-600 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-indigo-500/40 transition hover:translate-y-[1px] hover:shadow-lg"
-
-
-
-                >
-
-
-
-                  Save
-
-
-
-                </button>
-
-
-
-              </div>
-
-
-
-            </div>
-
-
-
-          </div>
-
-
-
-        </div>
-
-        )}
-
-
-
-        {isCaseModalOpen && (
-
-
-
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 backdrop-blur-sm">
-
-
-
-            <div className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-950/95 p-6 shadow-2xl shadow-slate-950/70">
-
-
-
-              <div className="mb-4 flex items-center justify-between">
-
-
-
-                <div>
-
-
-
-                  <h2 className="text-sm font-semibold text-slate-50">Create New Case</h2>
-
-
-
-                  <p className="text-xs text-slate-500">Link a new legal/billing case to this customer</p>
-
-
-
-                </div>
-
-
-
-                <button
-
-
-
-                  onClick={() => setIsCaseModalOpen(false)}
-
-
-
-                  className="rounded-full p-1.5 text-slate-500 transition hover:bg-slate-800 hover:text-slate-100"
-
-
-
-                >
-
-
-
-                  
-
-
-
-                </button>
-
-
-
-              </div>
-
-
-
-              <form onSubmit={handleAddCase} className="space-y-4">
-
-
-
-                <div>
-
-
-
-                  <label className="block text-xs font-medium text-slate-300">Case Name</label>
-
-
-
-
-
-
-                  <input
-
-
-
-                    type="text"
-
-
-
-                    value={caseName}
-
-
-
-                    onChange={(e) => setCaseName(e.target.value)}
-
-
-
-                    className="mt-1 w-full rounded-full border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-slate-100 placeholder:text-slate-500 focus:border-indigo-400"
-
-
-
-                    placeholder="Enter case name"
-
-
-
-                    required
-
-
-
-                  />
-
-
-
-                </div>
-
-
-
-                <div className="mt-4 flex justify-end gap-3">
-
-
-
-                  <button
-
-
-
-                    type="button"
-
-
-
-                    onClick={() => setIsCaseModalOpen(false)}
-
-
-
-                    className="rounded-full border border-slate-600 px-4 py-2 text-xs font-medium text-slate-200 hover:bg-slate-800"
-
-
-
-                  >
-
-
-
-                    Cancel
-
-
-
-                  </button>
-
-
-
-                  <button
-
-
-
-                    type="submit"
-
-
-
-                    className="rounded-full bg-gradient-to-r from-indigo-500 to-sky-500 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-indigo-500/40 hover:translate-y-[1px] hover:shadow-lg"
-
-
-
-                  >
-
-
-
-                    Add Case
-
-
-
-                  </button>
-
-
-
-                </div>
-
-
-
-              </form>
-
-
-
-            </div>
-
-
-
-          </div>
-
-
-
-        )}
-
-
-
-      </div>
-
-
-
-    </div>
-
-
-
-    </div>
-
-
-
-
-
-
-
-    {/* Modals */}
-
-
-
-    <>
-
-
-
-      {/* Bank Picker Modal */}
-
-
-
-      {showBankPicker && (
-
-
-
-        <>
-
-
-
-        <div
-
-
-
-          className="fixed inset-0 z-[65] bg-slate-900/60 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]"
-
-
-
-          onClick={closeBankPicker}
-
-
-
-        />
-
-
-
-        <div className="fixed inset-0 z-[70] flex items-center justify-center px-4 py-6">
-
-
-
-          <div
-
-
-
-            className="relative flex w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white/95 shadow-2xl shadow-slate-900/50 animate-[scaleIn_0.2s_ease-out]"
-
-
-
-            onClick={(e) => e.stopPropagation()}
-
-
-
-          >
-
-
-
-            <div className="flex items-start justify-between border-b border-slate-200/80 px-5 py-4">
-
-
-
-              <div>
-
-
-
-                <div className="text-sm font-semibold text-slate-900">Select Bank</div>
-
-
-
-                <div className="mt-0.5 text-xs text-slate-500">
-
-
-
-                  Choose a bank to associate with this deal
-
-
-
-                </div>
-
-
-
-              </div>
-
-
-
-              <button
-
-
-
-                type="button"
-
-
-
-                onClick={closeBankPicker}
-
-
-
-                className="rounded-full p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
-
-
-
-              >
-
-
-
-                <XCircle className="h-5 w-5" />
-
-
-
-              </button>
-
-
-
-            </div>
-
-
-
-
-
-
-
-            <div className="max-h-[70vh] flex-1 overflow-y-auto px-5 py-4">
-
-
-
-              {bankFormError && (
-
-
-
-                <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
-
-
-
-                  {bankFormError}
-
-
-
-                </div>
-
-
-
-              )}
-
-
-
-
-
-
-
-              <div className="mb-4">
-
-
-
-                <div className="relative">
-
-
-
-                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-
-
-
-                  <input
-
-
-
-                    type="text"
-
-
-
-                    value={bankSearch}
-
-
-
-                    onChange={(e) => {
-
-
-
-                      setBankSearch(e.target.value);
-
-
-
-                      setBankFormError("");
-
-
-
-                    }}
-
-
-
-                    placeholder="Search banks by name, branch, owner..."
-
-
-
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-400 focus:bg-white"
-
-
-
-                  />
-
-
-
-                </div>
-
-
-
-              </div>
-
-
-
-
-
-
-
-              <div className="space-y-2">
-
-
-
-                {banks
-
-
-
-                  .filter((b) => {
+                  {banks.filter((b) => {
 
 
 
@@ -14213,27 +14274,55 @@ async function ensureDealId() {
 
 
 
-                  })
+                  }).length === 0 && (
 
 
 
-                  .map((bankItem) => (
+                      <div className="py-8 text-center text-sm text-slate-500">
 
 
 
-                    <div
+                        No banks found. <a href="/bank" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">Create a new bank</a>
 
 
 
-                      key={bankItem.id}
+                      </div>
 
 
 
-                      onClick={() => selectBank(bankItem)}
+                    )}
 
 
 
-                      className="flex items-center justify-between rounded-xl border border-slate-200 p-4 hover:bg-slate-50 cursor-pointer transition-colors"
+                </div>
+
+
+
+
+
+
+
+                <div className="sticky bottom-0 border-t border-slate-200 bg-white px-5 py-4">
+
+
+
+                  <div className="flex items-center justify-end gap-3">
+
+
+
+                    <button
+
+
+
+                      type="button"
+
+
+
+                      onClick={closeBankPicker}
+
+
+
+                      className="rounded-full border border-slate-300 px-4 py-2 text-xs font-medium text-slate-700 hover:border-slate-400 hover:bg-slate-50"
 
 
 
@@ -14241,119 +14330,15 @@ async function ensureDealId() {
 
 
 
-                      <div className="flex items-center gap-3">
+                      Cancel
 
 
 
-                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100 text-blue-600">
+                    </button>
 
 
 
-                          <Building2 className="h-5 w-5" />
-
-
-
-                        </div>
-
-
-
-                        <div>
-
-
-
-                          <div className="text-sm font-medium text-slate-900">{bankItem.name}</div>
-
-
-
-                          <div className="text-xs text-slate-500">
-
-
-
-                            {bankItem.branch}  {bankItem.owner}
-
-
-
-                          </div>
-
-
-
-                        </div>
-
-
-
-                      </div>
-
-
-
-                      <div className="text-xs text-slate-400">
-
-
-
-                        <ChevronRight className="h-4 w-4" />
-
-
-
-                      </div>
-
-
-
-                    </div>
-
-
-
-                  ))}
-
-
-
-              </div>
-
-
-
-
-
-
-
-              {banks.filter((b) => {
-
-
-
-                const q = bankSearch.trim().toLowerCase();
-
-
-
-                return (
-
-
-
-                  b.name?.toLowerCase().includes(q) ||
-
-
-
-                  b.branch?.toLowerCase().includes(q) ||
-
-
-
-                  b.owner?.toLowerCase().includes(q) ||
-
-
-
-                  b.phone?.includes(q)
-
-
-
-                );
-
-
-
-              }).length === 0 && (
-
-
-
-                <div className="py-8 text-center text-sm text-slate-500">
-
-
-
-                  No banks found. <a href="/bank" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">Create a new bank</a>
+                  </div>
 
 
 
@@ -14361,7 +14346,7 @@ async function ensureDealId() {
 
 
 
-              )}
+              </div>
 
 
 
@@ -14369,581 +14354,525 @@ async function ensureDealId() {
 
 
 
+          </>
 
 
 
-
-            <div className="sticky bottom-0 border-t border-slate-200 bg-white px-5 py-4">
-
-
-
-              <div className="flex items-center justify-end gap-3">
+        )}
 
 
 
-                <button
-
-
-
-                  type="button"
-
-
-
-                  onClick={closeBankPicker}
-
-
-
-                  className="rounded-full border border-slate-300 px-4 py-2 text-xs font-medium text-slate-700 hover:border-slate-400 hover:bg-slate-50"
-
-
-
-                >
-
-
-
-                  Cancel
-
-
-
+        {showCustomerEditModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+            <div className="w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-2xl border border-slate-200/80 bg-white/95 shadow-2xl backdrop-blur-md">
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-slate-200/80 px-6 py-4 sticky top-0 bg-white/95 z-10">
+                <h2 className="text-lg font-semibold text-slate-900">Edit Customer</h2>
+                <button onClick={() => setShowCustomerEditModal(false)} className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600">
+                  <X className="h-5 w-5" />
                 </button>
-
-
-
               </div>
 
+              <div className="p-6 space-y-6">
 
-
-            </div>
-
-
-
-          </div>
-
-
-
-        </div>
-
-
-
-        </> 
-
-
-
-      )}
-
-
-
-      {showCustomerEditModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-2xl border border-slate-200/80 bg-white/95 shadow-2xl backdrop-blur-md">
-            {/* Header */}
-            <div className="flex items-center justify-between border-b border-slate-200/80 px-6 py-4 sticky top-0 bg-white/95 z-10">
-              <h2 className="text-lg font-semibold text-slate-900">Edit Customer</h2>
-              <button onClick={() => setShowCustomerEditModal(false)} className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <div className="p-6 space-y-6">
-
-              {/*  Customer Information  */}
-              <div>
-                <h3 className="text-sm font-semibold text-slate-800 mb-3 flex items-center gap-2">
-                  <User className="h-4 w-4 text-slate-500" /> Customer Information
-                </h3>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="col-span-2">
-                    <label className="block text-xs font-medium text-slate-700 mb-1">Customer Name <span className="text-rose-500">*</span></label>
-                    <input type="text" value={editForm.name} onChange={(e) => setEditForm({...editForm, name: e.target.value})}
-                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20" placeholder="Customer name" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">Email</label>
-                    <input type="email" value={editForm.email} onChange={(e) => setEditForm({...editForm, email: e.target.value})}
-                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20" placeholder="email@example.com" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">Phone</label>
-                    <input type="tel" value={editForm.phone} onChange={(e) => setEditForm({...editForm, phone: e.target.value})}
-                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20" placeholder="Phone number" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">Contact Person</label>
-                    <input type="text" value={editForm.contactName} onChange={(e) => setEditForm({...editForm, contactName: e.target.value})}
-                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20" placeholder="Contact person name" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">Contact Number</label>
-                    <input type="tel" value={editForm.contactNumber} onChange={(e) => setEditForm({...editForm, contactNumber: e.target.value})}
-                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20" placeholder="Contact number" />
+                {/*  Customer Information  */}
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-800 mb-3 flex items-center gap-2">
+                    <User className="h-4 w-4 text-slate-500" /> Customer Information
+                  </h3>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="col-span-2">
+                      <label className="block text-xs font-medium text-slate-700 mb-1">Customer Name <span className="text-rose-500">*</span></label>
+                      <input type="text" value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20" placeholder="Customer name" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-700 mb-1">Email</label>
+                      <input type="email" value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20" placeholder="email@example.com" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-700 mb-1">Phone</label>
+                      <input type="tel" value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20" placeholder="Phone number" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-700 mb-1">Contact Person</label>
+                      <input type="text" value={editForm.contactName} onChange={(e) => setEditForm({ ...editForm, contactName: e.target.value })}
+                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20" placeholder="Contact person name" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-700 mb-1">Contact Number</label>
+                      <input type="tel" value={editForm.contactNumber} onChange={(e) => setEditForm({ ...editForm, contactNumber: e.target.value })}
+                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20" placeholder="Contact number" />
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/*  Primary Address  */}
-              <div className="border-t pt-5">
-                <h3 className="text-sm font-semibold text-slate-800 mb-3 flex items-center gap-2">
-                  <Home className="h-4 w-4 text-slate-500" /> Primary Address (Required)
-                </h3>
-                <div className="space-y-3 p-4 border border-blue-200 rounded-lg bg-blue-50">
-                  <div>
-                    <label className="block text-xs font-medium text-slate-600 mb-1">Address Line <span className="text-rose-500">*</span></label>
-                    <textarea
-                      value={editAddresses.primary.addressLine}
-                      onChange={(e) => handleEditAddressFieldChange('primary', 'addressLine', e.target.value)}
-                      rows={2}
-                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 resize-none"
-                      placeholder="Enter primary address" />
+                {/*  Primary Address  */}
+                <div className="border-t pt-5">
+                  <h3 className="text-sm font-semibold text-slate-800 mb-3 flex items-center gap-2">
+                    <Home className="h-4 w-4 text-slate-500" /> Primary Address (Required)
+                  </h3>
+                  <div className="space-y-3 p-4 border border-blue-200 rounded-lg bg-blue-50">
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600 mb-1">Address Line <span className="text-rose-500">*</span></label>
+                      <textarea
+                        value={editAddresses.primary.addressLine}
+                        onChange={(e) => handleEditAddressFieldChange('primary', 'addressLine', e.target.value)}
+                        rows={2}
+                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 resize-none"
+                        placeholder="Enter primary address" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                      <div>
+                        <label className="block text-xs font-medium text-slate-600 mb-1">City <span className="text-rose-500">*</span></label>
+                        <input type="text" value={editAddresses.primary.city}
+                          onChange={(e) => handleEditAddressFieldChange('primary', 'city', e.target.value)}
+                          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                          placeholder="City" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-600 mb-1">State</label>
+                        <input type="text" value={editAddresses.primary.state}
+                          onChange={(e) => handleEditAddressFieldChange('primary', 'state', e.target.value)}
+                          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                          placeholder="State" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-600 mb-1">Pincode</label>
+                        <input type="text" value={editAddresses.primary.pincode}
+                          onChange={(e) => handleEditAddressFieldChange('primary', 'pincode', e.target.value)}
+                          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                          placeholder="Pincode" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-600 mb-1">Latitude <span className="text-rose-500">*</span></label>
+                        <input type="number" step="any" value={editAddresses.primary.latitude}
+                          onChange={(e) => handleEditAddressFieldChange('primary', 'latitude', e.target.value)}
+                          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                          placeholder="Latitude" />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-slate-600 mb-1">Longitude <span className="text-rose-500">*</span></label>
+                        <input type="number" step="any" value={editAddresses.primary.longitude}
+                          onChange={(e) => handleEditAddressFieldChange('primary', 'longitude', e.target.value)}
+                          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                          placeholder="Longitude" />
+                      </div>
+                      <div className="flex items-end gap-2">
+                        <button type="button" onClick={() => handleEditAddressGeocode('primary')}
+                          className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition-colors">
+                          <MapPin className="h-3.5 w-3.5" /> Auto-Geocode
+                        </button>
+                        <button type="button" onClick={() => handleEditReverseGeocode('primary')}
+                          disabled={!editAddresses.primary.latitude || !editAddresses.primary.longitude}
+                          className="flex items-center gap-1.5 px-3 py-2 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50">
+                          <Map className="h-3.5 w-3.5" /> Reverse
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                    <div>
-                      <label className="block text-xs font-medium text-slate-600 mb-1">City <span className="text-rose-500">*</span></label>
-                      <input type="text" value={editAddresses.primary.city}
-                        onChange={(e) => handleEditAddressFieldChange('primary', 'city', e.target.value)}
-                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                        placeholder="City" />
+                </div>
+
+                {/*  Additional Addresses  */}
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-800 mb-3">Additional Addresses (Optional)</h3>
+                  <div className="space-y-3">
+
+                    {/* Police Station */}
+                    <div className="p-4 border border-slate-200 rounded-lg">
+                      <div className="flex items-center mb-3">
+                        <input type="checkbox" checked={editAddresses.police.enabled}
+                          onChange={(e) => handleEditAddressToggle('police', e.target.checked)}
+                          className="mr-2" />
+                        <label className="text-sm font-medium text-slate-700 flex items-center gap-1.5">
+                          <Shield className="h-3.5 w-3.5 text-slate-500" /> Police Station Address
+                        </label>
+                      </div>
+                      {editAddresses.police.enabled && (
+                        <div className="space-y-3">
+                          <textarea value={editAddresses.police.addressLine}
+                            onChange={(e) => handleEditAddressFieldChange('police', 'addressLine', e.target.value)}
+                            rows={2} placeholder="Police station address"
+                            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 resize-none" />
+                          <div className="grid grid-cols-3 gap-3">
+                            <div>
+                              <label className="block text-xs font-medium text-slate-600 mb-1">City</label>
+                              <input type="text" value={editAddresses.police.city}
+                                onChange={(e) => handleEditAddressFieldChange('police', 'city', e.target.value)}
+                                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none"
+                                placeholder="City" />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-slate-600 mb-1">State</label>
+                              <input type="text" value={editAddresses.police.state}
+                                onChange={(e) => handleEditAddressFieldChange('police', 'state', e.target.value)}
+                                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none"
+                                placeholder="State" />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-slate-600 mb-1">Pincode</label>
+                              <input type="text" value={editAddresses.police.pincode}
+                                onChange={(e) => handleEditAddressFieldChange('police', 'pincode', e.target.value)}
+                                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none"
+                                placeholder="Pincode" />
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-xs font-medium text-slate-600 mb-1">Latitude</label>
+                              <input type="number" step="any" value={editAddresses.police.latitude}
+                                onChange={(e) => handleEditAddressFieldChange('police', 'latitude', e.target.value)}
+                                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none"
+                                placeholder="Latitude" />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-slate-600 mb-1">Longitude</label>
+                              <input type="number" step="any" value={editAddresses.police.longitude}
+                                onChange={(e) => handleEditAddressFieldChange('police', 'longitude', e.target.value)}
+                                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none"
+                                placeholder="Longitude" />
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <button type="button" onClick={() => handleEditAddressGeocode('police')}
+                              className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition-colors">
+                              <MapPin className="h-3.5 w-3.5" /> Auto-Geocode
+                            </button>
+                            <button type="button" onClick={() => handleEditReverseGeocode('police')}
+                              disabled={!editAddresses.police.latitude || !editAddresses.police.longitude}
+                              className="flex items-center gap-1.5 px-3 py-2 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50">
+                              <Map className="h-3.5 w-3.5" /> Reverse
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    <div>
-                      <label className="block text-xs font-medium text-slate-600 mb-1">State</label>
-                      <input type="text" value={editAddresses.primary.state}
-                        onChange={(e) => handleEditAddressFieldChange('primary', 'state', e.target.value)}
-                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                        placeholder="State" />
+
+                    {/* Branch Address */}
+                    <div className="p-4 border border-slate-200 rounded-lg">
+                      <div className="flex items-center mb-3">
+                        <input type="checkbox" checked={editAddresses.branch.enabled}
+                          onChange={(e) => handleEditAddressToggle('branch', e.target.checked)}
+                          className="mr-2" />
+                        <label className="text-sm font-medium text-slate-700 flex items-center gap-1.5">
+                          <Building className="h-3.5 w-3.5 text-slate-500" /> Branch Address
+                        </label>
+                      </div>
+                      {editAddresses.branch.enabled && (
+                        <div className="space-y-3">
+                          <textarea value={editAddresses.branch.addressLine}
+                            onChange={(e) => handleEditAddressFieldChange('branch', 'addressLine', e.target.value)}
+                            rows={2} placeholder="Branch address"
+                            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 resize-none" />
+                          <div className="grid grid-cols-3 gap-3">
+                            <div>
+                              <label className="block text-xs font-medium text-slate-600 mb-1">City</label>
+                              <input type="text" value={editAddresses.branch.city}
+                                onChange={(e) => handleEditAddressFieldChange('branch', 'city', e.target.value)}
+                                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none"
+                                placeholder="City" />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-slate-600 mb-1">State</label>
+                              <input type="text" value={editAddresses.branch.state}
+                                onChange={(e) => handleEditAddressFieldChange('branch', 'state', e.target.value)}
+                                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none"
+                                placeholder="State" />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-slate-600 mb-1">Pincode</label>
+                              <input type="text" value={editAddresses.branch.pincode}
+                                onChange={(e) => handleEditAddressFieldChange('branch', 'pincode', e.target.value)}
+                                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none"
+                                placeholder="Pincode" />
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-xs font-medium text-slate-600 mb-1">Latitude</label>
+                              <input type="number" step="any" value={editAddresses.branch.latitude}
+                                onChange={(e) => handleEditAddressFieldChange('branch', 'latitude', e.target.value)}
+                                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none"
+                                placeholder="Latitude" />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-slate-600 mb-1">Longitude</label>
+                              <input type="number" step="any" value={editAddresses.branch.longitude}
+                                onChange={(e) => handleEditAddressFieldChange('branch', 'longitude', e.target.value)}
+                                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none"
+                                placeholder="Longitude" />
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <button type="button" onClick={() => handleEditAddressGeocode('branch')}
+                              className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition-colors">
+                              <MapPin className="h-3.5 w-3.5" /> Auto-Geocode
+                            </button>
+                            <button type="button" onClick={() => handleEditReverseGeocode('branch')}
+                              disabled={!editAddresses.branch.latitude || !editAddresses.branch.longitude}
+                              className="flex items-center gap-1.5 px-3 py-2 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50">
+                              <Map className="h-3.5 w-3.5" /> Reverse
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    <div>
-                      <label className="block text-xs font-medium text-slate-600 mb-1">Pincode</label>
-                      <input type="text" value={editAddresses.primary.pincode}
-                        onChange={(e) => handleEditAddressFieldChange('primary', 'pincode', e.target.value)}
-                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                        placeholder="Pincode" />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-slate-600 mb-1">Latitude <span className="text-rose-500">*</span></label>
-                      <input type="number" step="any" value={editAddresses.primary.latitude}
-                        onChange={(e) => handleEditAddressFieldChange('primary', 'latitude', e.target.value)}
-                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                        placeholder="Latitude" />
+
+                    {/* Tahsil Address */}
+                    <div className="p-4 border border-slate-200 rounded-lg">
+                      <div className="flex items-center mb-3">
+                        <input type="checkbox" checked={editAddresses.tahsil.enabled}
+                          onChange={(e) => handleEditAddressToggle('tahsil', e.target.checked)}
+                          className="mr-2" />
+                        <label className="text-sm font-medium text-slate-700 flex items-center gap-1.5">
+                          <MapPin className="h-3.5 w-3.5 text-slate-500" /> Tahsil Address
+                        </label>
+                      </div>
+                      {editAddresses.tahsil.enabled && (
+                        <div className="space-y-3">
+                          <textarea value={editAddresses.tahsil.addressLine}
+                            onChange={(e) => handleEditAddressFieldChange('tahsil', 'addressLine', e.target.value)}
+                            rows={2} placeholder="Tahsil address"
+                            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 resize-none" />
+                          <div className="grid grid-cols-3 gap-3">
+                            <div>
+                              <label className="block text-xs font-medium text-slate-600 mb-1">City</label>
+                              <input type="text" value={editAddresses.tahsil.city}
+                                onChange={(e) => handleEditAddressFieldChange('tahsil', 'city', e.target.value)}
+                                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none"
+                                placeholder="City" />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-slate-600 mb-1">State</label>
+                              <input type="text" value={editAddresses.tahsil.state}
+                                onChange={(e) => handleEditAddressFieldChange('tahsil', 'state', e.target.value)}
+                                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none"
+                                placeholder="State" />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-slate-600 mb-1">Pincode</label>
+                              <input type="text" value={editAddresses.tahsil.pincode}
+                                onChange={(e) => handleEditAddressFieldChange('tahsil', 'pincode', e.target.value)}
+                                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none"
+                                placeholder="Pincode" />
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-xs font-medium text-slate-600 mb-1">Latitude</label>
+                              <input type="number" step="any" value={editAddresses.tahsil.latitude}
+                                onChange={(e) => handleEditAddressFieldChange('tahsil', 'latitude', e.target.value)}
+                                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none"
+                                placeholder="Latitude" />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-slate-600 mb-1">Longitude</label>
+                              <input type="number" step="any" value={editAddresses.tahsil.longitude}
+                                onChange={(e) => handleEditAddressFieldChange('tahsil', 'longitude', e.target.value)}
+                                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none"
+                                placeholder="Longitude" />
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <button type="button" onClick={() => handleEditAddressGeocode('tahsil')}
+                              className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition-colors">
+                              <MapPin className="h-3.5 w-3.5" /> Auto-Geocode
+                            </button>
+                            <button type="button" onClick={() => handleEditReverseGeocode('tahsil')}
+                              disabled={!editAddresses.tahsil.latitude || !editAddresses.tahsil.longitude}
+                              className="flex items-center gap-1.5 px-3 py-2 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50">
+                              <Map className="h-3.5 w-3.5" /> Reverse
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
+                </div>
+
+                {/*  Deal Information  */}
+                <div className="border-t pt-5">
+                  <h3 className="text-sm font-semibold text-slate-800 mb-3 flex items-center gap-2">
+                    <DollarSign className="h-4 w-4 text-slate-500" /> Deal Information
+                  </h3>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-xs font-medium text-slate-600 mb-1">Longitude <span className="text-rose-500">*</span></label>
-                      <input type="number" step="any" value={editAddresses.primary.longitude}
-                        onChange={(e) => handleEditAddressFieldChange('primary', 'longitude', e.target.value)}
-                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                        placeholder="Longitude" />
+                      <label className="block text-xs font-medium text-slate-700 mb-1">Department</label>
+                      <select value={editDepartment}
+                        onChange={async (e) => {
+                          const dept = e.target.value;
+                          setEditDepartment(dept);
+                          setEditForm(prev => ({ ...prev, department: dept, stage: "" }));
+                          if (dept) {
+                            const stages = await fetchStagesForDepartment(dept).catch(() => []);
+                            setEditAvailableStages(stages || []);
+                          } else { setEditAvailableStages([]); }
+                        }}
+                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20">
+                        <option value="">Select Department</option>
+                        {[...new Set((stagesFromBackend || []).map(s => s.department).filter(Boolean))].map(dept => (
+                          <option key={dept} value={dept}>{dept}</option>
+                        ))}
+                      </select>
                     </div>
-                    <div className="flex items-end gap-2">
-                      <button type="button" onClick={() => handleEditAddressGeocode('primary')}
-                        className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition-colors">
-                        <MapPin className="h-3.5 w-3.5" /> Auto-Geocode
-                      </button>
-                      <button type="button" onClick={() => handleEditReverseGeocode('primary')}
-                        disabled={!editAddresses.primary.latitude || !editAddresses.primary.longitude}
-                        className="flex items-center gap-1.5 px-3 py-2 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50">
-                        <Map className="h-3.5 w-3.5" /> Reverse
-                      </button>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-700 mb-1">Deal Stage</label>
+                      <select value={editForm.stage || ""} disabled={!editDepartment}
+                        onChange={(e) => setEditForm({ ...editForm, stage: e.target.value })}
+                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm disabled:bg-slate-100 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20">
+                        <option value="">Select Stage</option>
+                        {editAvailableStages.map(s => (
+                          <option key={s.stageCode} value={s.stageCode}>{s.stageName}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-700 mb-1">Bank</label>
+                      <select
+                        value={editSelectedBankName}
+                        onChange={(e) => {
+                          setEditSelectedBankName(e.target.value);
+                          setEditForm(prev => ({ ...prev, bankId: "", branchName: "" }));
+                        }}
+                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20">
+                        <option value="">Select Bank</option>
+                        {[...new Set(banks.map(b => b.name).filter(Boolean))].sort().map(name => (
+                          <option key={name} value={name}>{name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-700 mb-1">Branch</label>
+                      <select
+                        value={editForm.bankId || ""}
+                        onChange={(e) => {
+                          const b = banks.find(bk => String(bk.id) === String(e.target.value));
+                          setEditForm(prev => ({ ...prev, bankId: String(e.target.value), branchName: b?.branchName || "" }));
+                        }}
+                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20">
+                        <option value="">{editSelectedBankName ? "Select Branch" : "Select a bank first"}</option>
+                        {banks.filter(b => b.name === editSelectedBankName).map(b => (
+                          <option key={b.id} value={String(b.id)}>{b.branchName || b.branch || b.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-700 mb-1">Deal Value ()</label>
+                      <input type="number" min="0" value={editForm.valueAmount || ""}
+                        onChange={(e) => setEditForm({ ...editForm, valueAmount: e.target.value })}
+                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                        placeholder="0" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-700 mb-1">Closing Date</label>
+                      <input type="date" value={editForm.closingDate || ""}
+                        onChange={(e) => setEditForm({ ...editForm, closingDate: e.target.value })}
+                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20" />
+                    </div>
+                    <div className="col-span-2">
+                      <label className="block text-xs font-medium text-slate-700 mb-1">Description</label>
+                      <textarea value={editForm.description || ""} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                        rows={3}
+                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 resize-none"
+                        placeholder="Deal description" />
                     </div>
                   </div>
                 </div>
+
               </div>
 
-              {/*  Additional Addresses  */}
-              <div>
-                <h3 className="text-sm font-semibold text-slate-800 mb-3">Additional Addresses (Optional)</h3>
-                <div className="space-y-3">
-
-                  {/* Police Station */}
-                  <div className="p-4 border border-slate-200 rounded-lg">
-                    <div className="flex items-center mb-3">
-                      <input type="checkbox" checked={editAddresses.police.enabled}
-                        onChange={(e) => handleEditAddressToggle('police', e.target.checked)}
-                        className="mr-2" />
-                      <label className="text-sm font-medium text-slate-700 flex items-center gap-1.5">
-                        <Shield className="h-3.5 w-3.5 text-slate-500" /> Police Station Address
-                      </label>
-                    </div>
-                    {editAddresses.police.enabled && (
-                      <div className="space-y-3">
-                        <textarea value={editAddresses.police.addressLine}
-                          onChange={(e) => handleEditAddressFieldChange('police', 'addressLine', e.target.value)}
-                          rows={2} placeholder="Police station address"
-                          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 resize-none" />
-                        <div className="grid grid-cols-3 gap-3">
-                          <div>
-                            <label className="block text-xs font-medium text-slate-600 mb-1">City</label>
-                            <input type="text" value={editAddresses.police.city}
-                              onChange={(e) => handleEditAddressFieldChange('police', 'city', e.target.value)}
-                              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none"
-                              placeholder="City" />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-medium text-slate-600 mb-1">State</label>
-                            <input type="text" value={editAddresses.police.state}
-                              onChange={(e) => handleEditAddressFieldChange('police', 'state', e.target.value)}
-                              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none"
-                              placeholder="State" />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-medium text-slate-600 mb-1">Pincode</label>
-                            <input type="text" value={editAddresses.police.pincode}
-                              onChange={(e) => handleEditAddressFieldChange('police', 'pincode', e.target.value)}
-                              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none"
-                              placeholder="Pincode" />
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-3">
-                          <div>
-                            <label className="block text-xs font-medium text-slate-600 mb-1">Latitude</label>
-                            <input type="number" step="any" value={editAddresses.police.latitude}
-                              onChange={(e) => handleEditAddressFieldChange('police', 'latitude', e.target.value)}
-                              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none"
-                              placeholder="Latitude" />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-medium text-slate-600 mb-1">Longitude</label>
-                            <input type="number" step="any" value={editAddresses.police.longitude}
-                              onChange={(e) => handleEditAddressFieldChange('police', 'longitude', e.target.value)}
-                              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none"
-                              placeholder="Longitude" />
-                          </div>
-                        </div>
-                        <div className="flex gap-2">
-                          <button type="button" onClick={() => handleEditAddressGeocode('police')}
-                            className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition-colors">
-                            <MapPin className="h-3.5 w-3.5" /> Auto-Geocode
-                          </button>
-                          <button type="button" onClick={() => handleEditReverseGeocode('police')}
-                            disabled={!editAddresses.police.latitude || !editAddresses.police.longitude}
-                            className="flex items-center gap-1.5 px-3 py-2 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50">
-                            <Map className="h-3.5 w-3.5" /> Reverse
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Branch Address */}
-                  <div className="p-4 border border-slate-200 rounded-lg">
-                    <div className="flex items-center mb-3">
-                      <input type="checkbox" checked={editAddresses.branch.enabled}
-                        onChange={(e) => handleEditAddressToggle('branch', e.target.checked)}
-                        className="mr-2" />
-                      <label className="text-sm font-medium text-slate-700 flex items-center gap-1.5">
-                        <Building className="h-3.5 w-3.5 text-slate-500" /> Branch Address
-                      </label>
-                    </div>
-                    {editAddresses.branch.enabled && (
-                      <div className="space-y-3">
-                        <textarea value={editAddresses.branch.addressLine}
-                          onChange={(e) => handleEditAddressFieldChange('branch', 'addressLine', e.target.value)}
-                          rows={2} placeholder="Branch address"
-                          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 resize-none" />
-                        <div className="grid grid-cols-3 gap-3">
-                          <div>
-                            <label className="block text-xs font-medium text-slate-600 mb-1">City</label>
-                            <input type="text" value={editAddresses.branch.city}
-                              onChange={(e) => handleEditAddressFieldChange('branch', 'city', e.target.value)}
-                              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none"
-                              placeholder="City" />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-medium text-slate-600 mb-1">State</label>
-                            <input type="text" value={editAddresses.branch.state}
-                              onChange={(e) => handleEditAddressFieldChange('branch', 'state', e.target.value)}
-                              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none"
-                              placeholder="State" />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-medium text-slate-600 mb-1">Pincode</label>
-                            <input type="text" value={editAddresses.branch.pincode}
-                              onChange={(e) => handleEditAddressFieldChange('branch', 'pincode', e.target.value)}
-                              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none"
-                              placeholder="Pincode" />
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-3">
-                          <div>
-                            <label className="block text-xs font-medium text-slate-600 mb-1">Latitude</label>
-                            <input type="number" step="any" value={editAddresses.branch.latitude}
-                              onChange={(e) => handleEditAddressFieldChange('branch', 'latitude', e.target.value)}
-                              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none"
-                              placeholder="Latitude" />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-medium text-slate-600 mb-1">Longitude</label>
-                            <input type="number" step="any" value={editAddresses.branch.longitude}
-                              onChange={(e) => handleEditAddressFieldChange('branch', 'longitude', e.target.value)}
-                              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none"
-                              placeholder="Longitude" />
-                          </div>
-                        </div>
-                        <div className="flex gap-2">
-                          <button type="button" onClick={() => handleEditAddressGeocode('branch')}
-                            className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition-colors">
-                            <MapPin className="h-3.5 w-3.5" /> Auto-Geocode
-                          </button>
-                          <button type="button" onClick={() => handleEditReverseGeocode('branch')}
-                            disabled={!editAddresses.branch.latitude || !editAddresses.branch.longitude}
-                            className="flex items-center gap-1.5 px-3 py-2 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50">
-                            <Map className="h-3.5 w-3.5" /> Reverse
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Tahsil Address */}
-                  <div className="p-4 border border-slate-200 rounded-lg">
-                    <div className="flex items-center mb-3">
-                      <input type="checkbox" checked={editAddresses.tahsil.enabled}
-                        onChange={(e) => handleEditAddressToggle('tahsil', e.target.checked)}
-                        className="mr-2" />
-                      <label className="text-sm font-medium text-slate-700 flex items-center gap-1.5">
-                        <MapPin className="h-3.5 w-3.5 text-slate-500" /> Tahsil Address
-                      </label>
-                    </div>
-                    {editAddresses.tahsil.enabled && (
-                      <div className="space-y-3">
-                        <textarea value={editAddresses.tahsil.addressLine}
-                          onChange={(e) => handleEditAddressFieldChange('tahsil', 'addressLine', e.target.value)}
-                          rows={2} placeholder="Tahsil address"
-                          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 resize-none" />
-                        <div className="grid grid-cols-3 gap-3">
-                          <div>
-                            <label className="block text-xs font-medium text-slate-600 mb-1">City</label>
-                            <input type="text" value={editAddresses.tahsil.city}
-                              onChange={(e) => handleEditAddressFieldChange('tahsil', 'city', e.target.value)}
-                              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none"
-                              placeholder="City" />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-medium text-slate-600 mb-1">State</label>
-                            <input type="text" value={editAddresses.tahsil.state}
-                              onChange={(e) => handleEditAddressFieldChange('tahsil', 'state', e.target.value)}
-                              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none"
-                              placeholder="State" />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-medium text-slate-600 mb-1">Pincode</label>
-                            <input type="text" value={editAddresses.tahsil.pincode}
-                              onChange={(e) => handleEditAddressFieldChange('tahsil', 'pincode', e.target.value)}
-                              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none"
-                              placeholder="Pincode" />
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-3">
-                          <div>
-                            <label className="block text-xs font-medium text-slate-600 mb-1">Latitude</label>
-                            <input type="number" step="any" value={editAddresses.tahsil.latitude}
-                              onChange={(e) => handleEditAddressFieldChange('tahsil', 'latitude', e.target.value)}
-                              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none"
-                              placeholder="Latitude" />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-medium text-slate-600 mb-1">Longitude</label>
-                            <input type="number" step="any" value={editAddresses.tahsil.longitude}
-                              onChange={(e) => handleEditAddressFieldChange('tahsil', 'longitude', e.target.value)}
-                              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none"
-                              placeholder="Longitude" />
-                          </div>
-                        </div>
-                        <div className="flex gap-2">
-                          <button type="button" onClick={() => handleEditAddressGeocode('tahsil')}
-                            className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition-colors">
-                            <MapPin className="h-3.5 w-3.5" /> Auto-Geocode
-                          </button>
-                          <button type="button" onClick={() => handleEditReverseGeocode('tahsil')}
-                            disabled={!editAddresses.tahsil.latitude || !editAddresses.tahsil.longitude}
-                            className="flex items-center gap-1.5 px-3 py-2 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50">
-                            <Map className="h-3.5 w-3.5" /> Reverse
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/*  Deal Information  */}
-              <div className="border-t pt-5">
-                <h3 className="text-sm font-semibold text-slate-800 mb-3 flex items-center gap-2">
-                  <DollarSign className="h-4 w-4 text-slate-500" /> Deal Information
-                </h3>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">Department</label>
-                    <select value={editDepartment}
-                      onChange={async (e) => {
-                        const dept = e.target.value;
-                        setEditDepartment(dept);
-                        setEditForm(prev => ({ ...prev, department: dept, stage: "" }));
-                        if (dept) {
-                          const stages = await fetchStagesForDepartment(dept).catch(() => []);
-                          setEditAvailableStages(stages || []);
-                        } else { setEditAvailableStages([]); }
-                      }}
-                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20">
-                      <option value="">Select Department</option>
-                      {[...new Set((stagesFromBackend || []).map(s => s.department).filter(Boolean))].map(dept => (
-                        <option key={dept} value={dept}>{dept}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">Deal Stage</label>
-                    <select value={editForm.stage || ""} disabled={!editDepartment}
-                      onChange={(e) => setEditForm({...editForm, stage: e.target.value})}
-                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm disabled:bg-slate-100 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20">
-                      <option value="">Select Stage</option>
-                      {editAvailableStages.map(s => (
-                        <option key={s.stageCode} value={s.stageCode}>{s.stageName}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">Bank</label>
-                    <select
-                      value={editSelectedBankName}
-                      onChange={(e) => {
-                        setEditSelectedBankName(e.target.value);
-                        setEditForm(prev => ({ ...prev, bankId: "", branchName: "" }));
-                      }}
-                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20">
-                      <option value="">Select Bank</option>
-                      {[...new Set(banks.map(b => b.name).filter(Boolean))].sort().map(name => (
-                        <option key={name} value={name}>{name}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">Branch</label>
-                    <select
-                      value={editForm.bankId || ""}
-                      onChange={(e) => {
-                        const b = banks.find(bk => String(bk.id) === String(e.target.value));
-                        setEditForm(prev => ({ ...prev, bankId: String(e.target.value), branchName: b?.branchName || "" }));
-                      }}
-                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20">
-                      <option value="">{editSelectedBankName ? "Select Branch" : "Select a bank first"}</option>
-                      {banks.filter(b => b.name === editSelectedBankName).map(b => (
-                        <option key={b.id} value={String(b.id)}>{b.branchName || b.branch || b.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">Deal Value ()</label>
-                    <input type="number" min="0" value={editForm.valueAmount || ""}
-                      onChange={(e) => setEditForm({...editForm, valueAmount: e.target.value})}
-                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                      placeholder="0" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">Closing Date</label>
-                    <input type="date" value={editForm.closingDate || ""}
-                      onChange={(e) => setEditForm({...editForm, closingDate: e.target.value})}
-                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20" />
-                  </div>
-                  <div className="col-span-2">
-                    <label className="block text-xs font-medium text-slate-700 mb-1">Description</label>
-                    <textarea value={editForm.description || ""} onChange={(e) => setEditForm({...editForm, description: e.target.value})}
-                      rows={3}
-                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 resize-none"
-                      placeholder="Deal description" />
-                  </div>
-                </div>
+              {/* Footer */}
+              <div className="flex justify-end gap-3 border-t border-slate-200/80 px-6 py-4 sticky bottom-0 bg-white/95">
+                <button onClick={() => setShowCustomerEditModal(false)}
+                  className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50">
+                  Cancel
+                </button>
+                <button onClick={handleCustomerUpdate}
+                  className="rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-md shadow-blue-500/30 transition hover:translate-y-[1px] hover:shadow-lg">
+                  Save Changes
+                </button>
               </div>
 
             </div>
-
-            {/* Footer */}
-            <div className="flex justify-end gap-3 border-t border-slate-200/80 px-6 py-4 sticky bottom-0 bg-white/95">
-              <button onClick={() => setShowCustomerEditModal(false)}
-                className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50">
-                Cancel
-              </button>
-              <button onClick={handleCustomerUpdate}
-                className="rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-md shadow-blue-500/30 transition hover:translate-y-[1px] hover:shadow-lg">
-                Save Changes
-              </button>
-            </div>
-
           </div>
-        </div>
-      )}
+        )}
 
 
-    </>
-
-
-
-    {/*  Account Transfer Confirmation Dialog */}
-
-    <AccountTransferDialog
-
-      isOpen={showAccountTransferDialog}
-
-      dealName={deal?.name || "Untitled Deal"}
-
-      customerName={customer?.name || "Unknown Customer"}
-
-      customerEmail={customer?.email || ""}
-
-      customerPhone={customer?.contactPhone || customer?.phone || ""}
-
-      customerAddress={customer?.addresses?.[0] || {}} // Use first address from addresses array
-
-      customerProducts={products || []}
-
-      dealValue={finalAmount} //  FIXED: Use calculated finalAmount instead of dealValue
-
-      onConfirm={async () => {
-
-        await executeStageChange(pendingStageChange);
-
-        setShowAccountTransferDialog(false);
-
-        setPendingStageChange(null);
-
-        //  FIXED: Show success message
-
-        showSuccess("Deal successfully sent to Accounts. Accounts team has been notified.");
-
-      }}
-
-      onCancel={() => {
-
-        setShowAccountTransferDialog(false);
-
-        setPendingStageChange(null);
-
-      }}
-
-    />
+      </>
 
 
 
-    {/*  NEW: Approval Modal */}
+      {/*  Account Transfer Confirmation Dialog */}
 
-    <ApprovalModal
+      <AccountTransferDialog
 
-      isOpen={approvalModal.isOpen}
+        isOpen={showAccountTransferDialog}
 
-      type={approvalModal.type}
+        dealName={deal?.name || "Untitled Deal"}
 
-      title={approvalModal.title}
+        customerName={customer?.name || "Unknown Customer"}
 
-      message={approvalModal.message}
+        customerEmail={customer?.email || ""}
 
-      onConfirm={approvalModal.onConfirm}
+        customerPhone={customer?.contactPhone || customer?.phone || ""}
 
-      onCancel={approvalModal.onCancel}
+        customerAddress={customer?.addresses?.[0] || {}} // Use first address from addresses array
 
-      confirmText={approvalModal.confirmText}
+        customerProducts={products || []}
 
-      cancelText={approvalModal.cancelText}
+        dealValue={finalAmount} //  FIXED: Use calculated finalAmount instead of dealValue
 
-    />
+        onConfirm={async () => {
+
+          await executeStageChange(pendingStageChange);
+
+          setShowAccountTransferDialog(false);
+
+          setPendingStageChange(null);
+
+          //  FIXED: Show success message
+
+          showSuccess("Deal successfully sent to Accounts. Accounts team has been notified.");
+
+        }}
+
+        onCancel={() => {
+
+          setShowAccountTransferDialog(false);
+
+          setPendingStageChange(null);
+
+        }}
+
+      />
+
+
+
+      {/*  NEW: Approval Modal */}
+
+      <ApprovalModal
+
+        isOpen={approvalModal.isOpen}
+
+        type={approvalModal.type}
+
+        title={approvalModal.title}
+
+        message={approvalModal.message}
+
+        onConfirm={approvalModal.onConfirm}
+
+        onCancel={approvalModal.onCancel}
+
+        confirmText={approvalModal.confirmText}
+
+        cancelText={approvalModal.cancelText}
+
+      />
 
 
 
@@ -15100,10 +15029,3 @@ function TrashIcon() {
 
 
 }
-
-
-
-
-
-
-

@@ -82,7 +82,7 @@ export default function TasksManagementContent() {
   const [editingTask, setEditingTask] = useState(null);
   const [deleteTaskId, setDeleteTaskId] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const recordsPerPage = 5;
+  const recordsPerPage = 20;
   const excelInputRef = useRef(null);
   const [uploading, setUploading] = useState(false);
 
@@ -121,7 +121,7 @@ export default function TasksManagementContent() {
 
   const loadDepartments = async () => {
     try {
-      const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api.yashrajent.com';
+      const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080';
       const token = (typeof window !== 'undefined')
         ? (sessionStorage.getItem('token') || localStorage.getItem('token'))
         : null;
@@ -207,8 +207,8 @@ export default function TasksManagementContent() {
       setDeleteTaskId(null);
       toast.success("Task deleted successfully");
     } catch (error) {
-      console.error("Failed to delete task:", error);
-      toast.error(error.message || "Failed to delete task");
+      console.error("Failed to delete task:");
+      toast.error("Task is currently in progress and cannot be deleted.");
     }
   };
 
@@ -253,7 +253,7 @@ export default function TasksManagementContent() {
       if (!rows.length) { toast.error('No valid task rows found'); setUploading(false); return; }
 
       const authUser = (() => { try { return JSON.parse(sessionStorage.getItem('user_data') || '{}'); } catch { return {}; } })();
-      const API = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api.yashrajent.com';
+      const API = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080';
 
       const res = await fetch(`${API}/api/tasks/bulk`, {
         method: 'POST',
@@ -415,12 +415,14 @@ export default function TasksManagementContent() {
               <table className="min-w-full divide-y divide-slate-200">
                 <thead className="bg-slate-50 border-b border-slate-200" style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                   <tr>
+                    {/* Sticky: Sr No */}
+                    <th style={{ position: 'sticky', left: 0, zIndex: 20, background: 'rgb(248 250 252)', minWidth: 80 }} className="px-6 py-3 text-center text-xs font-medium text-slate-500 uppercase tracking-wider border-r border-slate-200">Sr No</th>
                     {/* Sticky: Task Name */}
-                    <th style={{ position: 'sticky', left: 0, zIndex: 20, background: 'rgb(248 250 252)', minWidth: 180 }} className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider border-r border-slate-200">Task Name</th>
+                    <th style={{ position: 'sticky', left: 80, zIndex: 20, background: 'rgb(248 250 252)', minWidth: 180 }} className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider border-r border-slate-200">Task Name</th>
                     {/* Sticky: Department */}
-                    <th style={{ position: 'sticky', left: 180, zIndex: 20, background: 'rgb(248 250 252)', minWidth: 130 }} className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider border-r border-slate-200">Department</th>
+                    <th style={{ position: 'sticky', left: 260, zIndex: 20, background: 'rgb(248 250 252)', minWidth: 130 }} className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider border-r border-slate-200">Department</th>
                     {/* Sticky: Client */}
-                    <th style={{ position: 'sticky', left: 310, zIndex: 20, background: 'rgb(248 250 252)', minWidth: 150 }} className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider border-r border-slate-200">Client</th>
+                    <th style={{ position: 'sticky', left: 390, zIndex: 20, background: 'rgb(248 250 252)', minWidth: 150 }} className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider border-r border-slate-200">Client</th>
                     {/* Scrollable columns */}
                     <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">Customer Location</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">Start Time</th>
@@ -432,16 +434,20 @@ export default function TasksManagementContent() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-slate-200">
-                  {paginatedTasks.map((task) => (
+                  {paginatedTasks.map((task, index) => (
                     <tr key={task.id} className="hover:bg-slate-50">
+                      {/* Sticky: Sr No */}
+                      <td style={{ position: 'sticky', left: 0, zIndex: 5, background: 'white', minWidth: 80 }} className="px-6 py-4 text-sm font-medium text-slate-900 border-r border-slate-200 whitespace-nowrap text-center">
+                        {sortedFilteredTasks.length - ((currentPage - 1) * recordsPerPage + index)}
+                      </td>
                       {/* Sticky: Task Name */}
-                      <td style={{ position: 'sticky', left: 0, zIndex: 5, background: 'white', minWidth: 180 }} className="px-6 py-4 text-sm font-medium text-slate-900 border-r border-slate-200 whitespace-nowrap">{task.taskName || '-'}</td>
+                      <td style={{ position: 'sticky', left: 80, zIndex: 5, background: 'white', minWidth: 180 }} className="px-6 py-4 text-sm font-medium text-slate-900 border-r border-slate-200 whitespace-nowrap">{task.taskName || '-'}</td>
                       {/* Sticky: Department */}
-                      <td style={{ position: 'sticky', left: 180, zIndex: 5, background: 'white', minWidth: 130 }} className="px-6 py-4 text-sm text-slate-600 border-r border-slate-200 whitespace-nowrap">
+                      <td style={{ position: 'sticky', left: 260, zIndex: 5, background: 'white', minWidth: 130 }} className="px-6 py-4 text-sm text-slate-600 border-r border-slate-200 whitespace-nowrap">
                         <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-indigo-100 text-indigo-800">{task.department || '-'}</span>
                       </td>
                       {/* Sticky: Client */}
-                      <td style={{ position: 'sticky', left: 310, zIndex: 5, background: 'white', minWidth: 150 }} className="px-6 py-4 text-sm text-slate-600 border-r border-slate-200 whitespace-nowrap">
+                      <td style={{ position: 'sticky', left: 390, zIndex: 5, background: 'white', minWidth: 150 }} className="px-6 py-4 text-sm text-slate-600 border-r border-slate-200 whitespace-nowrap">
                         {task.clientId ? (
                           <a href={`/customers/${task.clientId}`} className="text-indigo-600 hover:underline font-medium">{task.clientName || '-'}</a>
                         ) : (task.clientName || '-')}
@@ -692,7 +698,7 @@ function TaskModal({ task, employees, customFields, departments, currentUser, on
 
   const loadClients = async () => {
     try {
-      const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api.yashrajent.com';
+      const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080';
       const response = await fetch(`${API_BASE_URL}/api/clients`);
       const data = await response.json();
       setClients(data || []);
@@ -703,7 +709,7 @@ function TaskModal({ task, employees, customFields, departments, currentUser, on
 
   const fetchCustomerAddresses = async (clientId) => {
     try {
-      const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api.yashrajent.com';
+      const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080';
       const response = await fetch(`${API_BASE_URL}/api/clients/${clientId}/addresses`);
       const data = await response.json();
       
@@ -740,7 +746,7 @@ function TaskModal({ task, employees, customFields, departments, currentUser, on
 
   const fetchCustomFields = async (taskType) => {
     try {
-      const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api.yashrajent.com';
+      const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080';
       const response = await fetch(`${API_BASE_URL}/api/task-custom-fields?customTaskType=${encodeURIComponent(taskType)}`);
       const data = await response.json();
       setModalCustomFields(data || []);
@@ -772,7 +778,7 @@ function TaskModal({ task, employees, customFields, departments, currentUser, on
 
   const handleCreateCustomField = async () => {
     try {
-      const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "https://api.yashrajent.com";
+      const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080";
 
       const payload = {
         customTaskType: formData.customTaskType,
@@ -809,7 +815,7 @@ function TaskModal({ task, employees, customFields, departments, currentUser, on
     setLoading(true);
 
     try {
-      const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api.yashrajent.com';
+      const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080';
 
       console.log('[TaskEdit] submit:start', {
         mode: task ? 'edit' : 'create',

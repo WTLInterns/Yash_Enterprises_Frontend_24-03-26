@@ -7,6 +7,8 @@ import { getAuthUser } from "@/utils/authUser";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 
 export default function LeadApprovalsPage() {
+  console.log("🔄 Component Lifecycle: Component re-rendered");
+
   const user = getAuthUser();
   const router = useRouter();
 
@@ -20,7 +22,6 @@ export default function LeadApprovalsPage() {
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState({});
 
-  // ── Format date safely (uses requestedAt, not createdAt) ──────────────────
   const formatDate = (dateStr) => {
     if (!dateStr) return "—";
     const d = new Date(dateStr);
@@ -34,14 +35,12 @@ export default function LeadApprovalsPage() {
     });
   };
 
-  // ── Fetch approvals (no extra deal/client calls — backend already has all data) ──
   const fetchApprovals = async () => {
     try {
       setLoading(true);
       const data = await backendApi.get("/approvals/pending");
       setApprovals(Array.isArray(data) ? data : []);
     } catch (error) {
-      console.error("Failed to fetch approvals:", error);
       addToast("Failed to fetch approvals", "error");
     } finally {
       setLoading(false);
@@ -49,8 +48,8 @@ export default function LeadApprovalsPage() {
   };
 
   useEffect(() => {
+    console.log("🎬 Component Lifecycle: Component mounted");
     fetchApprovals();
-    // Auto-refresh every 60s (not 30s to avoid hammering)
     const interval = setInterval(fetchApprovals, 60000);
     return () => clearInterval(interval);
   }, []);
@@ -158,13 +157,12 @@ export default function LeadApprovalsPage() {
                 <table className="min-w-full divide-y divide-slate-200">
                   <thead className="bg-slate-50">
                     <tr>
-                      {["Deal ID", "Deal", "Client", "From Dept", "Current Stage", "Value", "Requested By", "Requested At", "Actions"].map((h, i) => (
+                      {["Deal ID", "Client", "From Dept", "Current Stage", "Value", "Requested By", "Requested At", "Actions"].map((h, i) => (
                         <th
                           key={h}
-                          className={`px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider ${
-                            i < 3 ? 'sticky bg-slate-50 z-10' : ''
-                          } ${i === 0 ? 'left-0' : i === 1 ? 'left-[80px]' : i === 2 ? 'left-[200px]' : ''}`}
-                          style={i < 3 ? { position: 'sticky', backgroundColor: 'rgb(248 250 252)' } : {}}
+                          className={`px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider ${i < 2 ? 'sticky bg-slate-50 z-10' : ''
+                            } ${i === 0 ? 'left-0' : i === 1 ? 'left-[80px]' : ''}`}
+                          style={i < 2 ? { position: 'sticky', backgroundColor: 'rgb(248 250 252)' } : {}}
                         >
                           {h}
                         </th>
@@ -172,86 +170,93 @@ export default function LeadApprovalsPage() {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-slate-200">
-                    {approvals.map((approval) => (
-                      <tr key={approval.id} className="hover:bg-slate-50">
-                        {/* Deal ID - frozen */}
-                        <td className="px-6 py-4 whitespace-nowrap sticky left-0 bg-white z-10" style={{ position: 'sticky', left: 0, backgroundColor: 'white' }}>
-                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-indigo-100 text-indigo-800">
-                            {approval.dealCode || approval.fromDepartment && approval.dealId ? `${approval.fromDepartment}${approval.dealId}` : `#${approval.dealId}`}
-                          </span>
-                        </td>
+                    {approvals.map((approval) => {
+                      const debugDealCode = approval.dealCode;
+                      return (
+                        <tr key={approval.id} className="hover:bg-slate-50">
+                          {/* Deal ID - frozen */}
+                          <td className="px-8 py-4 whitespace-nowrap sticky left-0 bg-white z-10"
+                            style={{ position: 'sticky', left: 0, backgroundColor: 'white' }}
+                          >
+                            <div className="mb-0.5">
+                              <span className="text-[15px] font-semibold text-indigo-600">
+                                {debugDealCode || "-"}
+                              </span>
+                            </div>
+                          </td>
 
-                        {/* Deal - frozen */}
-                        <td className="px-6 py-4 whitespace-nowrap sticky bg-white z-10" style={{ position: 'sticky', left: '80px', backgroundColor: 'white' }}>
+                          {/* Deal - frozen */}
+                          {/* <td className="px-6 py-4 whitespace-nowrap sticky bg-white z-10" style={{ position: 'sticky', left: '80px', backgroundColor: 'white' }}>
                           <div className="text-sm font-medium text-slate-900">
                             {approval.dealName || `Deal #${approval.dealId}`}
                           </div>
-                        </td>
+                        </td> */}
 
-                        {/* Client - frozen + clickable */}
-                        <td className="px-6 py-4 whitespace-nowrap sticky bg-white z-10 border-r border-slate-200" style={{ position: 'sticky', left: '200px', backgroundColor: 'white' }}>
-                          <div
-                            className="text-sm font-medium text-indigo-600 cursor-pointer hover:underline"
-                            onClick={() => approval.clientId && router.push(`/customers/${approval.clientId}`)}
-                          >
-                            {approval.clientName || (approval.clientId ? `Client #${approval.clientId}` : "—")}
-                          </div>
-                        </td>
-
-                        {/* From Dept */}
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
-                            {approval.fromDepartment || approval.currentDepartment || "—"}
-                          </span>
-                        </td>
-
-                        {/* Current Stage */}
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-slate-100 text-slate-700">
-                            {approval.currentStage || "—"}
-                          </span>
-                        </td>
-
-                        {/* Value */}
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-slate-900">
-                          {approval.valueAmount
-                            ? `₹${Number(approval.valueAmount).toLocaleString("en-IN")}` 
-                            : "—"}
-                        </td>
-
-                        {/* Requested By — dynamic from backend */}
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-slate-900">
-                            {approval.requestedByName || `User #${approval.requestedByUserId}` || "—"}
-                          </div>
-                        </td>
-
-                        {/* Requested At — uses requestedAt (not createdAt!) */}
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
-                          {formatDate(approval.requestedAt)}
-                        </td>
-
-                        {/* Actions */}
-                        <td className="px-6 py-4 whitespace-nowrap text-right">
-                          <div className="flex justify-end gap-2">
-                            <button
-                              onClick={() => handleApprove(approval.id, approval.dealName)}
-                              disabled={!!processing[approval.id]}
-                              className="px-3 py-1.5 bg-emerald-600 text-white text-xs font-semibold rounded-lg hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+                          {/* Client - frozen + clickable */}
+                          <td className="px-6 py-4 whitespace-nowrap sticky bg-white z-10 border-r border-slate-200" style={{ position: 'sticky', left: '80px', backgroundColor: 'white' }}>
+                            <div
+                              className="text-sm font-medium text-indigo-600 cursor-pointer hover:underline"
+                              onClick={() => approval.clientId && router.push(`/customers/${approval.clientId}`)}
                             >
-                              {processing[approval.id] === 'approve' ? "..." : "✅ Approve"}
-                            </button>
-                            <button
-                              onClick={() => handleReject(approval.id, approval.dealName)}
-                              disabled={!!processing[approval.id]}
-                              className="px-3 py-1.5 bg-rose-600 text-white text-xs font-semibold rounded-lg hover:bg-rose-700 disabled:opacity-50 transition-colors"
-                            >
-                              {processing[approval.id] === 'reject' ? "..." : "❌ Reject"}
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                              {approval.clientName || (approval.clientId ? `Client #${approval.clientId}` : "—")}
+                            </div>
+                          </td>
+
+                          {/* From Dept */}
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                              {approval.fromDepartment || approval.currentDepartment || "—"}
+                            </span>
+                          </td>
+
+                          {/* Current Stage */}
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-slate-100 text-slate-700">
+                              {approval.currentStage || "—"}
+                            </span>
+                          </td>
+
+                          {/* Value */}
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-slate-900">
+                            {approval.valueAmount
+                              ? `₹${Number(approval.valueAmount).toLocaleString("en-IN")}`
+                              : "—"}
+                          </td>
+
+                          {/* Requested By — dynamic from backend */}
+                          <td className="px-10 py-4 whitespace-nowrap">
+                            <div className="text-sm font-medium text-slate-900">
+                              {approval.requestedByName || `User #${approval.requestedByUserId}` || "—"}
+                            </div>
+                          </td>
+
+                          {/* Requested At — uses requestedAt (not createdAt!) */}
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
+                            {formatDate(approval.requestedAt)}
+                          </td>
+
+                          {/* Actions */}
+                          <td className="px-6 py-4 whitespace-nowrap text-right">
+                            <div className="flex justify-end gap-2">
+                              <button
+                                onClick={() => handleApprove(approval.id, approval.dealName)}
+                                disabled={!!processing[approval.id]}
+                                className="px-3 py-1.5 bg-emerald-600 text-white text-xs font-semibold rounded-lg hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+                              >
+                                {processing[approval.id] === 'approve' ? "..." : "✅ Approve"}
+                              </button>
+                              <button
+                                onClick={() => handleReject(approval.id, approval.dealName)}
+                                disabled={!!processing[approval.id]}
+                                className="px-3 py-1.5 bg-rose-600 text-white text-xs font-semibold rounded-lg hover:bg-rose-700 disabled:opacity-50 transition-colors"
+                              >
+                                {processing[approval.id] === 'reject' ? "..." : "❌ Reject"}
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -262,11 +267,10 @@ export default function LeadApprovalsPage() {
 
       {/* Toast */}
       {toast.show && (
-        <div className={`fixed top-4 right-4 z-50 px-6 py-3 rounded-lg shadow-lg text-white transition-all duration-300 ${
-          toast.type === 'success' ? 'bg-emerald-500' :
-          toast.type === 'error'   ? 'bg-rose-500'    :
-          toast.type === 'warning' ? 'bg-amber-500'   : 'bg-blue-500'
-        }`}>
+        <div className={`fixed top-4 right-4 z-50 px-6 py-3 rounded-lg shadow-lg text-white transition-all duration-300 ${toast.type === 'success' ? 'bg-emerald-500' :
+            toast.type === 'error' ? 'bg-rose-500' :
+              toast.type === 'warning' ? 'bg-amber-500' : 'bg-blue-500'
+          }`}>
           {toast.message}
         </div>
       )}

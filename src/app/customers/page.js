@@ -1,63 +1,23 @@
 "use client";
-
-
 import React, { useState, useEffect, useMemo, useRef, useCallback, useDeferredValue } from 'react';
-
-
-
 import { Search, Edit2, Trash2, Eye, Settings, X, Plus, Calendar, DollarSign, Building, User, Phone, Mail, MapPin, Map as MapIcon, Home, Shield, Upload, Download } from "lucide-react";
 import Link from "next/link";
-
-
-
 import { backendApi } from "@/services/api";
-
-
-
 import { clientApi } from "@/services/clientApi";
-
 import { departmentApiService } from "@/services/departmentApi.service";
-
-
-
 import DashboardLayout from "@/components/layout/DashboardLayout";
-
-
-
 import DynamicFieldsSection from "@/components/dynamic-fields/DynamicFieldsSection";
-
-
-
 import { useToast } from "@/components/common/ToastProvider";
-
-
-
 import { getLoggedInUser } from "@/utils/auth";
-
 import { getAuthUser } from "@/utils/authUser";
-
 import { getCurrentUserName, getCurrentUserRole } from "@/utils/userUtils";
-
 import { getTabSafeItem } from "@/utils/tabSafeStorage";
-
 import { broadcastActivity, createActivity } from "@/utils/activityBus";
-
-
-
 import { useCustomerAddressSync } from "@/context/CustomerAddressContext";
-
-
-
 import { useStages } from "@/context/StageContext";
-
-
-
 import CustomerExcelUploadModal from "@/components/excel/CustomerExcelUploadModal";
-
 import AccountTransferDialog from "@/components/common/AccountTransferDialog";
-
 const __DEBUG_CUSTOMER_ADDRESS_BLOCK = false;
-
 const AddressBlock = React.memo(function AddressBlock({
   type,
   label,
@@ -165,176 +125,79 @@ const AddressBlock = React.memo(function AddressBlock({
     </div>
   );
 });
-
 export default function CustomersPage() {
-
   const { addToast } = useToast();
-
-
   const { version } = useCustomerAddressSync();
-
-
-
   const { departments, getStagesForDepartment, fetchStagesForDepartment, fetchDepartments } = useStages();
-
-
-
   //  CRITICAL FIX: Use tab-safe storage for multi-tab login isolation
-
   const [userName, setUserName] = useState(() => {
-
     if (typeof window === 'undefined') return "Admin User";
-
     try {
-
       let rawUserData = getTabSafeItem("user_data");
-
       if (!rawUserData) {
-
         rawUserData = sessionStorage.getItem("user_data") || localStorage.getItem("user_data");
-
       }
-
       const user = rawUserData ? JSON.parse(rawUserData) : null;
-
       return user?.fullName || `${user?.firstName || ""} ${user?.lastName || ""}`.trim() || "Admin User";
-
     } catch {
-
       return "Admin User";
-
     }
-
   });
-
-
-
   const [userRole, setUserRole] = useState(() => {
-
     if (typeof window === 'undefined') return "";
-
     try {
-
       let role = getTabSafeItem("user_role");
-
       if (!role) {
-
         role = sessionStorage.getItem("user_role") || localStorage.getItem("user_role");
-
       }
-
       return role || "";
-
     } catch {
-
       return "";
-
     }
-
   });
-
-
-
-  //  CRITICAL: Cross-tab user data sync
-
+  //  CRITICAL: Cross-tab user data syn
   useEffect(() => {
-
     if (typeof window === 'undefined') return;
-
-
-
     const handleStorageChange = (e) => {
-
       if (e.key === 'user_data' || e.key === 'user_role') {
-
         // Update local state when user data changes in another tab
-
         try {
-
           let rawUserData = getTabSafeItem("user_data");
-
           if (!rawUserData) {
-
             rawUserData = sessionStorage.getItem("user_data") || localStorage.getItem("user_data");
-
           }
-
           const user = rawUserData ? JSON.parse(rawUserData) : null;
-
           setUserName(user?.fullName || `${user?.firstName || ""} ${user?.lastName || ""}`.trim() || "Admin User");
-
-
-
           let role = getTabSafeItem("user_role");
-
           if (!role) {
-
             role = sessionStorage.getItem("user_role") || localStorage.getItem("user_role");
-
           }
-
           setUserRole(role || "");
-
         } catch (error) {
-
         }
-
       }
-
     };
-
-
-
     // Listen for BroadcastChannel messages for real-time updates
-
     let broadcastChannel = null;
-
     if (typeof BroadcastChannel !== 'undefined') {
-
       broadcastChannel = new BroadcastChannel('crm-updates');
-
       broadcastChannel.onmessage = (e) => {
-
         if (e.data?.type === 'CUSTOMER_UPDATED') {
-
           fetchCustomers();
-
         }
-
-
-
         if (e.data?.type === 'DEAL_STAGE_CHANGED') {
-
           fetchDeals();
-
         }
-
       };
-
     }
-
-
-
     window.addEventListener('storage', handleStorageChange);
-
-
-
     return () => {
-
       window.removeEventListener('storage', handleStorageChange);
-
       if (broadcastChannel) {
-
         broadcastChannel.close();
-
       }
-
     };
-
   }, []);
-
-
-
   //  CRITICAL: Tab-safe auth user function  memoized to avoid JSON.parse on every render
   const authUserRef = useRef(null);
   const getTabSafeAuthUser = useCallback(() => {
@@ -356,10 +219,6 @@ export default function CustomersPage() {
     return () => window.removeEventListener('storage', clear);
   }, []);
 
-
-
-
-
   const [customers, setCustomers] = useState([]);
   const [banks, setBanks] = useState([]);
   const [deals, setDeals] = useState([]);
@@ -372,9 +231,9 @@ export default function CustomersPage() {
   const [loading, setLoading] = useState(true);
 
   // Column filter state variables
-  const [columnFilters, setColumnFilters] = useState({});       // { bank: Set(['Aavas',...]), stage: Set([...]) }
-  const [openFilterCol, setOpenFilterCol] = useState(null);     // which column dropdown is open
-  const [filterSearch, setFilterSearch] = useState({});         // search text inside each column's dropdown
+  const [columnFilters, setColumnFilters] = useState({});       
+  const [filterSearch, setFilterSearch] = useState({});
+  const [openFilterCol, setOpenFilterCol] = useState(null);     
   const [sortConfig, setSortConfig] = useState({ key: null, dir: 'asc' }); // column sort
 
   // Virtual scrolling state
@@ -385,9 +244,6 @@ export default function CustomersPage() {
 
   const tbodyRef = useRef(null);
 
-  // Virtual scrolling useEffect
-  // IMPORTANT: dep=[loading] so it re-attaches AFTER table renders (when loading becomes false)
-  // With dep=[] it ran at mount when loading=true  tbody not rendered  tbodyRef=null  no scroll
   useEffect(() => {
     if (loading) return; // table not rendered yet
     // small delay to let React finish rendering the tbody
@@ -412,59 +268,19 @@ export default function CustomersPage() {
       }
     };
   }, [loading]); // re-run when loading changes from true  false
-
-
-
   const [showCreateDrawer, setShowCreateDrawer] = useState(false);
-
-
-
   const [showDetailsDrawer, setShowDetailsDrawer] = useState(false);
-
-
-
   const [selectedCustomer, setSelectedCustomer] = useState(null);
-
-
-
   const [dynamicColumns, setDynamicColumns] = useState([]);
-
-
-
   const [clientFieldDefinitions, setClientFieldDefinitions] = useState([]);
-
-
-
   const [showExcelUploadModal, setShowExcelUploadModal] = useState(false);
-
-
-
   //  Account transfer dialog state
-
   const [showAccountTransferDialog, setShowAccountTransferDialog] = useState(false);
-
   const [pendingStageChange, setPendingStageChange] = useState(null);
-
-
-
-
-
-
-
   // For table filters
-
-
-
   const [filterDepartment, setFilterDepartment] = useState("");
-
-
-
   const [filterStage, setFilterStage] = useState("");
-
-
-
   const [filterAvailableStages, setFilterAvailableStages] = useState([]);
-
   //  NEW: Top department filter (Admin/Manager only)
   const [topDepartmentFilter, setTopDepartmentFilter] = useState("");
   const [allDepartments, setAllDepartments] = useState([]);
@@ -473,22 +289,13 @@ export default function CustomersPage() {
   useEffect(() => {
     setIsMounted(true); // Mark as mounted after hydration
     const _ud = (() => { try { return JSON.parse(sessionStorage.getItem('user_data') || localStorage.getItem('user_data') || '{}'); } catch { return {}; } })();
-    fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "https://api.yashrajent.com"}/api/stages/departments`, {
+    fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080"}/api/stages/departments`, {
       headers: { 'X-User-Id': String(_ud?.id ?? ''), 'X-User-Role': _ud?.role ?? '' }
     })
       .then(r => r.ok ? r.json() : [])
       .then(data => setAllDepartments(data || []))
       .catch(() => {});
   }, []);
-
-
-
-
-
-
-
-  // For create/edit form  these are passed to the drawer component
-  // They are kept here so openEdit/openCreate can set them
   const [formDepartment, setFormDepartment] = useState("");
   const [availableStages, setAvailableStages] = useState([]);
   const [deptSearch, setDeptSearch] = useState("");
@@ -517,86 +324,22 @@ export default function CustomersPage() {
     fetchStagesForDepartment(formDepartment).then(stages => { if (!cancelled) setAvailableStages(stages || []); }).catch(() => { if (!cancelled) setAvailableStages([]); });
     return () => { cancelled = true; };
   }, [formDepartment]);
-
-
-
-
-
-
-
   //  Normalize backend response
-
-
-
   const normalizeList = (res) => {
-
-
-
     if (Array.isArray(res)) return res;
-
-
-
     if (res?.content && Array.isArray(res.content)) return res.content;
-
-
-
     return [];
-
-
-
   };
-
-
-
-
-
-
-
   //  Extract status from various error shapes
-
-
-
   const getStatusFromError = (err) => {
-
-
-
     if (!err) return null;
-
-
-
     if (err?.response?.status) return err.response.status;
-
-
-
     if (err?.status) return err.status;
-
-
-
     if (err?.data?.status) return err.data.status;
-
-
-
     const msg = (err?.message || "").toString();
-
-
-
     if (/404|not\s*found/i.test(msg)) return 404;
-
-
-
     return null;
-
-
-
   };
-
-
-
-
-
-
-
-
   const fetchCustomers = async (silent = false) => {
     await loadAllData(silent);
   };
@@ -604,13 +347,6 @@ export default function CustomersPage() {
   const fetchDeals = async () => {
     await loadAllData(true);
   };
-
-
-
-
-
-
-
   const fetchClientFields = async () => {
     try {
       const res = await backendApi.get("/client-fields");
@@ -631,14 +367,6 @@ export default function CustomersPage() {
       if (list.length > 0) setBanks(list);
     }).catch(() => {});
   }, [showCreateDrawer]);
-
-
-
-
-
-
-
-
   useEffect(() => {
     loadAllData(false);
   }, []);
@@ -652,6 +380,7 @@ export default function CustomersPage() {
       const rows = Array.isArray(data) ? data : [];
 
       const customersData = rows.map(r => ({
+        
         id: r.id,
         name: r.name,
         email: r.email,
@@ -669,6 +398,7 @@ export default function CustomersPage() {
         city: r.city || "",
         state: r.state || "",
         pincode: r.pincode || "",
+        
       }));
 
       const allDeals = rows.flatMap(r =>
@@ -770,784 +500,197 @@ export default function CustomersPage() {
       maximumFractionDigits: 2,
     }).format(amount);
   };
-
-
-
-
-
-
-
   // Helper function to get address type display name
-
-
-
   const getAddressTypeDisplayName = (addressType) => {
-
     const displayNames = {
-
       'PRIMARY': 'Primary Address',
-
       'POLICE': 'Police Station Address',
-
       'BRANCH': 'Branch Address',
-
       'TAHSIL': 'Tahsil Address',
-
       'HEADOFFICE': 'Head Office Address'
-
     };
-
     return displayNames[addressType] || addressType;
-
   };
-
-
-  // Helper function to get all unique address types from customers
-
-
 
   const getAllAddressTypes = () => {
-
-
-
     const addressTypes = new Set();
-
-
-
     customers.forEach(customer => {
-
-
-
       if (customer.addresses && customer.addresses.length > 0) {
-
-
-
         customer.addresses.forEach(addr => {
-
-
-
           addressTypes.add(addr.addressType);
-
-
-
         });
-
-
-
       }
-
-
-
     });
-
-
-
     return Array.from(addressTypes).sort((a, b) => {
-
-
-
       const order = ["PRIMARY", "POLICE", "BRANCH", "TAHSIL"];
-
-
-
       return order.indexOf(a) - order.indexOf(b);
-
-
-
     });
-
-
-
   };
-
-
-
-
-
-
-
   // Helper function to get deal stage color and styling
-
-
-
   const getDealStageStyle = (stage, department) => {
-
-
-
     const stages = getStagesForDepartment(department);
-
-
-
     const stageData = stages.find(s => s.stageCode === stage);
-
-
-
-
-
-
-
     if (stageData?.isTerminal) {
-
-
-
       return { bg: 'bg-slate-100', text: 'text-slate-800', border: 'border-slate-200' };
-
-
-
     }
-
-
-
-
-
-
-
     // Default styling for non-terminal stages
-
-
-
     return { bg: 'bg-blue-100', text: 'text-blue-800', border: 'border-blue-200' };
-
-
-
   };
-
-
-
-
-
-
-
   // Helper function to get stage display name
-
   const getStageDisplayName = (stage, department) => {
-
     if (!stage || !department) return stage || "-";
-
     const stages = getStagesForDepartment(department) || [];
-
     const s = stages.find(x => x.stageCode === stage);
-
     return s?.stageName || stage;
-
   };
-
-
-
-
-
-
-
   // Helper function to format owner display with role
-
-
-
   const formatOwnerDisplay = (customer) => {
-
-
-
     //  FIX: Handle different possible data structures
-
-
-
     if (!customer) return "-";
-
-
-
     //  FIX: First try deal ownerName (from backend API)
-
     if (customer.ownerName) {
-
       return customer.ownerName;
-
     }
-
-
-
     // Case 1: Owner object with fullName
-
     if (customer.owner && customer.owner.fullName) {
-
       return customer.owner.fullName;
 
     }
-
-
-
     // Case 2: Owner object with firstName and lastName
-
     if (customer.owner && customer.owner.firstName) {
-
       const { firstName, lastName } = customer.owner;
-
       return lastName ? `${firstName} ${lastName}` : firstName;
-
     }
-
-
-
     // Case 3: Owner object with simple structure
-
     if (customer.owner && customer.owner.fullName) {
-
       return customer.owner.fullName;
-
     }
-
-
-
     return "-";
-
-
-
   };
-
-
-
   const formatAddressForTable = (address) => {
-
-
-
     if (!address) return "-";
-
-
-
     const parts = [address.addressLine, address.city, address.pincode].filter(Boolean);
-
-
-
     return parts.join(", ");
-
-
-
   };
-
-
-
   const getAddressTypeIcon = (addressType) => {
-
-
-
     switch (addressType) {
-
-
-
       case 'PRIMARY': return <Home className="h-3 w-3" />;
-
-
-
       case 'POLICE': return <Shield className="h-3 w-3" />;
-
-
-
       case 'BRANCH': return <Building className="h-3 w-3" />;
-
-
-
       case 'TAHSIL': return <MapPin className="h-3 w-3" />;
-
-
-
       default: return <MapPin className="h-3 w-3" />;
-
-
-
     }
-
-
-
   };
-
-
-
-
-
-
-
   const handleAddressToggle = (addressType, enabled) => {
-
-
-
     setForm({
-
-
-
       ...form,
-
-
-
       addresses: {
-
-
-
         ...form.addresses,
-
-
-
         [addressType]: {
-
-
-
           ...form.addresses[addressType],
-
-
-
           enabled: enabled,
-
-
-
           // Reset fields when disabled
-
-
-
           ...(enabled ? {} : {
-
-
-
             addressLine: "",
-
-
-
             city: "",
-
-
-
             pincode: "",
-
-
-
             latitude: "",
-
-
-
             longitude: ""
-
-
-
           })
-
-
-
         }
-
-
-
       }
-
-
-
     });
-
-
-
   };
-
-
-
-
-
-
-
   const handleAddressFieldChange = (addressType, field, value) => {
-
-
-
     setForm(prev => ({
-
-
-
       ...prev,
-
-
-
       addresses: {
-
-
-
         ...prev.addresses,
-
-
-
         [addressType]: {
-
-
-
           ...prev.addresses[addressType],
-
-
-
           [field]: value
-
-
-
         }
-
-
-
       }
-
-
-
     }));
-
-
-
   };
-
-
-
-
-
-
-
   const handleAddressGeocode = async (addressType) => {
-
-
-
     const address = form.addresses[addressType];
-
-
-
-
-
-
-
     if (!address.addressLine || address.addressLine.trim().length < 3) {
-
-
-
       addToast("Please enter a complete address first", "warning");
-
-
-
       return;
-
-
-
     }
-
-
-
-
-
-
-
     try {
-
-
-
-      const response = await fetch('https://api.yashrajent.com/api/clients/geocode', {
-
-
-
+      const response = await fetch('http://localhost:8080/api/clients/geocode', {
         method: 'POST',
-
-
-
         headers: {
-
-
-
           'Content-Type': 'application/json',
-
-
-
         },
-
-
-
         body: JSON.stringify({
-
-
-
           addressLine: address.addressLine,
-
-
-
           city: address.city,
-
-
-
           pincode: address.pincode,
-
-
-
           state: address.state,        //  DYNAMIC STATE
-
-
-
           country: "India"           //  FIXED: Country (can be dynamic later)
-
-
-
         })
-
-
-
       });
-
-
-
-
-
-
-
       const data = await response.json();
-
-
-
-
-
-
-
       if (data.success) {
-
-
-
         setForm(prev => ({
-
-
-
           ...prev,
-
-
-
           addresses: {
-
-
-
             ...prev.addresses,
-
-
-
             [addressType]: {
-
-
-
               ...prev.addresses[addressType],
-
-
-
               latitude: data.latitude.toString(),
-
-
-
               longitude: data.longitude.toString()
-
-
-
             }
-
-
-
           }
-
-
-
         }));
-
-
-
         addToast(`${addressType.charAt(0).toUpperCase() + addressType.slice(1)} address geocoded successfully!`, "success");
-
-
-
       } else {
-
         // Show improved error message for geocoding failures
-
-
-
         const errorMessage = data.message || 'Could not geocode address';
-
-
-
         const improvedMessage = errorMessage.includes('Unable to determine coordinates')
-
-
-
           ? ' Location Not Found\n\nWe could not detect exact coordinates for this address.\n\nPlease refine address or include a nearby landmark.'
-
-
-
           : errorMessage;
-
-
-
-
-
-
-
         addToast(improvedMessage, "warning");
-
-
-
       }
-
-
-
     } catch (error) {
-
       addToast('Failed to geocode address', "error");
-
-
-
     }
-
-
-
   };
-
-
-
-
-
-
-
   const handleReverseGeocode = async (addressType) => {
-
-
-
     const address = form.addresses[addressType];
-
-
-
     const lat = parseFloat(address.latitude);
-
-
-
     const lng = parseFloat(address.longitude);
-
-
-
-
-
-
-
     if (!lat || !lng) {
-
-
-
       addToast("Please enter latitude and longitude first", "warning");
-
-
-
       return;
-
-
-
     }
-
-
-
-
-
-
-
     try {
-
-
-
-      const response = await fetch('https://api.yashrajent.com/api/clients/reverse-geocode', {
-
-
-
+      const response = await fetch('http://localhost:8080/api/clients/reverse-geocode', {
         method: 'POST',
-
-
-
         headers: {
-
-
-
           'Content-Type': 'application/json',
-
-
-
         },
-
-
-
         body: JSON.stringify({ latitude: lat, longitude: lng })
-
-
-
       });
-
-
-
-
-
-
-
       const data = await response.json();
-
-
-
-
-
-
-
       if (data.success) {
-
-
-
         // Parse the returned address to update form fields
-
-
-
         const addressParts = data.address.split(',');
-
-
-
         if (addressParts.length >= 2) {
-
-
-
           handleAddressFieldChange(addressType, 'addressLine', addressParts[0].trim());
-
-
-
           handleAddressFieldChange(addressType, 'city', addressParts[1].trim());
-
-
-
           addToast(` Address updated from coordinates!`, "success");
-
-
-
         }
-
-
-
       } else {
-
         addToast(data.message || 'Could not reverse geocode coordinates', "warning");
-
-
-
       }
-
-
-
     } catch (error) {
-
       addToast('Failed to reverse geocode coordinates', "error");
-
-
-
     }
-
-
-
   };
-
-
-
-
-
-
-
   // O(1) bank lookup map  must be defined before getBankDetails
   const banksMap = useMemo(() => {
     const m = {};
@@ -1849,24 +992,7 @@ export default function CustomersPage() {
     setAvailableStages([]);
     setShowCreateDrawer(true);
   };
-
-
-
-
-
-
-
-
-  // Edit: always fetch fresh data
-
-  /**
-   * Converts backend addresses ARRAY  form addresses OBJECT.
-   *
-   * API shape  : [{ addressType:"PRIMARY", addressLine, city, state,
-   *                 pincode, latitude, longitude, id }, ...]
-   * Form shape : { primary: { enabled, id, addressLine, ... },
-   *                branch:  { enabled, id, addressLine, ... }, ... }
-   */
+   
   const mapAddressesToForm = (addresses = []) => {
     const result = {
       primary: { enabled: true,  id: null, addressLine: "", city: "", state: "", pincode: "", taluka: "", district: "", latitude: "", longitude: "" },
@@ -1923,7 +1049,7 @@ export default function CustomersPage() {
       // but backendApi.get("/api/clients/...") becomes /api/api/clients/...  500!
       const authUser = getTabSafeAuthUser();
       const addrResponse = await fetch(
-        `https://api.yashrajent.com/api/clients/${customer.id}/addresses`,
+        `http://localhost:8080/api/clients/${customer.id}/addresses`,
         {
           headers: {
             "X-User-Id": String(authUser?.id ?? ""),
@@ -1980,11 +1106,6 @@ export default function CustomersPage() {
       addToast("Failed to load customer details", "error");
     }
   };
-
-
-
-
-
   const openDetails = async (customer) => {
     setSelectedCustomer(customer);
     setShowDetailsDrawer(true);
@@ -1993,7 +1114,7 @@ export default function CustomersPage() {
     if (!customer.addresses || customer.addresses.length === 0) {
       try {
         const authUser = getTabSafeAuthUser();
-        const res = await fetch(`https://api.yashrajent.com/api/clients/${customer.id}/addresses`, {
+        const res = await fetch(`http://localhost:8080/api/clients/${customer.id}/addresses`, {
           headers: {
             "X-User-Id": String(authUser?.id ?? ""),
             "X-User-Role": authUser?.role ?? "",
@@ -2010,141 +1131,31 @@ export default function CustomersPage() {
       } catch {}
     }
   };
-
-
-
-
-
-
-
   const handleCreateOrUpdate = async () => {
-
-
-
     try {
-
-
-
       if (!form.name?.trim()) {
-
-
-
         addToast("Customer Name is required", "error");
-
-
-
         return;
-
-
-
       }
-
-
-
-
-
-
-
       // Validate primary address
-
-
-
       if (!form.addresses.primary.enabled || !form.addresses.primary.addressLine?.trim() || !form.addresses.primary.city?.trim()) {
-
-
-
         addToast("Primary address is required", "error");
-
-
-
         return;
-
-
-
       }
-
-
-
-
-
-
-
       if (!form.addresses.primary.enabled || !form.addresses.primary.latitude || !form.addresses.primary.longitude) {
-
-
-
         addToast("Primary address latitude and longitude are required", "error");
-
-
-
         return;
-
-
-
       }
-
-
-
-
-
-
-
       // Validate department and stage (CRITICAL)
-
-
-
       if (!formDepartment?.trim()) {
-
-
-
         addToast("Department is required", "error");
-
-
-
         return;
-
-
-
       }
-
-
-
-
-
-
-
       if (!form.stage?.trim()) {
-
-
-
         addToast("Deal Stage is required", "error");
-
-
-
         return;
-
-
-
       }
-
-
-
-
-
-
-
-      // Get logged in user for owner fields using tab-safe storage
-
-
-
       const user = getTabSafeAuthUser();
-
-
-
-
-
-
-
       const buildAddr = (type, typeConst, isPrimary) => ({
         id:          form.addresses[type].id || null,
         addressType: typeConst,
@@ -2164,393 +1175,118 @@ export default function CustomersPage() {
       if (form.addresses.branch.enabled)  addresses.push(buildAddr("branch",  "BRANCH",  false));
       if (form.addresses.police.enabled)  addresses.push(buildAddr("police",  "POLICE",  false));
       if (form.addresses.tahsil.enabled)  addresses.push(buildAddr("tahsil",  "TAHSIL",  false));
-
-
-
-
-
-
-
       // Create/Update Customer
-
-
-
       const customerPayload = {
-
-
-
         name: form.name?.trim(),
-
-
-
         email: form.email?.trim() || null,
-
-
-
         contactPhone: form.phone?.trim() || null,
-
-
-
         contactName: form.contactName || "",
-
-
-
         contactNumber: form.contactNumber?.trim() || null,
-
-
-
         // Include owner fields for backend auto-population
-
-
-
         ownerId: user?.id ?? null,
-
-
-
         createdBy: user?.id ?? null,
-
-
-
       };
-
-
-
-
-
-
-
       let savedCustomer;
-
-
-
       if (selectedCustomer?.id) {
-
-
-
         savedCustomer = await clientApi.update(selectedCustomer.id, customerPayload);
-
-
-
         //  Broadcast customer update activity
-
         broadcastActivity(createActivity(
-
           'CUSTOMER',
-
           `updated customer (${savedCustomer.name || savedCustomer.customerName || 'Unknown'})`,
-
           getCurrentUserName(),
-
           savedCustomer.department || savedCustomer.ownerName || 'Unassigned',
-
           { id: `customer_${savedCustomer.id}` }
-
         ));
-
-
-
-        // Update addresses using POST for existing customer (backend uses upsert)
-
-
-
-        await fetch(`https://api.yashrajent.com/api/clients/${savedCustomer.id}/addresses`, {
-
-
-
+        // Update addresses using POST for existing customer (backend uses upsert
+        await fetch(`http://localhost:8080/api/clients/${savedCustomer.id}/addresses`, {
           method: 'POST',
-
-
-
           headers: { 'Content-Type': 'application/json' },
-
-
-
           body: JSON.stringify(addresses)
-
-
-
         });
-
-
-
       } else {
-
-
-
         // Create customer first
-
-
-
         savedCustomer = await clientApi.create(customerPayload);
-
-
-
         //  Broadcast customer creation activity
-
         broadcastActivity(createActivity(
-
           'CUSTOMER',
-
           `created customer (${savedCustomer.name || savedCustomer.customerName || 'Unknown'})`,
-
           getCurrentUserName(),
-
           savedCustomer.department || savedCustomer.ownerName || 'Unassigned',
-
           { id: `customer_${savedCustomer.id}` }
-
         ));
-
-
-
         // Then create addresses using POST for new customer
-
-
-
-        await fetch(`https://api.yashrajent.com/api/clients/${savedCustomer.id}/addresses`, {
-
-
-
+        await fetch(`http://localhost:8080/api/clients/${savedCustomer.id}/addresses`, {
           method: 'POST',
-
-
-
           headers: { 'Content-Type': 'application/json' },
-
-
-
           body: JSON.stringify(addresses)
-
-
-
         });
-
-
-
       }
-
-
-
-
-
-
-
       // Save custom field values using our new API
-
-
-
       if (form.customFields && Object.keys(form.customFields).length > 0) {
-
-
-
         await clientApi.bulkUpdateFieldValues(savedCustomer.id, form.customFields);
-
-
-
       }
-
-
-
-
-
-
-
       // Create/Update associated Deal
-
-
-
       const bankIdNum = form.bankId ? Number(form.bankId) : null;
-
-
-
       const selectedBank = bankIdNum ? banks.find((b) => Number(b?.id) === bankIdNum) : null;
-
-
-
-
-
-
-
       const dealPayload = {
-
-
-
         name: form.name.trim(),
-
-
-
         clientId: Number(savedCustomer.id),
-
-
-
         bankId: bankIdNum,
-
-
-
         branchName: form.branchName || "",
-
-
-
         relatedBankName: selectedBank?.name || "",
-
-
-
         contactName: form.contactName || "",
-
-
-
         stageCode: form.stage,
-
-
-
         department: formDepartment, //  FIX
-
-
-
         valueAmount: Number(form.valueAmount) || 0,
-
-
-
         closingDate: form.closingDate || null,
-
-
-
         description: form.description || ""
-
-
-
       };
-
-
-
-
-
-
-
       if (selectedCustomer?.id) {
-
-
-
         //  CRITICAL FIX: Normalize clientId mapping for deal lookup
-
         const existingDeal = deals.find((deal) => Number(deal?.clientId ?? deal?.client_id) === Number(selectedCustomer.id));
-
-
-
         let savedDeal;
-
         if (existingDeal) {
-
-
-
           savedDeal = await backendApi.put(`/deals/${existingDeal.id}`, dealPayload);
-
-
-
           //  Broadcast deal update activity
-
           broadcastActivity(createActivity(
-
             'DEAL',
-
             `updated deal (${savedDeal.name || 'Unknown'} - ${savedDeal.clientName || 'Unknown'})`,
-
             getCurrentUserName(),
-
             savedDeal.department || savedDeal.ownerName || 'Unassigned',
-
             { id: `deal_${savedDeal.id}` }
-
           ));
-
-
-
         } else {
-
-
-
           savedDeal = await backendApi.post("/deals", dealPayload);
-
-
-
           //  Broadcast deal creation activity
-
           broadcastActivity(createActivity(
-
             'DEAL',
-
             `created deal (${savedDeal.name || 'Unknown'} - ${savedDeal.clientName || 'Unknown'})`,
-
             getCurrentUserName(),
-
             savedDeal.department || savedDeal.ownerName || 'Unassigned',
-
             { id: `deal_${savedDeal.id}` }
-
           ));
-
-
-
         }
-
-
-
         //  Broadcast deal stage change if stage changed
-
         if (form.stage && existingDeal?.stageCode !== form.stage) {
-
           broadcastActivity(createActivity(
-
             'DEAL',
-
             `Deal stage changed to ${form.stage}`,
-
             getCurrentUserName(),
-
             dealPayload.department || dealPayload.ownerName || 'Unassigned',
-
             { id: `deal_stage_${savedDeal.id || existingDeal.id}` }
-
           ));
-
         }
-
-
-
       } else {
-
-
-
         const newDeal = await backendApi.post("/deals", dealPayload);
-
-
-
         //  Broadcast deal creation activity for new customer
-
         broadcastActivity(createActivity(
-
           'DEAL',
-
           `created deal (${newDeal.name || 'Unknown'} - ${newDeal.clientName || 'Unknown'})`,
-
           getCurrentUserName(),
-
           newDeal.department || newDeal.ownerName || 'Unassigned',
-
           { id: `deal_${newDeal.id}` }
-
         ));
-
-
-
       }
-
-
-
-
-
-
-
       addToast(selectedCustomer?.id ? "Customer updated successfully" : "Customer created successfully", "success");
 
       // Reload all data silently after save (single API call)
@@ -2565,101 +1301,26 @@ export default function CustomersPage() {
           channel.close();
         }
       }
-
-
-
-
-
-
-
       setForm(makeEmptyForm());
-
-
-
-
-
-
-
       setFormDepartment("");
-
-
-
       setAvailableStages([]);
-
-
-
       setShowCreateDrawer(false);
-
-
-
       setSelectedCustomer(null);
-
-
-
     } catch (err) {
-
       const status = getStatusFromError(err);
-
-
-
       if (status === 404) {
-
-
-
         addToast("Customer not found. Reloading list...", "error");
-
-
-
         await fetchCustomers(true);
-
-
-
         setFormDepartment("");
-
-
-
         setAvailableStages([]);
-
-
-
         setShowCreateDrawer(false);
-
-
-
         setSelectedCustomer(null);
-
-
-
         return;
-
-
-
       }
-
-
-
       const errorMsg = err?.data?.message || err?.message || "Unknown error";
-
-
-
       addToast(`Failed to save customer: ${errorMsg}`, "error");
-
-
-
     }
-
-
-
   };
-
-
-
-
-
-
-
-
-
   const handleBulkDelete = async () => {
     if (selectedDealIds.length === 0) return;
     const count = selectedDealIds.length;
@@ -2667,7 +1328,7 @@ export default function CustomersPage() {
     setBulkDeleting(true);
     try {
       const authUser = getTabSafeAuthUser();
-      const res = await fetch('https://api.yashrajent.com/api/clients/bulk', {
+      const res = await fetch('http://localhost:8080/api/clients/bulk', {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
@@ -2798,248 +1459,56 @@ export default function CustomersPage() {
     URL.revokeObjectURL(url);
     addToast('Exported ' + flatRows.length + ' records', 'success');
   };
-
     const handleDelete = async (id) => {
-
-
-
     if (!confirm("Delete this customer?")) return;
-
-
-
-
-
-
-
     try {
-
-
-
       await clientApi.delete(id);
-
-
-
-
-
-
-
       // Optimistic remove
-
-
-
       setCustomers((prev) => prev.filter((c) => c.id !== id));
-
-
-
-
-
-
-
-      // Remove associated deal
-
-
-
       //  CRITICAL FIX: Normalize clientId mapping for deal lookup
-
       const customerDeal = deals.find(deal => Number(deal?.clientId ?? deal?.client_id) === Number(id));
-
-
-
       if (customerDeal) {
-
-
-
         await backendApi.delete(`/deals/${customerDeal.id}`);
-
-
-
         setDeals((prev) => prev.filter((d) => d.id !== customerDeal.id));
-
-
-
       }
-
-
-
-
-
-
-
       // If editing same customer, close drawer
-
-
-
       if (selectedCustomer?.id === id) {
-
-
-
         setSelectedCustomer(null);
-
-
-
         setShowCreateDrawer(false);
-
-
-
       }
-
-
-
-
-
-
-
       addToast("Customer deleted successfully", "success");
       // Optimistic  already removed from state above, no full reload needed
-
-
-
     } catch (err) {
-
       const status = getStatusFromError(err);
-
-
-
-
-
-
-
       if (status === 404) {
-
-
-
         addToast("Customer already deleted. Refreshing list...", "info");
-
-
-
         setCustomers((prev) => prev.filter((c) => c.id !== id));
-
-
-
         //  CRITICAL FIX: Normalize clientId mapping for deal filtering
-
         setDeals((prev) => prev.filter((d) => Number(d?.clientId ?? d?.client_id) !== Number(id)));
-
-
-
-
-
-
-
         if (selectedCustomer?.id === id) {
-
-
-
           setSelectedCustomer(null);
-
-
-
           setShowCreateDrawer(false);
-
-
-
         }
-
-
-
-
-
-
-
         await loadAllData(true);
-
         return;
-
-
-
       }
-
-
-
-
-
-
-
       addToast("Failed to delete customer", "error");
-
-
-
     }
-
-
-
   };
-
-
-
-
-
-
-
   return (
-
-
-
     <DashboardLayout
-
-
-
       header={{
-
-
-
         project: "Customers",
-
-
-
         user: { name: userName, role: userRole },
-
-
-
         notifications: [],
-
-
-
       }}
-
-
-
     >
-
-
-
       <div className="flex flex-col space-y-4">
-
-
-
-        {/* HEADER */}
-
-
-
         <div className="flex flex-wrap items-center justify-between gap-3">
-
-
-
           <div>
-
-
-
             <div className="text-lg font-semibold text-slate-900">Customers</div>
-
-
-
             <p className="text-sm text-slate-500">All customers and deals</p>
-
-
-
           </div>
-
-
-
-
-
-
-
           <div className="flex items-center gap-3">
 
             {selectedDealIds.length > 0 && (
@@ -3225,28 +1694,15 @@ export default function CustomersPage() {
                       <ColFilterTh label="Created At" colKey="createdAt" {...colFilterProps} />
                       <ColFilterTh label="Updated At" colKey="updatedAt" {...colFilterProps} />
                       <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">Closing Date</th>
-
-
-
                       {/* Dynamic address type columns */}
-                      
-
-
-                      
-
-
                       {dynamicColumns.map(col => (
                         <th key={col} className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
                           {formatLabel(col)}
                         </th>
                       ))}
-
-
-
                       <th className="px-6 py-3 text-center text-xs font-medium uppercase tracking-wider text-slate-500">Actions</th>
                     </tr>
                   </thead>
-
                   <tbody className="divide-y divide-slate-200 bg-white" ref={tbodyRef}>
                     {/* spacer row above */}
                     {paddingTop > 0 && (
@@ -3256,16 +1712,7 @@ export default function CustomersPage() {
                     )}
 
                     {flatRows.slice(clampedStart, visibleEnd).map(({ customer, deal: rowDeal }, _rowIdx) => {
-
-
-
                       const customerDeal = rowDeal;
-
-
-
-
-
-
                       // FIX 3  Normalise stageCode to UPPERCASE for consistent matching
                       const rawStageCode = customerDeal?.stageCode ?? customerDeal?.stage ?? "";
                       const normStageCode = rawStageCode.toUpperCase();
@@ -3274,16 +1721,8 @@ export default function CustomersPage() {
                       // FIX 2  Resolve bank details from the deal object (not bankId alone)
                       const bankDetails     = getBankDetails(customerDeal);
                       const customerLocation = getCustomerLocation(customer);
-
-
                       return (
-
-
-
                         <tr key={rowDeal ? `${customer.id}-${rowDeal.id}` : String(customer.id)} className="hover:bg-slate-50" style={{ height: ROW_HEIGHT }}>
-
-
-
                           {/* Row checkbox */}
                           <td className="px-3 py-4 sticky left-0 bg-white z-10" style={{ position: 'sticky', left: 0, backgroundColor: 'white', zIndex: 10, width: 40 }}>
                             <input
@@ -3313,33 +1752,12 @@ export default function CustomersPage() {
                               <span className="text-slate-400 text-xs">#{customerDeal.id}</span>
                             ) : "-"}
                           </td>
-
-
-
                           {/* Sticky Customer Name column */}
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900 sticky left-[72px] bg-white z-10 border-r border-slate-200" style={{ position: 'sticky', left: '72px', backgroundColor: 'white', zIndex: 10 }}>
-
                             <Link href={`/customers/${customer.id}`} className="hover:underline">
-
                               {customer.name}
-
                             </Link>
-
                           </td>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
                           {/* Address column */}
                           <td className="px-6 py-4 text-sm text-slate-700" style={{ maxWidth: 220 }}>
                             <span title={getFullAddress(customer)} style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -3356,20 +1774,6 @@ export default function CustomersPage() {
                               </span>
                             </div>
                           </td>
-
-
-
-
-
-
-
-                          
-
-
-
-
-
-
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700">{bankDetails.name}</td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700">{bankDetails.branch}</td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700">{customerLocation.taluka}</td>
@@ -3420,122 +1824,35 @@ export default function CustomersPage() {
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700">
                             {customer.updatedAt ? new Date(customer.updatedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : "-"}
                           </td>
-
-
-
-                          
-
-
                           {dynamicColumns.map((col) => (
-
-
-
                             <td key={col} className="px-6 py-4 whitespace-nowrap text-sm text-slate-700">
-
-
-
                               {customer.customFields?.[col] || "-"}
-
-
-
                             </td>
-
-
-
                           ))}
-
-
-
-
-
-
-
-                          
                           {/* Closing Date column */}
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700">
                             {customerDeal?.closingDate ? new Date(customerDeal.closingDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : "-"}
                           </td>
-
                           <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
-
-
-
                             <div className="flex items-center justify-center gap-2">
-
-
-
                               <button
-
-
-
                                 onClick={() => openEdit(customer)}
-
-
-
                                 className="text-blue-600 hover:text-blue-900"
-
-
-
                                 title="Edit"
-
-
-
                               >
-
-
-
                                 <Edit2 className="h-4 w-4" />
-
-
-
                               </button>
-
-
-
-
                               <button
-
-
                                 onClick={() => handleDelete(customer.id)}
-
-
-
                                 className="text-red-600 hover:text-red-900"
-
-
-
                                 title="Delete"
-
-
-
                               >
-
-
-
                                 <Trash2 className="h-4 w-4" />
-
-
-
                               </button>
-
-
-
                             </div>
-
-
-
                           </td>
-
-
-
                         </tr>
-
-
-
                       );
-
-
-
                     })}
 
                     {/* spacer row below */}
@@ -3555,17 +1872,8 @@ export default function CustomersPage() {
                         </td>
                       </tr>
                     )}
-
-
-
                   </tbody>
-
-
-
                 </table>
-
-
-
               </div>
             </div>
           );
@@ -3596,14 +1904,6 @@ export default function CustomersPage() {
             addToast={addToast}
           />
         )}
-
-
-
-
-
-
-
-
 {/* DETAILS DRAWER */}
         {showDetailsDrawer && selectedCustomer && (
           <>
@@ -3909,7 +2209,7 @@ function DrawerPortal({
     const addr = formRef.current.addresses[addressType];
     if (!addr.addressLine?.trim()) { addToast('Enter address first', 'warning'); return; }
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api.yashrajent.com'}/api/clients/geocode`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080'}/api/clients/geocode`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ addressLine: addr.addressLine, city: addr.city, pincode: addr.pincode, state: addr.state, country: 'India' })
       });

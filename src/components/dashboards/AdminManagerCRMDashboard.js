@@ -425,13 +425,13 @@ export default function AdminManagerCRMDashboard({ userName, userRole }) {
       icon: <Users className="h-6 w-6" />,
       color: "blue"
     },
-    {
-      title: "Total Deals",
-      value: deals.length.toLocaleString(),
-      subtitle: `across ${customers.length} customers`,
-      icon: <BarChart3 className="h-6 w-6" />,
-      color: "indigo"
-    },
+    // {
+    //   title: "Total Deals",
+    //   value: deals.length.toLocaleString(),
+    //   subtitle: `across ${customers.length} customers`,
+    //   icon: <BarChart3 className="h-6 w-6" />,
+    //   color: "indigo"
+    // },
     {
       title: "Pipeline Value",
       value: `₹${(dashboardStats.totalValue / 100000).toFixed(1)}L`,
@@ -473,22 +473,34 @@ export default function AdminManagerCRMDashboard({ userName, userRole }) {
       </div>
 
       {/* SUMMARY CARDS */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        {dashboardCards.map((card, index) => (
-          <div key={index} className="bg-white rounded-xl shadow-sm p-5 border border-gray-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-500">{card.title}</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">{card.value}</p>
-                {card.subtitle && <p className="text-xs text-gray-400 mt-0.5">{card.subtitle}</p>}
-              </div>
-              <div className={`p-3 rounded-lg bg-${card.color}-100 text-${card.color}-600`}>
-                {card.icon}
-              </div>
-            </div>
-          </div>
-        ))}
+<div className="flex flex-wrap justify-center gap-6 mb-6">
+  {dashboardCards.map((card, index) => (
+    <div
+      key={index}
+      className="w-full sm:w-[280px] lg:w-[300px] bg-white rounded-xl shadow-sm p-5 border border-gray-200"
+    >
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm font-medium text-gray-500">{card.title}</p>
+          <p className="text-2xl font-bold text-gray-900 mt-1">
+            {card.value}
+          </p>
+          {card.subtitle && (
+            <p className="text-xs text-gray-400 mt-0.5">
+              {card.subtitle}
+            </p>
+          )}
+        </div>
+
+        <div
+          className={`p-3 rounded-lg bg-${card.color}-100 text-${card.color}-600`}
+        >
+          {card.icon}
+        </div>
       </div>
+    </div>
+  ))}
+</div>
 
       {/* ROW 1: FUNNEL (left) + DEPARTMENT STATISTICS (right) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">

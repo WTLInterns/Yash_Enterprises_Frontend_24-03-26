@@ -812,7 +812,7 @@ export default function CustomersPage() {
 
             const res = await fetch(
 
-              `http://localhost:8080/api/clients/${customer.id}/addresses`,
+              `https://api.yashrajent.com/api/clients/${customer.id}/addresses`,
 
               {
 
@@ -1495,7 +1495,7 @@ export default function CustomersPage() {
 
 
 
-      const response = await fetch('http://localhost:8080/api/clients/geocode', {
+      const response = await fetch('https://api.yashrajent.com/api/clients/geocode', {
 
 
 
@@ -1723,7 +1723,7 @@ export default function CustomersPage() {
 
 
 
-      const response = await fetch('http://localhost:8080/api/clients/reverse-geocode', {
+      const response = await fetch('https://api.yashrajent.com/api/clients/reverse-geocode', {
 
 
 
@@ -2199,7 +2199,7 @@ export default function CustomersPage() {
       // but backendApi.get("/api/clients/...") becomes /api/api/clients/... → 500!
       const authUser = getTabSafeAuthUser();
       const addrResponse = await fetch(
-        `http://localhost:8080/api/clients/${customer.id}/addresses`,
+        `https://api.yashrajent.com/api/clients/${customer.id}/addresses`,
         {
           headers: {
             "X-User-Id": authUser?.id ?? "",
@@ -2739,7 +2739,7 @@ export default function CustomersPage() {
 
 
 
-        await fetch(`http://localhost:8080/api/clients/${savedCustomer.id}/addresses`, {
+        await fetch(`https://api.yashrajent.com/api/clients/${savedCustomer.id}/addresses`, {
 
 
 
@@ -2793,7 +2793,7 @@ export default function CustomersPage() {
 
 
 
-        await fetch(`http://localhost:8080/api/clients/${savedCustomer.id}/addresses`, {
+        await fetch(`https://api.yashrajent.com/api/clients/${savedCustomer.id}/addresses`, {
 
 
 
@@ -6455,7 +6455,7 @@ export default function CustomersPage() {
 
 
 
-                                  const response = await fetch(`http://localhost:8080/api/banks/${bankId}`);
+                                  const response = await fetch(`https://api.yashrajent.com/api/banks/${bankId}`);
 
 
 

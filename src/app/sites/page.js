@@ -233,7 +233,7 @@ export default function SitesPage() {
       const token = typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
 
       // Use fetch directly so we can send FormData without JSON headers
-      const res = await fetch("http://localhost:8080/api/sites/import", {
+      const res = await fetch("https://api.yashrajent.com/api/sites/import", {
         method: "POST",
         body: formData,
         headers: {
@@ -495,7 +495,7 @@ export default function SitesPage() {
                     try {
                       const token = typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
 
-                      const res = await fetch("http://localhost:8080/api/sites/export", {
+                      const res = await fetch("https://api.yashrajent.com/api/sites/export", {
                         method: "GET",
                         headers: {
                           Accept: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

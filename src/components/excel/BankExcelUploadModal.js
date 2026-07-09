@@ -3,7 +3,7 @@ import { useState, useRef } from "react";
 import { X, Download, Upload, FileSpreadsheet } from "lucide-react";
 import { toast } from "react-toastify";
 
-const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080";
+const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "https://api.yashrajent.com";
 
 export default function BankExcelUploadModal({ isOpen, onClose, onUploadSuccess }) {
   const [file, setFile] = useState(null);

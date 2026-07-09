@@ -11,7 +11,7 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import { getCurrentUserName, getCurrentUserRole, getCurrentUserId } from "@/utils/userUtils";
 import { toast } from "react-toastify";
 
-const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080";
+const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "https://api.yashrajent.com";
 
 const TABS = ["Documents", "Emails"];
 

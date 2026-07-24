@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 
 
@@ -2684,6 +2684,15 @@ export default function CustomerDetailPage() {
         const notesArray = safeArray(notesRes?.content || notesRes);
 
 
+        console.log('SET NOTES [initial load]');
+        console.log(notesArray);
+        console.log(notesArray[0]);
+        console.log(notesArray[0]?.attachments);
+        console.log(notesArray[0]?.attachments?.length);
+        if (notesArray[0]?.attachments?.[0]) {
+          console.log('ATTACHMENT KEYS', Object.keys(notesArray[0].attachments[0]));
+          console.log('FULL ATTACHMENT', notesArray[0].attachments[0]);
+        }
         setNotes(notesArray);
 
 
@@ -3961,6 +3970,15 @@ export default function CustomerDetailPage() {
 
 
 
+  }
+
+  function formatFileSize(bytes) {
+    if (!bytes) return "";
+    const units = ["B", "KB", "MB", "GB"];
+    const size = parseFloat(bytes);
+    const unitIndex = Math.floor(Math.log(size) / Math.log(1024));
+    const formattedSize = (size / Math.pow(1024, unitIndex)).toFixed(1);
+    return `${formattedSize} ${units[unitIndex]}`;
   }
 
 
@@ -6226,7 +6244,20 @@ Your request will be reviewed by the Manager/Admin before transfer.`,
 
 
 
-      await backendApi.post(`/deals/${dealId}/notes`, { title: noteTitle || "Note", text: noteText });
+      if (noteFile) {
+        const fd = new FormData();
+        fd.append("title", noteTitle || "Note");
+        fd.append("text", noteText);
+        fd.append("file", noteFile);
+        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "https://api.yashrajent.com";
+        const res = await fetch(`${backendUrl}/api/deals/${dealId}/notes`, {
+          method: "POST",
+          body: fd,
+        });
+        if (!res.ok) throw new Error(await res.text());
+      } else {
+        await backendApi.post(`/deals/${dealId}/notes`, { title: noteTitle || "Note", text: noteText });
+      }
 
 
 
@@ -6252,6 +6283,11 @@ Your request will be reviewed by the Manager/Admin before transfer.`,
       const notesArray = safeArray(notesRes?.content || notesRes);
 
 
+      console.log('SET NOTES [handleAddNote]');
+      console.log(notesArray);
+      console.log(notesArray[0]);
+      console.log(notesArray[0]?.attachments);
+      console.log(notesArray[0]?.attachments?.length);
       setNotes(notesArray);
 
 
@@ -7665,7 +7701,7 @@ Your request will be reviewed by the Manager/Admin before transfer.`,
 
 
 
-                              (Array.isArray(notes) ? notes : []).map((n) => (
+                              (Array.isArray(notes) ? notes : []).map((n) => { console.log('RENDER NOTE', n.id); console.log('ATTACHMENTS', n.attachments); console.log('COUNT', n.attachments?.length); return (
 
 
 
@@ -7711,15 +7747,51 @@ Your request will be reviewed by the Manager/Admin before transfer.`,
 
                                   <div className="mt-2 whitespace-pre-wrap text-sm text-slate-700">{n.body || n.text || ""}</div>
 
+                                  {n.attachments && n.attachments.length > 0 && (
+                                    <div className="mt-3 space-y-2">
+                                      {n.attachments.map((att, idx) => (
+                                        <div
+                                          key={idx}
+                                          className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs"
+                                        >
+                                          <PaperclipIcon />
+                                          <span className="flex-1 truncate font-medium text-slate-700">
+                                            {att.fileName || att.name || "Attachment"}
+                                          </span>
+                                          <span className="text-slate-500">
+                                            {att.fileSize ? formatFileSize(att.fileSize) : ""}
+                                          </span>
+                                          {/* <a
+                                            href={`${process.env.NEXT_PUBLIC_BACKEND_URL || "https://api.yashrajent.com"}/api/files/${att.id}`}
+                                            download={att.fileName || att.name}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="ml-2 flex items-center gap-1 rounded bg-blue-600 px-2 py-1 text-white hover:bg-blue-700"
+                                          >
+                                            <Download className="h-3 w-3" />
+                                            <span>Download</span>
+                                          </a> */}
+                                          <a
+                                            href={`${process.env.NEXT_PUBLIC_BACKEND_URL || "https://api.yashrajent.com"}/api/files/${att.id}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="ml-1 rounded border border-slate-300 bg-white px-2 py-1 text-slate-700 hover:bg-slate-100"
+                                          >
+                                            Open
+                                          </a>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
 
 
                                 </div>
 
 
 
-                              ))
+                              )}
 
-
+                            )
 
                             )}
 

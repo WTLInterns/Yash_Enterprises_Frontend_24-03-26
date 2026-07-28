@@ -22,6 +22,7 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { DepartmentDistributionChart, AttendanceChart, RoleDistributionChart } from '@/components/charts/HRMCharts';
+import writeExcelFile from 'write-excel-file/browser';
 
 export default function HRMDashboard() {
   const [userName, setUserName] = useState('');
@@ -343,60 +344,73 @@ export default function HRMDashboard() {
 
   const exportToExcel = async () => {
     try {
-      const ExcelJS = await import('exceljs');
       const { saveAs } = await import('file-saver');
       
-      const workbook = new ExcelJS.Workbook();
-      
-      // Summary Sheet
-      const summarySheet = workbook.addWorksheet('HRM Summary');
-      summarySheet.columns = [
-        { header: 'Metric', key: 'metric', width: 25 },
-        { header: 'Count', key: 'count', width: 15 }
-      ];
-      
-      summarySheet.addRows([
-        { metric: 'Total Employees', count: dashboardData.stats.totalEmployees },
-        { metric: 'Total Admins', count: dashboardData.stats.totalAdmins },
-        { metric: 'Total Managers', count: dashboardData.stats.totalManagers },
-        { metric: 'Total Team Leaders', count: dashboardData.stats.totalTLs },
-        { metric: 'Present Today', count: dashboardData.stats.presentToday },
-        { metric: 'Absent Today', count: dashboardData.stats.absentToday },
-        { metric: 'Leave Pending', count: dashboardData.stats.leavePending },
-        { metric: 'Leave Approved', count: dashboardData.stats.leaveApproved },
-        { metric: 'Leave Rejected', count: dashboardData.stats.leaveRejected }
-      ]);
-
-      // Department-wise Sheet
-      const deptSheet = workbook.addWorksheet('Department Details');
-      deptSheet.columns = [
-        { header: 'Department', key: 'dept', width: 15 },
-        { header: 'Total Employees', key: 'total', width: 15 },
-        { header: 'Team Leaders', key: 'tl', width: 12 },
-        { header: 'Managers', key: 'manager', width: 12 },
-        { header: 'Employees', key: 'employee', width: 12 },
-        { header: 'Present Today', key: 'present', width: 12 },
-        { header: 'Absent Today', key: 'absent', width: 12 },
-        { header: 'On Leave', key: 'onLeave', width: 10 }
+      // Summary Sheet data
+      const summaryData = [
+        // Header
+        [
+          { value: 'Metric', fontWeight: 'bold', textColor: '#FFFFFF', backgroundColor: '#3F51B5' },
+          { value: 'Count', fontWeight: 'bold', textColor: '#FFFFFF', backgroundColor: '#3F51B5' }
+        ],
+        // Data rows
+        ['Total Employees', dashboardData.stats.totalEmployees],
+        ['Total Admins', dashboardData.stats.totalAdmins],
+        ['Total Managers', dashboardData.stats.totalManagers],
+        ['Total Team Leaders', dashboardData.stats.totalTLs],
+        ['Present Today', dashboardData.stats.presentToday],
+        ['Absent Today', dashboardData.stats.absentToday],
+        ['Leave Pending', dashboardData.stats.leavePending],
+        ['Leave Approved', dashboardData.stats.leaveApproved],
+        ['Leave Rejected', dashboardData.stats.leaveRejected]
       ];
 
-      Object.entries(dashboardData.stats.departmentStats).forEach(([dept, stats]) => {
-        deptSheet.addRow({
+      // Department Sheet data
+      const deptData = [
+        // Header
+        [
+          { value: 'Department', fontWeight: 'bold', textColor: '#FFFFFF', backgroundColor: '#3F51B5' },
+          { value: 'Total Employees', fontWeight: 'bold', textColor: '#FFFFFF', backgroundColor: '#3F51B5' },
+          { value: 'Team Leaders', fontWeight: 'bold', textColor: '#FFFFFF', backgroundColor: '#3F51B5' },
+          { value: 'Managers', fontWeight: 'bold', textColor: '#FFFFFF', backgroundColor: '#3F51B5' },
+          { value: 'Employees', fontWeight: 'bold', textColor: '#FFFFFF', backgroundColor: '#3F51B5' },
+          { value: 'Present Today', fontWeight: 'bold', textColor: '#FFFFFF', backgroundColor: '#3F51B5' },
+          { value: 'Absent Today', fontWeight: 'bold', textColor: '#FFFFFF', backgroundColor: '#3F51B5' },
+          { value: 'On Leave', fontWeight: 'bold', textColor: '#FFFFFF', backgroundColor: '#3F51B5' }
+        ],
+        // Data rows
+        ...Object.entries(dashboardData.stats.departmentStats).map(([dept, stats]) => [
           dept,
-          total: stats.total,
-          tl: stats.tl,
-          manager: stats.manager,
-          employee: stats.employee,
-          present: stats.present,
-          absent: stats.absent,
-          onLeave: stats.onLeave
-        });
-      });
+          stats.total,
+          stats.tl,
+          stats.manager,
+          stats.employee,
+          stats.present,
+          stats.absent,
+          stats.onLeave
+        ])
+      ];
 
-      const buffer = await workbook.xlsx.writeBuffer();
-      const blob = new Blob([buffer], {
-        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-      });
+      const summaryColumns = [{ width: 25 }, { width: 15 }];
+      const deptColumns = [
+        { width: 15 },
+        { width: 15 },
+        { width: 12 },
+        { width: 12 },
+        { width: 12 },
+        { width: 12 },
+        { width: 12 },
+        { width: 10 }
+      ];
+
+      // Create multi-sheet workbook
+      const blob = await writeExcelFile(
+        [summaryData, deptData],
+        {
+          sheets: ['HRM Summary', 'Department Details'],
+          columns: [summaryColumns, deptColumns]
+        }
+      );
       
       const today = new Date().toISOString().split('T')[0];
       saveAs(blob, `HRM_Dashboard_Report_${today}.xlsx`);

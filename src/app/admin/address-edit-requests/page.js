@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { toast } from "react-hot-toast";
+import { toast } from "react-toastify";
 import { useCustomerAddressSync } from "@/context/CustomerAddressContext";
 import { useDepartmentGuard } from "@/hooks/useDepartmentGuard";
 import { getAuthUser } from "@/utils/authUser";

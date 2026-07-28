@@ -16,7 +16,7 @@ import {
   ChevronLeft,
   ChevronRight
 } from 'lucide-react';
-import ExcelJS from "exceljs";
+import writeExcelFile from 'write-excel-file/browser';
 import { saveAs } from "file-saver";
 
 const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api.yashrajent.com';
@@ -312,32 +312,50 @@ export default function ExpenseOverviewPage() {
   }
 
   async function downloadTemplate() {
-    const workbook = new ExcelJS.Workbook();
-    const ws = workbook.addWorksheet('Expenses');
-    ws.columns = [
-      { header: 'Employee Name',             key: 'employeeName',   width: 22 },
-      { header: 'Deal Code (PPE1/PPO2/…)',   key: 'dealCode',       width: 20 },
-      { header: 'Client Name (if no Deal)',  key: 'clientName',     width: 22 },
-      { header: 'Department (PPE/PPO/…)',   key: 'department',     width: 22 },
-      { header: 'Stage Code (DOP/PPS/…)',   key: 'stageCode',      width: 20 },
-      { header: 'Category',                  key: 'category',       width: 18 },
-      { header: 'Description',               key: 'description',    width: 30 },
-      { header: 'Amount',                    key: 'amount',         width: 15 },
-      { header: 'Expense Date (YYYY-MM-DD)', key: 'expenseDate',    width: 25 },
-      { header: 'Status',                    key: 'status',         width: 15 },
+    const data = [
+      // Header row
+      [
+        { value: 'Employee Name', fontWeight: 'bold', textColor: '#FFFFFF', backgroundColor: '#3F51B5' },
+        { value: 'Deal Code (PPE1/PPO2/…)', fontWeight: 'bold', textColor: '#FFFFFF', backgroundColor: '#3F51B5' },
+        { value: 'Client Name (if no Deal)', fontWeight: 'bold', textColor: '#FFFFFF', backgroundColor: '#3F51B5' },
+        { value: 'Department (PPE/PPO/…)', fontWeight: 'bold', textColor: '#FFFFFF', backgroundColor: '#3F51B5' },
+        { value: 'Stage Code (DOP/PPS/…)', fontWeight: 'bold', textColor: '#FFFFFF', backgroundColor: '#3F51B5' },
+        { value: 'Category', fontWeight: 'bold', textColor: '#FFFFFF', backgroundColor: '#3F51B5' },
+        { value: 'Description', fontWeight: 'bold', textColor: '#FFFFFF', backgroundColor: '#3F51B5' },
+        { value: 'Amount', fontWeight: 'bold', textColor: '#FFFFFF', backgroundColor: '#3F51B5' },
+        { value: 'Expense Date (YYYY-MM-DD)', fontWeight: 'bold', textColor: '#FFFFFF', backgroundColor: '#3F51B5' },
+        { value: 'Status', fontWeight: 'bold', textColor: '#FFFFFF', backgroundColor: '#3F51B5' },
+      ],
+      // Example row
+      [
+        'John Doe',
+        'PPE1',
+        '',
+        '',
+        '',
+        'Travel',
+        'Client visit',
+        500,
+        '2024-01-15',
+        'PENDING'
+      ]
     ];
-    ws.getRow(1).eachCell(cell => {
-      cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF3F51B5' } };
-    });
-    ws.addRow({
-      employeeName: 'John Doe', dealCode: 'PPE1', clientName: '',
-      department: '', stageCode: '',
-      category: 'Travel', description: 'Client visit',
-      amount: 500, expenseDate: '2024-01-15', status: 'PENDING'
-    });
-    const buffer = await workbook.xlsx.writeBuffer();
-    saveAs(new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), 'expenses-template.xlsx');
+
+    const columns = [
+      { width: 22 },
+      { width: 20 },
+      { width: 22 },
+      { width: 22 },
+      { width: 20 },
+      { width: 18 },
+      { width: 30 },
+      { width: 15 },
+      { width: 25 },
+      { width: 15 },
+    ];
+
+    const blob = await writeExcelFile(data, { columns });
+    saveAs(blob, 'expenses-template.xlsx');
   }
 
   async function handleDelete(id) {
@@ -367,10 +385,17 @@ export default function ExpenseOverviewPage() {
   }
 
   const STATUS_COLORS = {
-    PENDING:  { argb: 'FFFFF9C4' }, // yellow
-    APPROVED: { argb: 'FFC8E6C9' }, // green
-    PAID:     { argb: 'FFC8E6C9' }, // green
-    REJECTED: { argb: 'FFFFCDD2' }, // red
+    PENDING:  '#FFF9C4', // yellow
+    APPROVED: '#C8E6C9', // green
+    PAID:     '#C8E6C9', // green
+    REJECTED: '#FFCDD2', // red
+  };
+
+  const STATUS_TEXT_COLORS = {
+    PENDING:  '#795548',
+    APPROVED: '#1B5E20',
+    PAID:     '#1B5E20',
+    REJECTED: '#B71C1C',
   };
 
   async function exportExcel() {
@@ -386,167 +411,57 @@ export default function ExpenseOverviewPage() {
       rows = rows.filter(e => e.expenseDate && e.expenseDate <= exportToDate);
     }
 
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet('Expenses');
+    // Sort by employee name, then by date
+    rows.sort((a, b) => {
+      const empCompare = (a.employeeName || '').localeCompare(b.employeeName || '');
+      if (empCompare !== 0) return empCompare;
+      return (a.expenseDate || '').localeCompare(b.expenseDate || '');
+    });
 
-    worksheet.columns = [
-      { header: 'Employee Name',    key: 'employeeName',    width: 22 },
-      { header: 'Client Name',      key: 'clientName',      width: 20 },
-      { header: 'Department',       key: 'departmentName',  width: 18 },
-      { header: 'Category',         key: 'category',        width: 18 },
-      { header: 'Description',      key: 'description',     width: 30 },
-      { header: 'Amount (₹)',       key: 'amount',          width: 15 },
-      { header: 'Date',             key: 'expenseDate',     width: 18 },
-      { header: 'Status',           key: 'status',          width: 14 },
-      { header: 'Rejection Reason', key: 'rejectionReason', width: 30 },
+    // Build data array
+    const data = [
+      // Header row
+      [
+        { value: 'Employee Name', fontWeight: 'bold', textColor: '#FFFFFF', backgroundColor: '#3F51B5', align: 'center' },
+        { value: 'Client Name', fontWeight: 'bold', textColor: '#FFFFFF', backgroundColor: '#3F51B5', align: 'center' },
+        { value: 'Department', fontWeight: 'bold', textColor: '#FFFFFF', backgroundColor: '#3F51B5', align: 'center' },
+        { value: 'Category', fontWeight: 'bold', textColor: '#FFFFFF', backgroundColor: '#3F51B5', align: 'center' },
+        { value: 'Description', fontWeight: 'bold', textColor: '#FFFFFF', backgroundColor: '#3F51B5', align: 'center' },
+        { value: 'Amount (₹)', fontWeight: 'bold', textColor: '#FFFFFF', backgroundColor: '#3F51B5', align: 'center' },
+        { value: 'Date', fontWeight: 'bold', textColor: '#FFFFFF', backgroundColor: '#3F51B5', align: 'center' },
+        { value: 'Status', fontWeight: 'bold', textColor: '#FFFFFF', backgroundColor: '#3F51B5', align: 'center' },
+        { value: 'Rejection Reason', fontWeight: 'bold', textColor: '#FFFFFF', backgroundColor: '#3F51B5', align: 'center' },
+      ],
+      // Data rows
+      ...rows.map(expense => [
+        expense.employeeName || '',
+        expense.clientName || '',
+        expense.departmentName || '',
+        expense.category || '',
+        expense.description || '',
+        expense.amount || 0,
+        expense.expenseDate || '',
+        { 
+          value: expense.status || '',
+          backgroundColor: STATUS_COLORS[expense.status],
+          textColor: STATUS_TEXT_COLORS[expense.status],
+          fontWeight: 'bold'
+        },
+        expense.rejectionReason || '',
+      ])
     ];
 
-    // Style header row
-    worksheet.getRow(1).eachCell(cell => {
-      cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF3F51B5' } };
-      cell.alignment = { vertical: 'middle', horizontal: 'center' };
-    });
-
-    // Group by employee name, sort each group by date
-    const grouped = {};
-    rows.forEach(e => {
-      const key = e.employeeName || 'Unknown';
-      if (!grouped[key]) grouped[key] = [];
-      grouped[key].push(e);
-    });
-    const empNames = Object.keys(grouped).sort((a, b) => a.localeCompare(b));
-    const summaryMap = {};
-
-    empNames.forEach(empName => {
-      const empRows = grouped[empName].slice().sort((a, b) =>
-        (a.expenseDate || '').localeCompare(b.expenseDate || '')
-      );
-
-      // Blue employee name banner row
-      const empHeaderRow = worksheet.addRow([`👤  ${empName}`, '', '', '', '', '', '', '', '']);
-      worksheet.mergeCells(`A${empHeaderRow.number}:I${empHeaderRow.number}`);
-      empHeaderRow.getCell(1).font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
-      empHeaderRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1565C0' } };
-      empHeaderRow.getCell(1).alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
-      empHeaderRow.height = 20;
-
-      // Data rows sorted by date
-      empRows.forEach(expense => {
-        const row = worksheet.addRow({
-          employeeName:    expense.employeeName    || '',
-          clientName:      expense.clientName      || '',
-          departmentName:  expense.departmentName  || '',
-          category:        expense.category        || '',
-          description:     expense.description     || '',
-          amount:          expense.amount          || 0,
-          expenseDate:     expense.expenseDate     || '',
-          status:          expense.status          || '',
-          rejectionReason: expense.rejectionReason || '',
-        });
-        const fillColor = STATUS_COLORS[expense.status];
-        if (fillColor) {
-          const statusCell = row.getCell(8);
-          statusCell.fill = { type: 'pattern', pattern: 'solid', fgColor: fillColor };
-          statusCell.font = {
-            bold: true,
-            color: {
-              argb: expense.status === 'PENDING'  ? 'FF795548' :
-                    expense.status === 'REJECTED' ? 'FFB71C1C' : 'FF1B5E20'
-            }
-          };
-        }
-      });
-
-      // Per-employee subtotal row
-      const totalAmt    = empRows.reduce((s, e) => s + (Number(e.amount) || 0), 0);
-      const pending     = empRows.filter(e => e.status === 'PENDING').length;
-      const paid        = empRows.filter(e => e.status === 'PAID' || e.status === 'APPROVED').length;
-      const rejected    = empRows.filter(e => e.status === 'REJECTED').length;
-      const pendingAmt  = empRows.filter(e => e.status === 'PENDING').reduce((s, e) => s + (Number(e.amount) || 0), 0);
-      const paidAmt     = empRows.filter(e => e.status === 'PAID' || e.status === 'APPROVED').reduce((s, e) => s + (Number(e.amount) || 0), 0);
-      const rejectedAmt = empRows.filter(e => e.status === 'REJECTED').reduce((s, e) => s + (Number(e.amount) || 0), 0);
-      summaryMap[empName] = { pending, paid, rejected, pendingAmt, paidAmt, rejectedAmt };
-
-      const subtotalRow = worksheet.addRow([
-        `Subtotal — ${empName}`, '', '', '',
-        `${empRows.length} expense(s)`,
-        totalAmt, '',
-        `P:${pending}  ✓:${paid}  ✗:${rejected}`, '',
-      ]);
-      subtotalRow.eachCell(cell => {
-        cell.font = { bold: true, italic: true, color: { argb: 'FF1A237E' } };
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8EAF6' } };
-      });
-      subtotalRow.getCell(6).numFmt = '#,##0.00';
-
-      worksheet.addRow([]); // blank separator between employees
-    });
-
-    // Employee-wise summary section at the bottom
-    if (empNames.length > 0) {
-      worksheet.addRow([]);
-      worksheet.getColumn(10).width = 22;
-      worksheet.getColumn(11).width = 26;
-
-      const summaryHeaderRow = worksheet.addRow([
-        'EMPLOYEE-WISE SUMMARY', '', '', '', '',
-        'Pending Count', 'Pending Amount (₹)',
-        'Paid/Approved Count', 'Paid/Approved Amount (₹)',
-        'Rejected Count', 'Rejected Amount (₹)',
-      ]);
-      summaryHeaderRow.eachCell(cell => {
-        cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF37474F' } };
-        cell.alignment = { vertical: 'middle', horizontal: 'center' };
-      });
-
-      empNames.forEach(name => {
-        const s = summaryMap[name];
-        const dataRow = worksheet.addRow([
-          name, '', '', '', '',
-          s.pending, s.pendingAmt,
-          s.paid,    s.paidAmt,
-          s.rejected, s.rejectedAmt,
-        ]);
-        dataRow.getCell(1).font = { bold: true };
-        [6, 7].forEach(col => {
-          dataRow.getCell(col).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF9C4' } };
-          dataRow.getCell(col).font = { color: { argb: 'FF795548' }, bold: true };
-          dataRow.getCell(col).alignment = { horizontal: 'center' };
-        });
-        [8, 9].forEach(col => {
-          dataRow.getCell(col).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFC8E6C9' } };
-          dataRow.getCell(col).font = { color: { argb: 'FF1B5E20' }, bold: true };
-          dataRow.getCell(col).alignment = { horizontal: 'center' };
-        });
-        [10, 11].forEach(col => {
-          dataRow.getCell(col).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFCDD2' } };
-          dataRow.getCell(col).font = { color: { argb: 'FFB71C1C' }, bold: true };
-          dataRow.getCell(col).alignment = { horizontal: 'center' };
-        });
-      });
-
-      const totals = empNames.reduce((acc, name) => {
-        const s = summaryMap[name];
-        acc.pending += s.pending; acc.pendingAmt += s.pendingAmt;
-        acc.paid    += s.paid;    acc.paidAmt    += s.paidAmt;
-        acc.rejected += s.rejected; acc.rejectedAmt += s.rejectedAmt;
-        return acc;
-      }, { pending: 0, pendingAmt: 0, paid: 0, paidAmt: 0, rejected: 0, rejectedAmt: 0 });
-
-      const totalRow = worksheet.addRow([
-        'GRAND TOTAL', '', '', '', '',
-        totals.pending, totals.pendingAmt,
-        totals.paid,    totals.paidAmt,
-        totals.rejected, totals.rejectedAmt,
-      ]);
-      totalRow.eachCell(cell => {
-        cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1A237E' } };
-        cell.alignment = { horizontal: 'center' };
-      });
-    }
+    const columns = [
+      { width: 22 },
+      { width: 20 },
+      { width: 18 },
+      { width: 18 },
+      { width: 30 },
+      { width: 15 },
+      { width: 18 },
+      { width: 14 },
+      { width: 30 },
+    ];
 
     // Filename: employee name + date range
     const empLabel = exportType === 'employee' && exportEmployeeId
@@ -554,11 +469,8 @@ export default function ExpenseOverviewPage() {
       : 'all';
     const dateLabel = `${exportFromDate || 'start'}_to_${exportToDate || 'end'}`;
 
-    const buffer = await workbook.xlsx.writeBuffer();
-    saveAs(
-      new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }),
-      `expenses_${empLabel}_${dateLabel}.xlsx`
-    );
+    const blob = await writeExcelFile(data, { columns });
+    saveAs(blob, `expenses_${empLabel}_${dateLabel}.xlsx`);
     setShowExportModal(false);
   }
 
